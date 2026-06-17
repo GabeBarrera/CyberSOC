@@ -1,0 +1,2299 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>CyberSOC // All-Domain Operations</title>
+<meta name="description" content="CyberSOC â€” mobile cyber deck and SOC operations console." />
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+<!-- Leaflet (dark map) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+<style>
+/* ===================================================================
+   CyberSOC â€” modern minimalist cyberpunk SOC console
+   Base: near-black warm Â· Accent: magenta #ff2d6f
+   Status: green / amber / red Â· Type: IBM Plex Mono + Sans
+   =================================================================== */
+
+:root {
+  --bg:        #0a0608;
+  --bg-1:      #0e0a0d;
+  --bg-2:      #130d11;
+  --panel:     #100b0f;
+  --line:      rgba(255, 45, 111, 0.16);
+  --line-soft: rgba(255, 255, 255, 0.06);
+
+  --accent:      #ff2d6f;
+  --accent-dim:  #7a1538;
+  --accent-glow: rgba(255, 45, 111, 0.45);
+
+  --txt:    #ece2e7;
+  --txt-mut:#8d7f86;
+  --txt-dim:#5c5158;
+
+  --op:  #2ee36a;   /* operational */
+  --deg: #f5a623;   /* degraded   */
+  --out: #ff3b3b;   /* outage     */
+
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'IBM Plex Sans', system-ui, sans-serif;
+
+  --nav-h: 52px;
+  --ticker-h: 30px;
+  --top-h: calc(var(--nav-h) + var(--ticker-h));
+  --panel-w: 360px;
+}
+
+/* ===================== LIGHT THEME ===================== */
+:root[data-theme="light"] {
+  --bg:        #eceef3;
+  --bg-1:      #e2e5ec;
+  --bg-2:      #d6dae3;
+  --panel:     #f5f6f9;
+  --line:      rgba(255, 45, 111, 0.24);
+  --line-soft: rgba(26, 24, 34, 0.10);
+  --txt:    #1a1822;
+  --txt-mut:#585360;
+  --txt-dim:#8c8794;
+  --op:  #138a3e;
+  --deg: #b97400;
+  --out: #d12b2b;
+}
+:root.no-ticker { --ticker-h: 0px; }
+:root.reduce-motion .ticker-track,
+:root.reduce-motion .log-scanline,
+:root.reduce-motion .ns-live,
+:root.reduce-motion .region-marker.pinging .rm-ping { animation: none !important; }
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; height: 100%; width: 100%;
+  background: var(--bg);
+  color: var(--txt);
+  font-family: var(--sans);
+  overflow: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+body { position: relative; }
+
+::selection { background: var(--accent); color: #0a0608; }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--accent-dim); border-radius: 0; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ===================== TOP NAV ===================== */
+.topnav {
+  position: fixed; top: 0; left: 0; right: 0; height: var(--nav-h);
+  z-index: 1200;
+  display: flex; align-items: center; gap: 18px;
+  padding: 0 16px;
+  background: linear-gradient(180deg, #120c10 0%, #0c080b 100%);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 1px 0 rgba(255,45,111,0.08), 0 8px 24px rgba(0,0,0,0.6);
+}
+.brand { display: flex; align-items: baseline; gap: 9px; }
+.brand-glyph { color: var(--accent); font-size: 13px; transform: translateY(1px); text-shadow: 0 0 10px var(--accent-glow); }
+.brand-name { font-family: var(--sans); font-weight: 700; font-size: 16px; letter-spacing: .5px; }
+.brand-accent { color: var(--accent); }
+.brand-sub { font-family: var(--mono); font-size: 9px; letter-spacing: 2.5px; color: var(--txt-dim); border-left: 1px solid var(--line); padding-left: 9px; }
+
+.nav-views { display: flex; gap: 4px; margin-left: 6px; }
+.nav-btn {
+  appearance: none; background: transparent; border: none; cursor: pointer;
+  font-family: var(--mono); font-size: 12px; font-weight: 500; letter-spacing: 2px;
+  color: var(--txt-mut); padding: 8px 16px; position: relative;
+  transition: color .18s ease;
+}
+.nav-btn::after {
+  content: ""; position: absolute; left: 16px; right: 16px; bottom: 4px; height: 2px;
+  background: var(--accent); transform: scaleX(0); transform-origin: left;
+  transition: transform .22s ease; box-shadow: 0 0 8px var(--accent-glow);
+}
+.nav-btn:hover { color: var(--txt); }
+.nav-btn.is-active { color: var(--accent); }
+.nav-btn.is-active::after { transform: scaleX(1); }
+
+.nav-status { margin-left: auto; display: flex; align-items: center; gap: 18px; font-family: var(--mono); font-size: 11px; color: var(--txt-mut); }
+.ns-item { display: flex; align-items: center; gap: 7px; letter-spacing: 1px; }
+.ns-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--op); box-shadow: 0 0 8px var(--op); }
+.ns-live { animation: blink 2.4s infinite; }
+@keyframes blink { 0%,100%{opacity:1;} 50%{opacity:.35;} }
+#nav-clock { color: var(--txt); }
+
+/* ===================== VIEWS ===================== */
+.view { position: fixed; inset: var(--top-h) 0 0 0; display: none; }
+.view.is-active { display: block; }
+
+/* ===================== TICKER ===================== */
+.ticker {
+  position: fixed; top: var(--nav-h); left: 0; right: 0; height: var(--ticker-h);
+  z-index: 1100; display: flex; align-items: stretch; overflow: hidden;
+  background: linear-gradient(180deg, #0c080b, #08060a);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--mono);
+}
+:root[data-theme="light"] .ticker { background: linear-gradient(180deg, #f3f4f8, #e8eaf0); }
+:root.no-ticker .ticker { display: none; }
+.ticker-label {
+  flex-shrink: 0; display: flex; align-items: center; gap: 7px; padding: 0 14px;
+  background: var(--accent); color: #0a0608; font-weight: 600; font-size: 10px; letter-spacing: 2px; z-index: 2;
+  box-shadow: 4px 0 14px rgba(0,0,0,.4);
+}
+.ticker-label .tl-pulse { width: 7px; height: 7px; border-radius: 50%; background: #0a0608; animation: blink 1.8s infinite; }
+.ticker-viewport { position: relative; flex: 1; overflow: hidden; }
+.ticker-track {
+  position: absolute; top: 0; left: 0; height: 100%;
+  display: flex; align-items: center; white-space: nowrap; will-change: transform;
+  animation: ticker-scroll var(--ticker-dur, 48s) linear infinite;
+}
+.ticker-track:hover { animation-play-state: paused; }
+@keyframes ticker-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.tk-item { display: inline-flex; align-items: center; gap: 8px; padding: 0 18px; height: 100%; border-right: 1px solid var(--line-soft); }
+.tk-dot { width: 7px; height: 7px; transform: rotate(45deg); flex-shrink: 0; box-shadow: 0 0 6px currentColor; }
+.tk-name { color: var(--txt); font-size: 11px; }
+.tk-status { font-size: 9px; letter-spacing: 1px; }
+.tk-src { color: var(--txt-dim); font-size: 9px; letter-spacing: 1px; border: 1px solid var(--line-soft); padding: 1px 4px; }
+.tk-allgood { color: var(--op); font-size: 11px; letter-spacing: 2px; padding: 0 22px; }
+
+/* ===================== MAP + RADAR ===================== */
+#map { position: absolute; inset: 0; background: #060406; z-index: 1; }
+.leaflet-container { background: #060406; font-family: var(--mono); }
+.leaflet-control-attribution { background: rgba(8,5,7,.7) !important; color: var(--txt-dim) !important; font-size: 9px !important; }
+.leaflet-control-attribution a { color: var(--txt-mut) !important; }
+.leaflet-control-zoom { border: 1px solid var(--line) !important; margin: 14px !important; }
+.leaflet-control-zoom a { background: #100b0f !important; color: var(--accent) !important; border-bottom: 1px solid var(--line) !important; }
+.leaflet-control-zoom a:hover { background: #1a1014 !important; }
+
+#radar { position: absolute; inset: 0; z-index: 400; pointer-events: none; overflow: hidden; }
+#radar-sweep {
+  position: absolute; width: 320vmax; height: 320vmax;
+  left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(0deg);
+  border-radius: 50%;
+  background: conic-gradient(from 0deg,
+    rgba(255,45,111,0) 0deg,
+    rgba(255,45,111,0) 300deg,
+    rgba(255,45,111,0.02) 330deg,
+    rgba(255,45,111,0.14) 356deg,
+    rgba(255,45,111,0.55) 360deg);
+  will-change: transform;
+}
+#radar-sweep::after {
+  content: ""; position: absolute; left: 50%; top: 0; width: 1px; height: 50%;
+  background: linear-gradient(180deg, rgba(255,45,111,0) 0%, var(--accent) 100%);
+  transform-origin: bottom center; box-shadow: 0 0 6px var(--accent-glow);
+}
+#radar-rings { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); }
+.radar-ring {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+  border: 1px solid rgba(255,45,111,0.10); border-radius: 50%;
+}
+#radar-home {
+  position: absolute; width: 12px; height: 12px; left: 50%; top: 50%;
+  transform: translate(-50%,-50%); border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 0 3px rgba(255,45,111,0.18), 0 0 16px var(--accent-glow);
+}
+#radar-home::before, #radar-home::after {
+  content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+  border: 1px solid var(--accent); border-radius: 50%; opacity: .5;
+}
+#radar-home::before { width: 22px; height: 22px; }
+#radar-home::after { width: 34px; height: 34px; opacity: .25; }
+
+/* region markers */
+.region-marker { position: relative; width: 14px; height: 14px; }
+.rm-dot {
+  position: absolute; left: 50%; top: 50%; width: 8px; height: 8px;
+  transform: translate(-50%,-50%) rotate(45deg);
+  background: var(--op); box-shadow: 0 0 8px currentColor;
+}
+.region-marker.status-operational .rm-dot { background: var(--op); color: var(--op); }
+.region-marker.status-degraded   .rm-dot { background: var(--deg); color: var(--deg); }
+.region-marker.status-outage      .rm-dot { background: var(--out); color: var(--out); }
+.rm-ping {
+  position: absolute; left: 50%; top: 50%; width: 8px; height: 8px;
+  transform: translate(-50%,-50%) rotate(45deg);
+  border: 1px solid currentColor; opacity: 0;
+}
+.region-marker.status-operational .rm-ping { color: var(--op); }
+.region-marker.status-degraded   .rm-ping { color: var(--deg); }
+.region-marker.status-outage      .rm-ping { color: var(--out); }
+.region-marker.pinging .rm-ping { animation: ping 1.4s cubic-bezier(.2,.6,.3,1) forwards; }
+@keyframes ping {
+  0%   { opacity: .9; transform: translate(-50%,-50%) rotate(45deg) scale(1); }
+  100% { opacity: 0;  transform: translate(-50%,-50%) rotate(45deg) scale(7); }
+}
+.region-popup .leaflet-popup-content-wrapper { background: #100b0f; color: var(--txt); border: 1px solid var(--line); border-radius: 2px; box-shadow: 0 8px 30px rgba(0,0,0,.7); }
+.region-popup .leaflet-popup-tip { background: #100b0f; border-left: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.region-popup .leaflet-popup-content { margin: 12px 14px; font-family: var(--mono); }
+.rp-name { font-weight: 600; font-size: 13px; letter-spacing: .5px; }
+.rp-meta { font-size: 10px; color: var(--txt-mut); margin-top: 4px; letter-spacing: 1px; }
+.rp-status { display: inline-block; margin-top: 8px; font-size: 10px; letter-spacing: 2px; padding: 2px 8px; border: 1px solid currentColor; }
+
+/* ===================== HUD READOUT ===================== */
+.hud-readout {
+  position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
+  z-index: 500; text-align: center; pointer-events: none;
+  background: rgba(10,6,8,0.55); backdrop-filter: blur(6px);
+  border: 1px solid var(--line); padding: 10px 22px;
+}
+.hud-title { font-family: var(--mono); font-size: 11px; letter-spacing: 4px; color: var(--txt-mut); }
+.hud-metrics { display: flex; gap: 26px; margin: 8px 0 6px; justify-content: center; }
+.metric { display: flex; flex-direction: column; align-items: center; }
+.metric-num { font-family: var(--mono); font-size: 22px; font-weight: 600; line-height: 1; }
+.metric-lbl { font-family: var(--mono); font-size: 8px; letter-spacing: 2px; margin-top: 4px; }
+.met-op  { color: var(--op); }  #m-op  { color: var(--op); }
+.met-deg { color: var(--deg); } #m-deg { color: var(--deg); }
+.met-out { color: var(--out); } #m-out { color: var(--out); }
+.hud-sync { font-family: var(--mono); font-size: 9px; letter-spacing: 1.5px; color: var(--txt-dim); }
+
+/* ===================== SIDE PANELS ===================== */
+.side-panel { position: absolute; top: 0; bottom: 0; width: var(--panel-w); max-width: 86vw; z-index: 800; }
+.side-panel.left  { left: 0;  transform: translateX(-100%); transition: transform .32s cubic-bezier(.4,0,.2,1); }
+.side-panel.right { right: 0; transform: translateX(100%);  transition: transform .32s cubic-bezier(.4,0,.2,1); }
+.side-panel.open { transform: translateX(0); }
+
+.panel-inner {
+  position: absolute; inset: 0; background: var(--panel);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.side-panel.left  .panel-inner { border-right: 1px solid var(--line); box-shadow: 14px 0 40px rgba(0,0,0,.55); }
+.side-panel.right .panel-inner { border-left: 1px solid var(--line);  box-shadow: -14px 0 40px rgba(0,0,0,.55); }
+
+.pull-tab {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  background: var(--panel); border: 1px solid var(--line);
+  color: var(--accent); cursor: pointer; z-index: 2;
+  width: 34px; min-height: 120px; padding: 14px 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+}
+.pull-tab.left  { right: -34px; border-left: none;  border-radius: 0 4px 4px 0; box-shadow: 6px 0 18px rgba(0,0,0,.5); }
+.pull-tab.right { left: -34px;  border-right: none; border-radius: 4px 0 0 4px; box-shadow: -6px 0 18px rgba(0,0,0,.5); }
+.tab-label { writing-mode: vertical-rl; text-orientation: mixed; font-family: var(--mono); font-size: 11px; letter-spacing: 3px; }
+.pull-tab.right .tab-label { transform: rotate(180deg); }
+.tab-badge { font-family: var(--mono); font-size: 10px; background: var(--accent); color: #0a0608; padding: 1px 5px; border-radius: 2px; min-width: 16px; text-align: center; }
+.tab-badge.zero { background: var(--bg-2); color: var(--txt-dim); }
+.tab-caret { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+
+.panel-head { padding: 16px 18px 12px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+.panel-head h2 { margin: 0; font-family: var(--mono); font-size: 13px; letter-spacing: 3px; color: var(--txt); }
+.panel-sub { font-family: var(--mono); font-size: 9px; letter-spacing: 2px; color: var(--txt-dim); }
+
+/* ===================== ALERT FEED ===================== */
+.alert-list { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.alert-card { border: 1px solid var(--line-soft); border-left-width: 3px; background: var(--bg-1); padding: 11px 12px; }
+.alert-card.sev-degraded { border-left-color: var(--deg); }
+.alert-card.sev-outage   { border-left-color: var(--out); }
+.alert-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.alert-sev { font-family: var(--mono); font-size: 9px; letter-spacing: 2px; padding: 2px 7px; }
+.sev-degraded .alert-sev { color: var(--deg); border: 1px solid var(--deg); }
+.sev-outage   .alert-sev { color: var(--out); border: 1px solid var(--out); }
+.alert-time { font-family: var(--mono); font-size: 9px; color: var(--txt-dim); }
+.alert-region { font-family: var(--sans); font-weight: 600; font-size: 13px; }
+.alert-svc { font-family: var(--mono); font-size: 10px; color: var(--accent); letter-spacing: 1px; margin: 2px 0 5px; }
+.alert-msg { font-size: 12px; color: var(--txt-mut); line-height: 1.45; }
+.alert-empty { text-align: center; color: var(--op); font-family: var(--mono); font-size: 11px; letter-spacing: 2px; margin-top: 40px; }
+
+/* ===================== CLI ===================== */
+.cli-out { flex: 1; overflow-y: auto; padding: 14px; font-family: var(--mono); font-size: 12px; line-height: 1.55; }
+.cli-line { white-space: pre-wrap; word-break: break-word; }
+.cli-line.cmd { color: var(--txt); }
+.cli-line.cmd .ci-prompt { color: var(--accent); }
+.cli-line.sys { color: var(--txt-mut); }
+.cli-line.ok  { color: var(--op); }
+.cli-line.warn{ color: var(--deg); }
+.cli-line.err { color: var(--out); }
+.cli-line.head{ color: var(--accent); letter-spacing: 1px; }
+.cli-input-row { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--line); flex-shrink: 0; background: var(--bg-1); }
+.cli-prompt { font-family: var(--mono); font-size: 12px; color: var(--accent); white-space: nowrap; }
+.cli-tilde { color: var(--txt-mut); }
+.cli-input { flex: 1; background: transparent; border: none; outline: none; color: var(--txt); font-family: var(--mono); font-size: 12px; caret-color: var(--accent); }
+
+/* ===================== DOSSIER ===================== */
+#view-dossier { background:
+  radial-gradient(1200px 600px at 70% -10%, rgba(255,45,111,0.06), transparent 60%),
+  repeating-linear-gradient(0deg, transparent 0 38px, rgba(255,255,255,0.012) 38px 39px),
+  var(--bg); }
+
+.dossier-stage { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.case-track { width: min(760px, 92vw); height: min(78vh, 720px); position: relative; }
+
+.swipe-nav {
+  position: absolute; top: 50%; transform: translateY(-50%); z-index: 30;
+  width: 46px; height: 46px; border-radius: 50%; cursor: pointer;
+  background: rgba(16,11,15,.8); border: 1px solid var(--line); color: var(--accent);
+  font-size: 24px; line-height: 1; display: flex; align-items: center; justify-content: center;
+  transition: background .18s, box-shadow .18s;
+}
+.swipe-nav:hover { background: #1a1014; box-shadow: 0 0 18px var(--accent-glow); }
+.swipe-nav.prev { left: max(20px, 4vw); }
+.swipe-nav.next { right: max(20px, 4vw); }
+.swipe-hint { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); font-family: var(--mono); font-size: 10px; letter-spacing: 3px; color: var(--txt-dim); pointer-events: none; white-space: nowrap; }
+
+/* case card */
+.case-card {
+  position: absolute; inset: 0; background: linear-gradient(180deg, #100b0f, #0c080b);
+  border: 1px solid var(--line); box-shadow: 0 24px 70px rgba(0,0,0,.6);
+  display: grid; grid-template-columns: 240px 1fr; overflow: hidden;
+}
+.case-card.swiping { transition: none; }
+.case-card.slide-anim { transition: transform .28s ease, opacity .28s ease; }
+
+.cc-stamp { position: absolute; top: 30px; left: 26px; z-index: 6; font-family: var(--mono); font-size: 12px; letter-spacing: 3px; color: var(--out); border: 2px solid var(--out); padding: 5px 11px; transform: rotate(-9deg); opacity: .82; background: rgba(10,6,8,.35); pointer-events: none; }
+.cc-left { border-right: 1px solid var(--line); padding: 20px; display: flex; flex-direction: column; gap: 14px; background: rgba(255,255,255,0.015); }
+.cc-photo { width: 100%; aspect-ratio: 3/4; border: 1px solid var(--line); position: relative; overflow: hidden; background: #0a0608; }
+.cc-photo img { width: 100%; height: 100%; object-fit: cover; filter: grayscale(.25) contrast(1.05); }
+.cc-photo .ph-empty {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center;
+  background: repeating-linear-gradient(45deg, #0c080b 0 9px, #110c10 9px 18px);
+  color: var(--txt-dim); font-family: var(--mono); font-size: 10px; letter-spacing: 2px;
+}
+.cc-photo .ph-corner { position: absolute; width: 14px; height: 14px; border: 2px solid var(--accent); }
+.ph-corner.tl { top: 6px; left: 6px; border-right: none; border-bottom: none; }
+.ph-corner.tr { top: 6px; right: 6px; border-left: none; border-bottom: none; }
+.ph-corner.bl { bottom: 6px; left: 6px; border-right: none; border-top: none; }
+.ph-corner.br { bottom: 6px; right: 6px; border-left: none; border-top: none; }
+
+.cc-badges { display: flex; flex-direction: column; gap: 8px; }
+.cc-badge { font-family: var(--mono); font-size: 10px; letter-spacing: 1.5px; padding: 7px 10px; border: 1px solid var(--line-soft); display: flex; justify-content: space-between; }
+.cc-badge .b-lbl { color: var(--txt-dim); }
+.cc-badge .b-val { color: var(--txt); font-weight: 500; }
+.threat-LOW    { color: var(--op);  border-color: var(--op) !important; }
+.threat-GUARDED{ color: #8fd14f; }
+.threat-ELEVATED{ color: var(--deg); }
+.threat-HIGH   { color: #ff7a3d; }
+.threat-SEVERE { color: var(--out); border-color: var(--out) !important; }
+
+.cc-right { padding: 22px 26px 64px; display: flex; flex-direction: column; overflow-y: auto; }
+.cc-filehdr { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+.cc-fileno { font-family: var(--mono); font-size: 10px; letter-spacing: 2px; color: var(--accent); }
+.cc-class { font-family: var(--mono); font-size: 9px; letter-spacing: 2px; color: var(--out); border: 1px solid var(--out); padding: 2px 7px; }
+.cc-name { font-family: var(--sans); font-size: 30px; font-weight: 700; line-height: 1.05; margin: 16px 0 2px; }
+.cc-alias { font-family: var(--mono); font-size: 12px; color: var(--accent); letter-spacing: 1px; margin-bottom: 18px; }
+.cc-alias:empty { display: none; }
+
+.cc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 22px; margin-bottom: 18px; }
+.cc-field .f-lbl { font-family: var(--mono); font-size: 9px; letter-spacing: 2px; color: var(--txt-dim); margin-bottom: 3px; }
+.cc-field .f-val { font-family: var(--sans); font-size: 14px; color: var(--txt); }
+.cc-desc { border-top: 1px solid var(--line); padding-top: 14px; margin-top: auto; }
+.cc-desc .f-lbl { font-family: var(--mono); font-size: 9px; letter-spacing: 2px; color: var(--txt-dim); margin-bottom: 6px; }
+.cc-desc .f-val { font-size: 13px; line-height: 1.55; color: var(--txt-mut); white-space: pre-wrap; }
+.cc-edit { position: absolute; bottom: 16px; right: 18px; z-index: 6; white-space: nowrap; }
+
+.case-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; color: var(--txt-mut); }
+.case-empty .ce-glyph { font-size: 30px; color: var(--accent); }
+.case-empty p { font-family: var(--mono); letter-spacing: 2px; font-size: 12px; }
+
+/* roster */
+.dossier-roster { z-index: 900; }
+.roster-search { padding: 10px 12px; border-bottom: 1px solid var(--line-soft); }
+.roster-search input, .editor-form input, .editor-form select, .editor-form textarea {
+  width: 100%; background: var(--bg); border: 1px solid var(--line-soft); color: var(--txt);
+  font-family: var(--mono); font-size: 12px; padding: 8px 10px; outline: none;
+}
+.roster-search input:focus, .editor-form input:focus, .editor-form select:focus, .editor-form textarea:focus { border-color: var(--accent); }
+.roster-list { flex: 1; overflow-y: auto; }
+.roster-item { display: flex; align-items: center; gap: 11px; padding: 11px 14px; border-bottom: 1px solid var(--line-soft); cursor: pointer; transition: background .14s; }
+.roster-item:hover { background: var(--bg-1); }
+.roster-item.active { background: rgba(255,45,111,0.08); border-left: 3px solid var(--accent); padding-left: 11px; }
+.ri-thumb { width: 34px; height: 42px; flex-shrink: 0; border: 1px solid var(--line-soft); object-fit: cover; background: repeating-linear-gradient(45deg,#0c080b 0 6px,#110c10 6px 12px); filter: grayscale(.3); }
+.ri-meta { min-width: 0; }
+.ri-name { font-family: var(--sans); font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ri-sub { font-family: var(--mono); font-size: 9px; color: var(--txt-dim); letter-spacing: 1px; }
+.ri-dot { width: 6px; height: 6px; margin-left: auto; flex-shrink: 0; transform: rotate(45deg); }
+
+.btn-new { margin: 12px; padding: 11px; background: var(--accent); color: #0a0608; border: none; cursor: pointer; font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: 2px; flex-shrink: 0; }
+.btn-new:hover { box-shadow: 0 0 18px var(--accent-glow); }
+
+/* ===================== LOG (dummy) ===================== */
+.log-placeholder { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; overflow: hidden;
+  background: radial-gradient(900px 500px at 50% 30%, rgba(255,45,111,0.05), transparent 60%), var(--bg); }
+.log-scanline { position: absolute; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--accent-glow), transparent); animation: scan 4.5s linear infinite; opacity: .5; }
+@keyframes scan { 0%{top:-2%;} 100%{top:102%;} }
+.log-glyph { font-size: 36px; color: var(--accent); text-shadow: 0 0 22px var(--accent-glow); }
+.log-placeholder h1 { font-family: var(--mono); font-size: 26px; letter-spacing: 8px; margin: 0; }
+.log-status { font-family: var(--mono); font-size: 11px; letter-spacing: 3px; color: var(--deg); }
+.log-bar { width: min(380px, 70vw); height: 4px; background: var(--bg-2); border: 1px solid var(--line); overflow: hidden; }
+.log-bar span { display: block; height: 100%; width: 38%; background: var(--accent); box-shadow: 0 0 12px var(--accent-glow); animation: load 3.2s ease-in-out infinite; }
+@keyframes load { 0%{width:8%;} 50%{width:64%;} 100%{width:8%;} }
+.log-note { font-family: var(--sans); font-size: 12px; color: var(--txt-mut); max-width: 360px; }
+
+/* ===================== MODAL ===================== */
+.modal-scrim { position: fixed; inset: 0; z-index: 2000; background: rgba(4,2,3,.78); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; padding: 20px; }
+.modal-scrim.open { display: flex; }
+.modal { width: min(680px, 96vw); max-height: 92vh; overflow: hidden; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 30px 90px rgba(0,0,0,.7); display: flex; flex-direction: column; }
+.modal-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+.modal-head h2 { margin: 0; font-family: var(--mono); font-size: 15px; letter-spacing: 3px; color: var(--accent); }
+.modal-close { background: none; border: none; color: var(--txt-mut); font-size: 16px; cursor: pointer; }
+.modal-close:hover { color: var(--accent); }
+
+.editor-form { padding: 20px; overflow-y: auto; display: grid; grid-template-columns: 180px 1fr; gap: 22px; }
+.ef-photo { display: flex; flex-direction: column; gap: 10px; }
+.ef-photo-frame { width: 100%; aspect-ratio: 3/4; border: 1px solid var(--line); background: repeating-linear-gradient(45deg,#0c080b 0 9px,#110c10 9px 18px); overflow: hidden; position: relative; }
+.ef-photo-frame img { width: 100%; height: 100%; object-fit: cover; }
+.ef-photo-btn { text-align: center; cursor: pointer; font-family: var(--mono); font-size: 11px; letter-spacing: 1px; padding: 9px; border: 1px solid var(--accent); color: var(--accent); }
+.ef-photo-btn:hover { background: rgba(255,45,111,.1); }
+.ef-photo-clear { background: none; border: 1px solid var(--line-soft); color: var(--txt-dim); font-family: var(--mono); font-size: 10px; letter-spacing: 1px; padding: 7px; cursor: pointer; }
+.ef-fields { display: flex; flex-direction: column; gap: 12px; }
+.ef-fields label { display: flex; flex-direction: column; gap: 5px; font-family: var(--mono); font-size: 10px; letter-spacing: 1.5px; color: var(--txt-dim); }
+.ef-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ef-actions { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--line); padding-top: 16px; margin-top: 4px; }
+.ef-actions-right { display: flex; gap: 10px; }
+.btn-primary { background: var(--accent); color: #0a0608; border: none; padding: 10px 22px; font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: 2px; cursor: pointer; }
+.btn-primary:hover { box-shadow: 0 0 18px var(--accent-glow); }
+.btn-ghost { background: none; border: 1px solid var(--line); color: var(--txt-mut); padding: 10px 18px; font-family: var(--mono); font-size: 12px; letter-spacing: 2px; cursor: pointer; }
+.btn-ghost:hover { color: var(--txt); border-color: var(--txt-mut); }
+.btn-delete { border-color: var(--out); color: var(--out); }
+.btn-delete:hover { background: rgba(255,59,59,.12); color: var(--out); }
+
+/* ===================== LOCATION LINK + ASSOCIATES ===================== */
+.loc-link { color: var(--accent); cursor: pointer; border-bottom: 1px dashed var(--accent-dim); transition: text-shadow .15s; }
+.loc-link:hover { text-shadow: 0 0 10px var(--accent-glow); }
+.loc-link.loc-loading { opacity: .5; }
+.cc-assoc { border-top: 1px solid var(--line); padding-top: 13px; margin-top: 14px; }
+.cc-assoc .f-lbl { font-family: var(--mono); font-size: 9px; letter-spacing: 2px; color: var(--txt-dim); margin-bottom: 8px; }
+.assoc-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
+.assoc-chip { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line-soft); padding: 5px 9px; background: var(--bg-1); }
+.assoc-name { color: var(--accent); cursor: pointer; font-size: 12px; font-weight: 600; }
+.assoc-name:hover { text-shadow: 0 0 10px var(--accent-glow); }
+.assoc-type { font-family: var(--mono); font-size: 9px; letter-spacing: 1px; color: var(--txt-dim); text-transform: uppercase; }
+.assoc-empty { font-family: var(--mono); font-size: 11px; color: var(--txt-dim); }
+
+/* ===================== REL EDITOR ===================== */
+.ef-rels { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-top: 14px; }
+.ef-rels-head { font-family: var(--mono); font-size: 10px; letter-spacing: 2px; color: var(--txt-dim); margin-bottom: 10px; }
+.ef-rels-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.rel-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--accent-dim); background: rgba(255,45,111,0.07); padding: 5px 6px 5px 10px; font-size: 12px; }
+.rel-chip b { font-weight: 600; }
+.rel-chip button { background: none; border: none; color: var(--txt-mut); cursor: pointer; font-size: 11px; padding: 0 2px; }
+.rel-chip button:hover { color: var(--out); }
+.ef-rels-add { display: grid; grid-template-columns: 1fr 170px auto; gap: 10px; align-items: start; }
+.ef-rel-search { position: relative; }
+.ef-rel-results { position: absolute; top: 100%; left: 0; right: 0; z-index: 5; background: var(--bg-2); border: 1px solid var(--line); max-height: 180px; overflow-y: auto; display: none; }
+.rel-result { padding: 8px 10px; font-family: var(--mono); font-size: 11px; cursor: pointer; border-bottom: 1px solid var(--line-soft); }
+.rel-result span { color: var(--accent); }
+.rel-result:hover { background: rgba(255,45,111,0.1); }
+#ef-rel-add { padding: 8px 14px; white-space: nowrap; }
+
+/* ===================== SETTINGS ===================== */
+#view-settings { overflow-y: auto; background:
+  radial-gradient(1100px 560px at 50% -8%, rgba(255,45,111,0.05), transparent 60%), var(--bg); }
+.settings-wrap { max-width: 760px; margin: 0 auto; padding: 34px 24px 70px; }
+.settings-title { font-family: var(--mono); font-size: 22px; letter-spacing: 6px; color: var(--accent); margin: 0 0 4px; }
+.settings-sub { font-family: var(--mono); font-size: 11px; letter-spacing: 2px; color: var(--txt-dim); margin-bottom: 26px; }
+.set-section { border: 1px solid var(--line); background: var(--panel); margin-bottom: 18px; }
+.set-section > h3 { margin: 0; padding: 13px 18px; font-family: var(--mono); font-size: 12px; letter-spacing: 3px; color: var(--txt); border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 9px; }
+.set-section > h3::before { content: "â—†"; color: var(--accent); font-size: 10px; }
+.set-row { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 15px 18px; border-top: 1px solid var(--line-soft); }
+.set-row:first-of-type { border-top: none; }
+.set-info { min-width: 0; }
+.set-label { font-family: var(--sans); font-size: 14px; font-weight: 600; color: var(--txt); }
+.set-desc { font-family: var(--mono); font-size: 10px; letter-spacing: .5px; color: var(--txt-mut); margin-top: 3px; }
+.set-control { flex-shrink: 0; }
+
+.toggle { width: 48px; height: 25px; border: 1px solid var(--line); background: var(--bg-2); position: relative; cursor: pointer; transition: background .2s, border-color .2s; }
+.toggle::after { content: ""; position: absolute; top: 2px; left: 2px; width: 19px; height: 19px; background: var(--txt-mut); transition: transform .2s, background .2s; }
+.toggle.on { border-color: var(--accent); background: rgba(255,45,111,0.16); }
+.toggle.on::after { transform: translateX(23px); background: var(--accent); box-shadow: 0 0 9px var(--accent-glow); }
+
+.segmented { display: flex; border: 1px solid var(--line); }
+.segmented button { background: transparent; border: none; border-left: 1px solid var(--line-soft); color: var(--txt-mut); font-family: var(--mono); font-size: 11px; letter-spacing: 1px; padding: 8px 15px; cursor: pointer; }
+.segmented button:first-child { border-left: none; }
+.segmented button.on { background: var(--accent); color: #0a0608; font-weight: 600; }
+
+.set-slider { display: flex; align-items: center; gap: 13px; }
+.set-slider input[type=range] { width: 170px; accent-color: var(--accent); }
+.set-slider .sv { font-family: var(--mono); font-size: 11px; color: var(--accent); min-width: 56px; text-align: right; }
+
+.swatches { display: flex; gap: 12px; }
+.swatch { width: 24px; height: 24px; transform: rotate(45deg); cursor: pointer; border: 1px solid var(--line-soft); }
+.swatch.on { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px currentColor, 0 0 12px currentColor; }
+
+.set-reset { margin-top: 8px; }
+.set-foot { font-family: var(--mono); font-size: 10px; letter-spacing: 1px; color: var(--txt-dim); text-align: center; margin-top: 24px; line-height: 1.7; }
+
+/* ===================== WEB VIEW ===================== */
+.webview-scrim { position: fixed; inset: 0; z-index: 1800; background: var(--bg); display: none; flex-direction: column; }
+.webview-scrim.open { display: flex; }
+.webview-head { height: 54px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; border-bottom: 1px solid var(--line); background: linear-gradient(180deg,#120c10,#0c080b); }
+.wv-title { font-family: var(--mono); font-size: 14px; letter-spacing: 3px; color: var(--accent); display: flex; align-items: baseline; gap: 14px; }
+.wv-sub { font-size: 9px; letter-spacing: 2px; color: var(--txt-dim); }
+.wv-actions { display: flex; gap: 10px; }
+.wv-actions .btn-ghost { padding: 8px 14px; font-size: 11px; }
+.webview-canvas { position: relative; flex: 1; overflow: hidden;
+  background:
+    radial-gradient(900px 500px at 50% 40%, rgba(255,45,111,0.05), transparent 60%),
+    repeating-linear-gradient(0deg, transparent 0 39px, rgba(255,255,255,0.02) 39px 40px),
+    repeating-linear-gradient(90deg, transparent 0 39px, rgba(255,255,255,0.02) 39px 40px),
+    var(--bg); }
+.wv-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.wv-node { position: absolute; width: 150px; transform: translate(-50%, -50%); background: linear-gradient(180deg,#130d11,#0d0a0c); border: 1px solid var(--line); padding: 10px 12px; cursor: grab; user-select: none; box-shadow: 0 8px 24px rgba(0,0,0,.5); transition: box-shadow .15s, border-color .15s; }
+.wv-node:hover { border-color: var(--accent); box-shadow: 0 0 22px var(--accent-glow); }
+.wv-node.dragging { cursor: grabbing; z-index: 50; box-shadow: 0 0 30px var(--accent-glow); }
+.wv-node-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.wv-node-dot { width: 8px; height: 8px; transform: rotate(45deg); flex-shrink: 0; }
+.wv-node-name { font-family: var(--sans); font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wv-node-sub { font-family: var(--mono); font-size: 9px; letter-spacing: 1px; color: var(--txt-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wv-edge-label { font-family: var(--mono); font-size: 9px; fill: var(--txt-mut); letter-spacing: 1px; }
+
+/* ===================== RESPONSIVE ===================== */
+@media (max-width: 720px) {
+  :root { --panel-w: 320px; }
+  .brand-sub { display: none; }
+  .nav-status .ns-item:first-child { display: none; }
+  .nav-btn { padding: 8px 12px; font-size: 11px; }
+  .hud-readout { top: 10px; padding: 8px 14px; }
+  .hud-metrics { gap: 16px; }
+  .metric-num { font-size: 18px; }
+  .case-card { grid-template-columns: 1fr; }
+  .cc-left { flex-direction: row; border-right: none; border-bottom: 1px solid var(--line); }
+  .cc-photo { width: 110px; aspect-ratio: 3/4; flex-shrink: 0; }
+  .cc-right { padding: 16px; }
+  .cc-name { font-size: 22px; }
+  .editor-form { grid-template-columns: 1fr; }
+  .ef-photo { flex-direction: row; align-items: flex-start; }
+  .ef-photo-frame { width: 120px; flex-shrink: 0; }
+}
+
+</style>
+</head>
+<body>
+
+<!-- ===================== TOP NAV ===================== -->
+<header class="topnav">
+  <div class="brand">
+    <span class="brand-glyph">â—†</span>
+    <span class="brand-name">Cyber<span class="brand-accent">SOC</span></span>
+    <span class="brand-sub">ALL-DOMAIN OPS</span>
+  </div>
+
+  <nav class="nav-views" role="tablist">
+    <button class="nav-btn is-active" data-view="sitrep" role="tab">SITREP</button>
+    <button class="nav-btn" data-view="dossier" role="tab">DOSSIER</button>
+    <button class="nav-btn" data-view="log" role="tab">LOG</button>
+    <button class="nav-btn" data-view="settings" role="tab">SETTINGS</button>
+  </nav>
+
+  <div class="nav-status">
+    <span class="ns-item"><span class="ns-dot ns-live"></span><span id="nav-conn">SECURE LINK</span></span>
+    <span class="ns-item" id="nav-clock">--:--:--</span>
+  </div>
+</header>
+
+<!-- ===================== STATUS TICKER ===================== -->
+<div class="ticker" id="ticker">
+  <div class="ticker-label"><span class="tl-pulse"></span><span id="ticker-label-text">STATUS</span></div>
+  <div class="ticker-viewport">
+    <div class="ticker-track" id="ticker-track"></div>
+  </div>
+</div>
+
+<!-- ===================== SITREP VIEW ===================== -->
+<main id="view-sitrep" class="view is-active">
+  <div id="map"></div>
+
+  <!-- Radar overlay (positioned over the map) -->
+  <div id="radar" aria-hidden="true">
+    <div id="radar-sweep"></div>
+    <div id="radar-rings"></div>
+    <div id="radar-home" title="Operator position"></div>
+  </div>
+
+  <!-- Top-left HUD readout -->
+  <div class="hud-readout">
+    <div class="hud-title">AZURE THREAT LANDSCAPE</div>
+    <div class="hud-metrics">
+      <div class="metric"><span class="metric-num" id="m-op">--</span><span class="metric-lbl met-op">OPERATIONAL</span></div>
+      <div class="metric"><span class="metric-num" id="m-deg">--</span><span class="metric-lbl met-deg">DEGRADED</span></div>
+      <div class="metric"><span class="metric-num" id="m-out">--</span><span class="metric-lbl met-out">OUTAGE</span></div>
+    </div>
+    <div class="hud-sync">LAST SYNC <span id="m-sync">--:--:--</span> Â· <span id="m-loc">ACQUIRING POSâ€¦</span></div>
+  </div>
+
+  <!-- ===== LEFT PANEL: granular alerts ===== -->
+  <aside id="alert-panel" class="side-panel left">
+    <button class="pull-tab left" id="alert-tab" aria-label="Toggle alert feed">
+      <span class="tab-label">ALERTS</span>
+      <span class="tab-badge" id="alert-count">0</span>
+    </button>
+    <div class="panel-inner">
+      <div class="panel-head">
+        <h2>ALERT FEED</h2>
+        <span class="panel-sub">GRANULAR INCIDENT DETAIL</span>
+      </div>
+      <div class="alert-list" id="alert-list"></div>
+    </div>
+  </aside>
+
+  <!-- ===== RIGHT PANEL: command line ===== -->
+  <aside id="cli-panel" class="side-panel right">
+    <button class="pull-tab right" id="cli-tab" aria-label="Toggle command line">
+      <span class="tab-label">CMD</span>
+      <span class="tab-caret">â€º_</span>
+    </button>
+    <div class="panel-inner">
+      <div class="panel-head">
+        <h2>COMMAND LINE</h2>
+        <span class="panel-sub">SOC-1 // OPERATOR SHELL</span>
+      </div>
+      <div class="cli-out" id="cli-out"></div>
+      <form class="cli-input-row" id="cli-form" autocomplete="off">
+        <span class="cli-prompt">soc@cybersoc<span class="cli-tilde">:~$</span></span>
+        <input type="text" id="cli-input" class="cli-input" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="type 'help'" />
+      </form>
+    </div>
+  </aside>
+</main>
+
+<!-- ===================== DOSSIER VIEW ===================== -->
+<main id="view-dossier" class="view">
+  <!-- Left pull-out: roster -->
+  <aside id="roster-panel" class="side-panel left dossier-roster">
+    <button class="pull-tab left" id="roster-tab" aria-label="Toggle roster">
+      <span class="tab-label">ROSTER</span>
+      <span class="tab-badge" id="roster-count">0</span>
+    </button>
+    <div class="panel-inner">
+      <div class="panel-head">
+        <h2>SUBJECT ROSTER</h2>
+        <span class="panel-sub">SORTED Aâ€“Z</span>
+      </div>
+      <div class="roster-search">
+        <input type="text" id="roster-search" placeholder="filter subjectsâ€¦" spellcheck="false" />
+      </div>
+      <div class="roster-list" id="roster-list"></div>
+      <button class="btn-new" id="btn-new">+ NEW SUBJECT</button>
+    </div>
+  </aside>
+
+  <!-- Case file stage -->
+  <section class="dossier-stage" id="dossier-stage">
+    <button class="swipe-nav prev" id="prev-subject" aria-label="Previous subject">â€¹</button>
+    <button class="swipe-nav next" id="next-subject" aria-label="Next subject">â€º</button>
+    <div class="case-track" id="case-track"><!-- card injected here --></div>
+    <div class="swipe-hint">SWIPE â€¹ â€º</div>
+  </section>
+</main>
+
+<!-- ===================== LOG VIEW (dummy) ===================== -->
+<main id="view-log" class="view">
+  <div class="log-placeholder">
+    <div class="log-scanline"></div>
+    <div class="log-glyph">â—†</div>
+    <h1>EVENT LOG</h1>
+    <p class="log-status">MODULE OFFLINE Â· CALIBRATING TELEMETRY</p>
+    <div class="log-bar"><span id="log-bar-fill"></span></div>
+    <p class="log-note">Forensic event timeline and audit trail will mount here.</p>
+  </div>
+</main>
+
+<!-- ===================== SETTINGS VIEW ===================== -->
+<main id="view-settings" class="view">
+  <div class="settings-wrap" id="settings-wrap"></div>
+</main>
+
+<!-- ===================== EDITOR MODAL ===================== -->
+<div class="modal-scrim" id="editor-scrim">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editor-title">
+    <div class="modal-head">
+      <h2 id="editor-title">NEW SUBJECT</h2>
+      <button class="modal-close" id="editor-close" aria-label="Close">âœ•</button>
+    </div>
+    <form id="editor-form" class="editor-form">
+      <div class="ef-photo">
+        <div class="ef-photo-frame" id="ef-photo-frame"></div>
+        <label class="ef-photo-btn">UPLOAD IMAGE<input type="file" id="ef-photo-input" accept="image/*" hidden /></label>
+        <button type="button" class="ef-photo-clear" id="ef-photo-clear">CLEAR</button>
+      </div>
+      <div class="ef-fields">
+        <label>FULL NAME<input type="text" name="name" required placeholder="LAST, FIRST" /></label>
+        <label>ALIAS / HANDLE<input type="text" name="alias" placeholder="known aliases" /></label>
+        <div class="ef-row">
+          <label>DOB<input type="date" name="dob" /></label>
+          <label>SEX<select name="sex"><option value="">â€”</option><option>Male</option><option>Female</option><option>Unknown</option></select></label>
+        </div>
+        <label>RACE / ETHNICITY
+          <select name="ethnicity">
+            <option value="">â€”</option>
+            <option>American Indian or Alaska Native</option>
+            <option>Asian</option>
+            <option>Black or African American</option>
+            <option>Hispanic or Latino</option>
+            <option>Native Hawaiian or Other Pacific Islander</option>
+            <option>White</option>
+            <option>Two or More Races</option>
+            <option>Unknown</option>
+          </select>
+        </label>
+        <div class="ef-row">
+          <label>THREAT LEVEL
+            <select name="threat"><option>LOW</option><option>GUARDED</option><option selected>ELEVATED</option><option>HIGH</option><option>SEVERE</option></select>
+          </label>
+          <label>STATUS
+            <select name="status"><option>ACTIVE</option><option>AT LARGE</option><option>IN CUSTODY</option><option>SURVEILLANCE</option><option>CLEARED</option></select>
+          </label>
+        </div>
+        <label>LAST KNOWN LOCATION<input type="text" name="location" placeholder="city, region" /></label>
+        <label>AFFILIATIONS<input type="text" name="affiliations" placeholder="comma separated" /></label>
+        <label>DESCRIPTION / NOTES<textarea name="description" rows="4" placeholder="behavioral notes, MO, identifying marksâ€¦"></textarea></label>
+      </div>
+      <div class="ef-rels">
+        <div class="ef-rels-head">RELATIONSHIPS / KNOWN ASSOCIATES</div>
+        <div class="ef-rels-list" id="ef-rels-list"></div>
+        <div class="ef-rels-add">
+          <div class="ef-rel-search">
+            <input type="text" id="ef-rel-search" placeholder="search roster subjectsâ€¦" autocomplete="off" spellcheck="false" />
+            <div class="ef-rel-results" id="ef-rel-results"></div>
+          </div>
+          <input type="text" id="ef-rel-type" list="rel-types" placeholder="relationship (e.g. brother)" autocomplete="off" />
+          <datalist id="rel-types">
+            <option>Mother</option><option>Father</option><option>Son</option><option>Daughter</option>
+            <option>Brother</option><option>Sister</option><option>Spouse</option><option>Partner</option>
+            <option>Cousin</option><option>Coworker</option><option>Associate</option><option>Acquaintance</option>
+            <option>Handler</option><option>Accomplice</option><option>Rival</option><option>Informant</option>
+          </datalist>
+          <button type="button" class="btn-ghost" id="ef-rel-add">+ ADD</button>
+        </div>
+      </div>
+      <div class="ef-actions">
+        <button type="button" class="btn-ghost btn-delete" id="ef-delete">DELETE</button>
+        <div class="ef-actions-right">
+          <button type="button" class="btn-ghost" id="ef-cancel">CANCEL</button>
+          <button type="submit" class="btn-primary">SAVE FILE</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ===================== RELATIONSHIP WEB VIEW ===================== -->
+<div class="webview-scrim" id="webview-scrim">
+  <div class="webview-head">
+    <div class="wv-title">â—ˆ RELATIONSHIP WEB <span class="wv-sub">DRAG TO REARRANGE Â· CLICK A NODE TO OPEN FILE</span></div>
+    <div class="wv-actions">
+      <button class="btn-ghost" id="wv-relayout">â†» RE-LAYOUT</button>
+      <button class="btn-ghost" id="wv-close">âœ• CLOSE</button>
+    </div>
+  </div>
+  <div class="webview-canvas" id="webview-canvas">
+    <svg class="wv-lines" id="wv-lines"></svg>
+    <!-- nodes injected -->
+  </div>
+</div>
+
+<!-- Leaflet -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+<script>
+/* ===================================================================
+   CyberSOC â€” data layer
+   - AZURE_REGIONS: real Azure region coordinates (mock status feed)
+   - DOSSIER seed loader (data/soc_dossier.json -> localStorage)
+   =================================================================== */
+
+/* Real Azure regions with approximate geo coordinates.
+   `status` is mock telemetry; in a hosted env you could replace
+   refreshAzureStatus() with a real fetch of an Azure status JSON feed. */
+const AZURE_REGIONS = [
+  { code: "eastus",        name: "East US",            geo: "Virginia, USA",      lat: 37.37,  lng: -79.82, status: "operational" },
+  { code: "eastus2",       name: "East US 2",          geo: "Virginia, USA",      lat: 36.66,  lng: -78.39, status: "operational" },
+  { code: "centralus",     name: "Central US",         geo: "Iowa, USA",          lat: 41.59,  lng: -93.62, status: "degraded"    },
+  { code: "northcentralus",name: "North Central US",   geo: "Illinois, USA",      lat: 41.88,  lng: -87.62, status: "operational" },
+  { code: "southcentralus",name: "South Central US",   geo: "Texas, USA",         lat: 29.42,  lng: -98.49, status: "operational" },
+  { code: "westus",        name: "West US",            geo: "California, USA",    lat: 37.78,  lng: -122.42,status: "operational" },
+  { code: "westus2",       name: "West US 2",          geo: "Washington, USA",    lat: 47.23,  lng: -119.85,status: "operational" },
+  { code: "westus3",       name: "West US 3",          geo: "Arizona, USA",       lat: 33.45,  lng: -112.07,status: "outage"      },
+  { code: "canadacentral", name: "Canada Central",     geo: "Toronto, CA",        lat: 43.65,  lng: -79.38, status: "operational" },
+  { code: "canadaeast",    name: "Canada East",        geo: "Quebec, CA",         lat: 46.81,  lng: -71.21, status: "operational" },
+  { code: "brazilsouth",   name: "Brazil South",       geo: "SÃ£o Paulo, BR",      lat: -23.55, lng: -46.63, status: "operational" },
+  { code: "northeurope",   name: "North Europe",       geo: "Ireland",            lat: 53.34,  lng: -6.26,  status: "operational" },
+  { code: "westeurope",    name: "West Europe",        geo: "Netherlands",        lat: 52.37,  lng: 4.90,   status: "degraded"    },
+  { code: "uksouth",       name: "UK South",           geo: "London, UK",         lat: 51.51,  lng: -0.13,  status: "operational" },
+  { code: "ukwest",        name: "UK West",            geo: "Cardiff, UK",        lat: 51.48,  lng: -3.18,  status: "operational" },
+  { code: "francecentral", name: "France Central",     geo: "Paris, FR",          lat: 48.86,  lng: 2.35,   status: "operational" },
+  { code: "germanywc",     name: "Germany West Central",geo: "Frankfurt, DE",     lat: 50.11,  lng: 8.68,   status: "operational" },
+  { code: "switzerlandn",  name: "Switzerland North",  geo: "ZÃ¼rich, CH",         lat: 47.38,  lng: 8.54,   status: "operational" },
+  { code: "norwaye",       name: "Norway East",        geo: "Oslo, NO",           lat: 59.91,  lng: 10.75,  status: "operational" },
+  { code: "swedenc",       name: "Sweden Central",     geo: "GÃ¤vle, SE",          lat: 60.67,  lng: 17.14,  status: "operational" },
+  { code: "uaenorth",      name: "UAE North",          geo: "Dubai, AE",          lat: 25.27,  lng: 55.31,  status: "operational" },
+  { code: "southafrican",  name: "South Africa North", geo: "Johannesburg, ZA",   lat: -26.20, lng: 28.05,  status: "operational" },
+  { code: "centralindia",  name: "Central India",      geo: "Pune, IN",           lat: 18.52,  lng: 73.86,  status: "degraded"    },
+  { code: "southeastasia", name: "Southeast Asia",     geo: "Singapore",          lat: 1.35,   lng: 103.82, status: "operational" },
+  { code: "eastasia",      name: "East Asia",          geo: "Hong Kong",          lat: 22.32,  lng: 114.17, status: "operational" },
+  { code: "japaneast",     name: "Japan East",         geo: "Tokyo, JP",          lat: 35.68,  lng: 139.69, status: "operational" },
+  { code: "koreacentral",  name: "Korea Central",      geo: "Seoul, KR",          lat: 37.57,  lng: 126.98, status: "operational" },
+  { code: "australiaeast", name: "Australia East",     geo: "Sydney, AU",         lat: -33.87, lng: 151.21, status: "operational" }
+];
+
+/* Services that can be flagged in an alert */
+const AZURE_SERVICES = [
+  "Virtual Machines", "App Service", "Azure SQL Database", "Storage",
+  "Azure Kubernetes Service", "Azure Active Directory", "Cosmos DB",
+  "Azure Functions", "Networking", "Key Vault", "Service Bus", "Azure Monitor"
+];
+
+const DEGRADED_MSGS = [
+  "Elevated latency observed on regional gateways. Mitigation in progress.",
+  "Intermittent connection failures affecting a subset of customers.",
+  "Increased error rates on management plane operations.",
+  "Partial capacity constraint; new deployments may be delayed."
+];
+const OUTAGE_MSGS = [
+  "Loss of availability impacting multiple services. Engineers engaged.",
+  "Underlying network infrastructure failure under active investigation.",
+  "Datacenter cooling event triggered protective shutdown of racks.",
+  "Storage subsystem fault â€” failover initiated to secondary scale unit."
+];
+
+/* per-region active alert detail (generated for non-operational regions) */
+const ALERT_DETAIL = {};
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function regionTrackingId() { return "AZ-" + Math.floor(1000 + Math.random() * 8999); }
+
+function ensureAlertDetail(r) {
+  if (r.status === "operational") { delete ALERT_DETAIL[r.code]; return; }
+  if (!ALERT_DETAIL[r.code] || ALERT_DETAIL[r.code].sev !== r.status) {
+    ALERT_DETAIL[r.code] = {
+      sev: r.status,
+      service: pick(AZURE_SERVICES),
+      msg: r.status === "outage" ? pick(OUTAGE_MSGS) : pick(DEGRADED_MSGS),
+      id: regionTrackingId(),
+      since: Date.now() - Math.floor(Math.random() * 5400 * 1000)
+    };
+  }
+}
+AZURE_REGIONS.forEach(ensureAlertDetail);
+
+/* When the page is served by the bundled Node server (port 3005),
+   /api/* is same-origin and LIVE. Otherwise these fetches fail and the
+   app silently falls back to local simulation. */
+let LIVE_MODE = false;
+let LIVE_MODE_SW = false;
+
+/* SolarWinds Observability components (Atlassian Statuspage).
+   Live data via /api/solarwinds-status (proxies the status JSON API). */
+const SOLARWINDS_COMPONENTS = [
+  { name: "Login", status: "operational" },
+  { name: "Alerting", status: "operational" },
+  { name: "APM", status: "operational" },
+  { name: "DEM", status: "operational" },
+  { name: "RUM", status: "operational" },
+  { name: "Logs", status: "operational" },
+  { name: "Database Observability", status: "operational" },
+  { name: "Network Observability", status: "operational" },
+  { name: "Kubernetes Observability", status: "operational" },
+  { name: "Infrastructure Observability", status: "operational" },
+  { name: "Agent Downloads & Updates", status: "operational" },
+  { name: "AIOps Service", status: "operational" }
+];
+
+const SW_DRIFT = ["degraded", "outage", "maintenance"];
+function simSolarWinds() {
+  // mostly operational; occasionally nudge one component
+  if (Math.random() < 0.25) {
+    const c = SOLARWINDS_COMPONENTS[Math.floor(Math.random() * SOLARWINDS_COMPONENTS.length)];
+    c.status = c.status === "operational" ? SW_DRIFT[Math.floor(Math.random() * SW_DRIFT.length)] : "operational";
+  }
+  return SOLARWINDS_COMPONENTS;
+}
+
+async function syncSolarWindsStatus() {
+  try {
+    const res = await fetch("/api/solarwinds-status", { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.components)) {
+        const byName = {};
+        data.components.forEach((c) => { byName[c.name.toLowerCase()] = c.status; });
+        SOLARWINDS_COMPONENTS.forEach((c) => {
+          const s = byName[c.name.toLowerCase()];
+          if (s) c.status = s;
+        });
+        LIVE_MODE_SW = true;
+        return true;
+      }
+    }
+  } catch (e) { /* server not running */ }
+  LIVE_MODE_SW = false;
+  simSolarWinds();
+  return false;
+}
+
+async function syncAzureStatus() {
+  try {
+    const res = await fetch("/api/azure-status", { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.regions)) {
+        const byCode = {};
+        data.regions.forEach((r) => { byCode[r.code] = r; });
+        AZURE_REGIONS.forEach((r) => {
+          const s = byCode[r.code];
+          if (s && s.status) {
+            r.status = s.status;
+            if (r.status !== "operational") {
+              ALERT_DETAIL[r.code] = {
+                sev: r.status,
+                service: s.service || "Multiple services",
+                msg: s.msg || (r.status === "outage" ? "Service availability impacted." : "Degraded performance reported."),
+                id: s.id || regionTrackingId(),
+                since: s.since || Date.now()
+              };
+            } else { delete ALERT_DETAIL[r.code]; }
+          }
+        });
+        LIVE_MODE = true;
+        return true;
+      }
+    }
+  } catch (e) { /* server not running */ }
+  LIVE_MODE = false;
+  refreshAzureStatus(); // local simulation fallback
+  return false;
+}
+
+/* Simulated status drift (fallback when no live feed is available). */
+function refreshAzureStatus() {
+  // 35% chance to mutate one random region's status on each tick
+  if (Math.random() < 0.35) {
+    const r = pick(AZURE_REGIONS);
+    const roll = Math.random();
+    if (r.status === "operational") {
+      r.status = roll < 0.78 ? "degraded" : "outage";
+    } else if (r.status === "degraded") {
+      r.status = roll < 0.55 ? "operational" : "outage";
+    } else { // outage
+      r.status = roll < 0.6 ? "degraded" : "operational";
+    }
+    ensureAlertDetail(r);
+  }
+  return AZURE_REGIONS;
+}
+
+function statusCounts() {
+  const c = { operational: 0, degraded: 0, outage: 0 };
+  AZURE_REGIONS.forEach(r => c[r.status]++);
+  return c;
+}
+
+/* ============ DOSSIER PERSISTENCE ============
+   Working copy lives in localStorage('soc_dossier').
+   Seeded from data/soc_dossier.json on first run.
+   Use exportDossier() to download an updated soc_dossier.json
+   to commit back into the repo's data/ folder. */
+const DOSSIER_KEY = "soc_dossier";
+
+const DOSSIER_FALLBACK = [
+  {
+    id: "sub-0001", name: "ARDEN, Mara", alias: "NIGHTJAR",
+    dob: "1991-03-14", sex: "Female", ethnicity: "White",
+    threat: "HIGH", status: "AT LARGE", location: "Lisbon, PT",
+    affiliations: "Helix Collective, ex-NSA contractor",
+    caseNumber: "CS-2241-A", photo: "",
+    relationships: [ { id: "sub-0002", type: "Associate" }, { id: "sub-0003", type: "Recruiter" } ],
+    description: "Former signals analyst turned broker of zero-day exploits. Operates through layered cut-outs and disposable hardware. Known for spear-phishing campaigns against utility SCADA networks. Identifying mark: small circuit-trace tattoo, left wrist."
+  },
+  {
+    id: "sub-0002", name: "OKONKWO, Daniel", alias: "GHOSTWIRE",
+    dob: "1986-11-02", sex: "Male", ethnicity: "Black or African American",
+    threat: "SEVERE", status: "SURVEILLANCE", location: "Unknown",
+    affiliations: "Independent Â· suspected state proxy",
+    caseNumber: "CS-1908-C", photo: "",
+    relationships: [ { id: "sub-0001", type: "Associate" } ],
+    description: "Believed responsible for the 'Tidewater' ransomware family. Highly disciplined OPSEC; no confirmed photograph on file. Communicates via rotating onion services. Considered a flight risk and technically sophisticated."
+  },
+  {
+    id: "sub-0003", name: "VOSS, Lena", alias: "CIPHER-9",
+    dob: "1998-07-21", sex: "Female", ethnicity: "Two or More Races",
+    threat: "ELEVATED", status: "IN CUSTODY", location: "Berlin, DE",
+    affiliations: "Lattice crew",
+    caseNumber: "CS-2310-B", photo: "",
+    relationships: [ { id: "sub-0004", type: "Coworker" } ],
+    description: "Apprehended following a coordinated takedown of a credential-stuffing marketplace. Cooperating witness. Specializes in botnet orchestration and residential proxy laundering."
+  },
+  {
+    id: "sub-0004", name: "KORHONEN, Aleksi", alias: "DEADBOLT",
+    dob: "1979-01-30", sex: "Male", ethnicity: "White",
+    threat: "GUARDED", status: "CLEARED", location: "Helsinki, FI",
+    affiliations: "None (cleared)",
+    caseNumber: "CS-1455-D", photo: "",
+    description: "Initial person of interest in a supply-chain compromise; subsequently cleared after forensic timeline placed him offsite. File retained for reference only."
+  }
+];
+
+function loadDossier() {
+  try {
+    const raw = localStorage.getItem(DOSSIER_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) { /* ignore */ }
+  return null;
+}
+
+function saveDossier(list) {
+  try { localStorage.setItem(DOSSIER_KEY, JSON.stringify(list)); } catch (e) {}
+}
+
+function normalizeProfile(p) { if (!Array.isArray(p.relationships)) p.relationships = []; return p; }
+
+/* Seed order: (1) live server, (2) localStorage working copy,
+   (3) bundled data/soc_dossier.json, (4) embedded fallback. */
+async function seedDossier() {
+  // 1. live server is authoritative
+  try {
+    const res = await fetch("/api/dossier", { cache: "no-store" });
+    if (res.ok) {
+      const json = await res.json();
+      if (Array.isArray(json)) { saveDossier(json); return json.map(normalizeProfile); }
+    }
+  } catch (e) { /* server not running */ }
+  // 2. localStorage working copy
+  const existing = loadDossier();
+  if (existing && existing.length) return existing.map(normalizeProfile);
+  // 3. bundled seed file
+  let seed = DOSSIER_FALLBACK;
+  try {
+    const res = await fetch("data/soc_dossier.json", { cache: "no-store" });
+    if (res.ok) {
+      const json = await res.json();
+      if (Array.isArray(json) && json.length) seed = json;
+    }
+  } catch (e) { /* file:// or offline â€” use fallback */ }
+  saveDossier(seed);
+  return seed.map(normalizeProfile);
+}
+
+/* Push the full roster to the server (writes data/soc_dossier.json). */
+function saveDossierRemote(list) {
+  try {
+    return fetch("/api/dossier", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(list)
+    }).catch(() => {});
+  } catch (e) { return Promise.resolve(); }
+}
+
+/* Geocode an address: local proxy first, then public Nominatim. */
+async function geocodeAddress(q) {
+  if (!q) return null;
+  try {
+    const r = await fetch("/api/geocode?q=" + encodeURIComponent(q), { cache: "no-store" });
+    if (r.ok) { const j = await r.json(); if (j && j.lat != null) return j; }
+  } catch (e) {}
+  try {
+    const r = await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + encodeURIComponent(q), { headers: { Accept: "application/json" } });
+    if (r.ok) { const a = await r.json(); if (a && a[0]) return { lat: +a[0].lat, lng: +a[0].lon, display: a[0].display_name }; }
+  } catch (e) {}
+  return null;
+}
+
+function exportDossier(list) {
+  const blob = new Blob([JSON.stringify(list, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "soc_dossier.json";
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+</script>
+<script>
+/* ===================================================================
+   CyberSOC â€” SITREP view
+   Leaflet dark map Â· Azure region markers Â· radar sweep (ping-on-touch)
+   Â· left alert feed Â· right command line
+   =================================================================== */
+(function () {
+  let map, radarCenterLatLng = null;
+  const markers = {};        // code -> { marker, el, latlng, lastPing }
+  let sweepAngle = 0, prevSweepAngle = 0;
+  let SWEEP_SPEED = 0.7;   // deg per frame (~8.5s / revolution)
+  let sweepEnabled = true;
+  let refreshTimer = null;
+  let baseLayer = null;
+  const PING_COOLDOWN = 1500;
+  const BASEMAPS = {
+    dark: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+    light: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+  };
+
+  const $ = (s) => document.querySelector(s);
+
+  /* ---------- map + markers ---------- */
+  function initMap() {
+    map = L.map("map", {
+      zoomControl: true,
+      worldCopyJump: true,
+      minZoom: 2,
+      maxZoom: 7,
+      attributionControl: true
+    }).setView([30, 5], 2);
+
+    baseLayer = L.tileLayer(
+      (window.Settings && window.Settings.get("theme") === "light") ? BASEMAPS.light : BASEMAPS.dark,
+      {
+        attribution: '&copy; OpenStreetMap &copy; CARTO Â· CyberSOC',
+        subdomains: "abcd",
+        maxZoom: 19
+      }
+    ).addTo(map);
+
+    AZURE_REGIONS.forEach(addRegionMarker);
+
+    map.on("move zoom moveend zoomend", positionRadar);
+    map.on("zoomend moveend", refreshMarkerAngles);
+  }
+
+  function markerIcon(r) {
+    return L.divIcon({
+      className: "",
+      html: `<div class="region-marker status-${r.status}" data-code="${r.code}">
+               <span class="rm-ping"></span><span class="rm-dot"></span>
+             </div>`,
+      iconSize: [14, 14],
+      iconAnchor: [7, 7]
+    });
+  }
+
+  function addRegionMarker(r) {
+    const m = L.marker([r.lat, r.lng], { icon: markerIcon(r), keyboard: false }).addTo(map);
+    m.bindPopup(regionPopup(r), { className: "region-popup", closeButton: false });
+    markers[r.code] = { marker: m, latlng: L.latLng(r.lat, r.lng), lastPing: 0 };
+  }
+
+  function regionPopup(r) {
+    const color = r.status === "outage" ? "var(--out)" : r.status === "degraded" ? "var(--deg)" : "var(--op)";
+    return `<div class="rp-name">${r.name}</div>
+            <div class="rp-meta">${r.code} Â· ${r.geo}</div>
+            <div class="rp-status" style="color:${color}">${r.status.toUpperCase()}</div>`;
+  }
+
+  function updateMarkerStatus(r) {
+    const ref = markers[r.code];
+    if (!ref) return;
+    ref.marker.setPopupContent(regionPopup(r));
+    const el = ref.marker.getElement();
+    if (el) {
+      const node = el.querySelector(".region-marker");
+      if (node) node.className = `region-marker status-${r.status}`;
+    }
+  }
+
+  /* ---------- radar ---------- */
+  function setRadarCenter(latlng) {
+    radarCenterLatLng = latlng;
+    positionRadar();
+    refreshMarkerAngles();
+    const loc = $("#m-loc");
+    if (loc) loc.textContent = `POS ${latlng.lat.toFixed(2)}, ${latlng.lng.toFixed(2)}`;
+  }
+
+  function positionRadar() {
+    if (!map || !radarCenterLatLng) return;
+    const p = map.latLngToContainerPoint(radarCenterLatLng);
+    const sweep = $("#radar-sweep"), rings = $("#radar-rings"), home = $("#radar-home");
+    [sweep, rings, home].forEach((el) => {
+      if (!el) return;
+      el.style.left = p.x + "px";
+      el.style.top = p.y + "px";
+    });
+  }
+
+  function buildRings() {
+    const wrap = $("#radar-rings");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    [90, 180, 280].forEach((d) => {
+      const ring = document.createElement("div");
+      ring.className = "radar-ring";
+      ring.style.width = d + "px";
+      ring.style.height = d + "px";
+      wrap.appendChild(ring);
+    });
+  }
+
+  // angle (deg) of a screen vector, clockwise from north (matches CSS conic sweep)
+  function screenAngle(dx, dy) {
+    let a = Math.atan2(dx, -dy) * 180 / Math.PI; // dy is +down
+    return (a + 360) % 360;
+  }
+
+  // cache marker angles; recomputed on pan/zoom and used by the sweep loop
+  const markerAngles = {};
+  function refreshMarkerAngles() {
+    if (!map || !radarCenterLatLng) return;
+    const c = map.latLngToContainerPoint(radarCenterLatLng);
+    Object.keys(markers).forEach((code) => {
+      const p = map.latLngToContainerPoint(markers[code].latlng);
+      markerAngles[code] = screenAngle(p.x - c.x, p.y - c.y);
+    });
+  }
+
+  function crossed(prev, cur, target) {
+    if (prev <= cur) return target > prev && target <= cur;
+    return target > prev || target <= cur; // wrapped past 360
+  }
+
+  function triggerPing(code) {
+    const ref = markers[code];
+    if (!ref) return;
+    const now = performance.now();
+    if (now - ref.lastPing < PING_COOLDOWN) return;
+    const el = ref.marker.getElement();
+    if (!el) return;
+    const node = el.querySelector(".region-marker");
+    if (!node) return;
+    ref.lastPing = now;
+    node.classList.remove("pinging");
+    void node.offsetWidth; // reflow to restart animation
+    node.classList.add("pinging");
+  }
+
+  function sweepLoop() {
+    if (sweepEnabled) {
+      prevSweepAngle = sweepAngle;
+      sweepAngle = (sweepAngle + SWEEP_SPEED) % 360;
+      const sweep = $("#radar-sweep");
+      if (sweep) sweep.style.transform = `translate(-50%, -50%) rotate(${sweepAngle}deg)`;
+
+    if (radarCenterLatLng) {
+      // ping a region ONLY when the rotating line passes over its center
+      Object.keys(markerAngles).forEach((code) => {
+        if (crossed(prevSweepAngle, sweepAngle, markerAngles[code])) triggerPing(code);
+      });
+    }
+    }
+    requestAnimationFrame(sweepLoop);
+  }
+
+  /* ---------- geolocation ---------- */
+  function acquirePosition() {
+    const fallback = L.latLng(38.95, -77.15); // default operator position
+    if (!navigator.geolocation) { setRadarCenter(fallback); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const ll = L.latLng(pos.coords.latitude, pos.coords.longitude);
+        setRadarCenter(ll);
+        map.flyTo(ll, 3, { duration: 1.2 });
+      },
+      () => { setRadarCenter(fallback); },
+      { enableHighAccuracy: false, timeout: 6000, maximumAge: 600000 }
+    );
+  }
+
+  /* ---------- HUD + alerts ---------- */
+  function fmtTime(ts) {
+    const d = ts ? new Date(ts) : new Date();
+    return d.toTimeString().slice(0, 8);
+  }
+  function ago(ts) {
+    const s = Math.floor((Date.now() - ts) / 1000);
+    if (s < 60) return s + "s";
+    const m = Math.floor(s / 60);
+    if (m < 60) return m + "m";
+    return Math.floor(m / 60) + "h " + (m % 60) + "m";
+  }
+
+  function updateHUD() {
+    const c = statusCounts();
+    $("#m-op").textContent = String(c.operational).padStart(2, "0");
+    $("#m-deg").textContent = String(c.degraded).padStart(2, "0");
+    $("#m-out").textContent = String(c.outage).padStart(2, "0");
+    $("#m-sync").textContent = fmtTime();
+  }
+
+  function renderAlerts() {
+    const list = $("#alert-list");
+    const active = AZURE_REGIONS.filter((r) => r.status !== "operational");
+    const count = active.length;
+    const badge = $("#alert-count");
+    badge.textContent = count;
+    badge.classList.toggle("zero", count === 0);
+
+    if (!count) {
+      list.innerHTML = `<div class="alert-empty">âœ“ ALL REGIONS NOMINAL</div>`;
+      return;
+    }
+    // outages first, then degraded
+    active.sort((a, b) => (a.status === "outage" ? -1 : 1) - (b.status === "outage" ? -1 : 1));
+    list.innerHTML = active.map((r) => {
+      const d = ALERT_DETAIL[r.code] || {};
+      return `<div class="alert-card sev-${r.status}">
+        <div class="alert-top">
+          <span class="alert-sev">${r.status === "outage" ? "OUTAGE" : "DEGRADED"}</span>
+          <span class="alert-time">${d.id || ""} Â· ${d.since ? ago(d.since) + " ago" : ""}</span>
+        </div>
+        <div class="alert-region">${r.name}</div>
+        <div class="alert-svc">${d.service || "Multiple services"} Â· ${r.geo}</div>
+        <div class="alert-msg">${d.msg || ""}</div>
+      </div>`;
+    }).join("");
+  }
+
+  async function refreshAll() {
+    await syncAzureStatus();
+    AZURE_REGIONS.forEach(updateMarkerStatus);
+    updateHUD();
+    renderAlerts();
+    updateFeedIndicator();
+    if (window.Ticker) window.Ticker.refresh();
+  }
+
+  function updateFeedIndicator() {
+    const el = $("#nav-conn"); if (!el) return;
+    const dot = el.parentElement.querySelector(".ns-dot");
+    if (LIVE_MODE) { el.textContent = "AZURE LIVE"; if (dot) dot.style.background = dot.style.boxShadow = ""; }
+    else { el.textContent = "SIM FEED"; }
+    if (dot) {
+      dot.style.background = LIVE_MODE ? "var(--op)" : "var(--deg)";
+      dot.style.boxShadow = "0 0 8px " + (LIVE_MODE ? "var(--op)" : "var(--deg)");
+    }
+  }
+
+  /* ---------- side-panel pull tabs ---------- */
+  function wireTabs() {
+    $("#cli-tab").addEventListener("click", () => {
+      const open = $("#cli-panel").classList.toggle("open");
+      if (open) setTimeout(() => $("#cli-input").focus(), 320);
+    });
+    $("#alert-tab").addEventListener("click", () => $("#alert-panel").classList.toggle("open"));
+  }
+
+  /* ---------- command line ---------- */
+  function cliPrint(text, cls) {
+    const out = $("#cli-out");
+    const line = document.createElement("div");
+    line.className = "cli-line " + (cls || "sys");
+    line.innerHTML = text;
+    out.appendChild(line);
+    out.scrollTop = out.scrollHeight;
+  }
+  function cliEcho(cmd) {
+    cliPrint(`<span class="ci-prompt">soc@cybersoc:~$</span> ${cmd}`, "cmd");
+  }
+
+  const COMMANDS = {
+    help() {
+      cliPrint("AVAILABLE COMMANDS", "head");
+      const rows = [
+        ["help", "list available commands"],
+        ["sitrep", "full situational report â€” all region statuses"],
+        ["status &lt;code&gt;", "detail for one region (e.g. status westus3)"],
+        ["alerts", "list active incidents only"],
+        ["regions", "list all monitored region codes"],
+        ["scan", "force re-sync of the status feed"],
+        ["locate", "show operator / radar position"],
+        ["clear", "clear the console"]
+      ];
+      rows.forEach(([c, d]) => cliPrint(`  <span style="color:var(--accent)">${c.padEnd(16)}</span> ${d}`, "sys"));
+    },
+    sitrep() {
+      const c = statusCounts();
+      cliPrint("â—† SITREP // AZURE THREAT LANDSCAPE", "head");
+      cliPrint(`  SYNCED ${fmtTime()} Â· ${AZURE_REGIONS.length} REGIONS MONITORED`, "sys");
+      cliPrint(`  OPERATIONAL ${c.operational}   DEGRADED ${c.degraded}   OUTAGE ${c.outage}`, "sys");
+      cliPrint("â€”".repeat(40), "sys");
+      ["outage", "degraded", "operational"].forEach((st) => {
+        const group = AZURE_REGIONS.filter((r) => r.status === st);
+        if (!group.length) return;
+        const cls = st === "outage" ? "err" : st === "degraded" ? "warn" : "ok";
+        group.forEach((r) => {
+          const dot = st === "operational" ? "â—" : "â–²";
+          cliPrint(`  ${dot} ${r.name.padEnd(22)} ${r.code.padEnd(16)} ${st.toUpperCase()}`, cls);
+        });
+      });
+    },
+    status(arg) {
+      if (!arg) { cliPrint("usage: status &lt;region-code&gt;", "warn"); return; }
+      const r = AZURE_REGIONS.find((x) => x.code === arg.toLowerCase() || x.name.toLowerCase() === arg.toLowerCase());
+      if (!r) { cliPrint(`region '${arg}' not found. try 'regions'.`, "err"); return; }
+      const cls = r.status === "outage" ? "err" : r.status === "degraded" ? "warn" : "ok";
+      cliPrint(`â—† ${r.name} [${r.code}]`, "head");
+      cliPrint(`  LOCATION  ${r.geo}`, "sys");
+      cliPrint(`  STATUS    ${r.status.toUpperCase()}`, cls);
+      const d = ALERT_DETAIL[r.code];
+      if (d) {
+        cliPrint(`  INCIDENT  ${d.id} Â· ${d.service}`, "sys");
+        cliPrint(`  SINCE     ${ago(d.since)} ago`, "sys");
+        cliPrint(`  DETAIL    ${d.msg}`, cls);
+      } else {
+        cliPrint("  no active incidents.", "ok");
+      }
+    },
+    alerts() {
+      const active = AZURE_REGIONS.filter((r) => r.status !== "operational");
+      if (!active.length) { cliPrint("âœ“ no active incidents â€” all regions nominal.", "ok"); return; }
+      cliPrint(`â—† ${active.length} ACTIVE INCIDENT(S)`, "head");
+      active.forEach((r) => {
+        const d = ALERT_DETAIL[r.code] || {};
+        const cls = r.status === "outage" ? "err" : "warn";
+        cliPrint(`  ${r.status === "outage" ? "âœ•" : "â–²"} ${r.name} â€” ${d.service || ""} (${d.id || ""})`, cls);
+      });
+    },
+    regions() {
+      cliPrint("MONITORED REGIONS", "head");
+      const codes = AZURE_REGIONS.map((r) => r.code);
+      for (let i = 0; i < codes.length; i += 3) {
+        cliPrint("  " + codes.slice(i, i + 3).map((c) => c.padEnd(18)).join(""), "sys");
+      }
+    },
+    scan() {
+      cliPrint("> initiating telemetry re-syncâ€¦", "sys");
+      syncAzureStatus().then((live) => {
+        AZURE_REGIONS.forEach(updateMarkerStatus);
+        updateHUD(); renderAlerts(); updateFeedIndicator();
+        cliPrint(`âœ“ sync complete @ ${fmtTime()} Â· source: ${live ? "AZURE LIVE FEED" : "LOCAL SIMULATION"}`, live ? "ok" : "warn");
+      });
+    },
+    locate() {
+      if (!radarCenterLatLng) { cliPrint("position not yet acquired.", "warn"); return; }
+      cliPrint(`â—† OPERATOR POSITION`, "head");
+      cliPrint(`  LAT ${radarCenterLatLng.lat.toFixed(4)}  LNG ${radarCenterLatLng.lng.toFixed(4)}`, "sys");
+      cliPrint(`  radar sweep originating from this point.`, "sys");
+    },
+    clear() { $("#cli-out").innerHTML = ""; }
+  };
+
+  function runCommand(raw) {
+    const parts = raw.trim().split(/\s+/);
+    const cmd = (parts[0] || "").toLowerCase();
+    const arg = parts.slice(1).join(" ");
+    if (!cmd) return;
+    cliEcho(raw);
+    if (COMMANDS[cmd]) COMMANDS[cmd](arg);
+    else cliPrint(`command not found: ${cmd}. type 'help'.`, "err");
+  }
+
+  function wireCLI() {
+    $("#cli-form").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const input = $("#cli-input");
+      const v = input.value;
+      if (v.trim()) runCommand(v);
+      input.value = "";
+    });
+    // boot banner
+    cliPrint("CyberSOC operator shell v1.0", "head");
+    cliPrint("secure link established. type 'help' to begin.", "sys");
+  }
+
+  /* ---------- public init ---------- */
+  window.Sitrep = {
+    init() {
+      initMap();
+      buildRings();
+      wireTabs();
+      wireCLI();
+      acquirePosition();
+      updateHUD();
+      renderAlerts();
+      requestAnimationFrame(sweepLoop);
+      refreshAll();
+      refreshTimer = setInterval(refreshAll, 7000);
+    },
+    onShow() {
+      if (map) setTimeout(() => { map.invalidateSize(); positionRadar(); refreshMarkerAngles(); }, 60);
+    },
+    setSweepEnabled(on) {
+      sweepEnabled = !!on;
+      const r = document.getElementById("radar");
+      if (r) r.style.display = on ? "" : "none";
+    },
+    setSweepSpeed(v) { SWEEP_SPEED = +v || 0.7; },
+    setRefreshInterval(ms) {
+      if (refreshTimer) clearInterval(refreshTimer);
+      refreshTimer = setInterval(refreshAll, Math.max(2000, +ms || 7000));
+    },
+    setBasemap(theme) {
+      if (!map || !baseLayer) return;
+      map.removeLayer(baseLayer);
+      baseLayer = L.tileLayer(theme === "light" ? BASEMAPS.light : BASEMAPS.dark,
+        { attribution: '&copy; OpenStreetMap &copy; CARTO Â· CyberSOC', subdomains: "abcd", maxZoom: 19 }).addTo(map);
+    },
+    /* drop a located pin on the map (used by Dossier last-known-location) */
+    async dropPin(query, label) {
+      const geo = await geocodeAddress(query);
+      if (!geo) return false;
+      const ll = L.latLng(geo.lat, geo.lng);
+      if (window.__pinLayer) map.removeLayer(window.__pinLayer);
+      window.__pinLayer = L.layerGroup([
+        L.circle(ll, { radius: 140000, color: "#ff2d6f", weight: 1.5, fillColor: "#ff2d6f", fillOpacity: 0.10 }),
+        L.circleMarker(ll, { radius: 6, color: "#ff2d6f", weight: 2, fillColor: "#ff2d6f", fillOpacity: 1 })
+          .bindPopup(`<div class="rp-name">${label || "SUBJECT"}</div><div class="rp-meta">${(geo.display || query).slice(0, 60)}</div>`, { className: "region-popup", closeButton: false })
+      ]).addTo(map);
+      map.flyTo(ll, 6, { duration: 1.4 });
+      setTimeout(() => { window.__pinLayer && window.__pinLayer.getLayers()[1].openPopup(); }, 1500);
+      return true;
+    }
+  };
+})();
+
+</script>
+<script>
+/* ===================================================================
+   CyberSOC â€” DOSSIER view
+   Case-file profiles Â· roster panel Â· swipe navigation Â· CRUD
+   Persists to localStorage('soc_dossier'), seeded from data/soc_dossier.json
+   =================================================================== */
+(function () {
+  const $ = (s) => document.querySelector(s);
+
+  let profiles = [];
+  let currentIndex = 0;
+  let editingId = null;
+  let tempPhoto = "";
+  let editRels = [];
+  let pendingRelId = null;
+
+  const THREATS = ["LOW", "GUARDED", "ELEVATED", "HIGH", "SEVERE"];
+  const threatColor = {
+    LOW: "var(--op)", GUARDED: "#8fd14f", ELEVATED: "var(--deg)", HIGH: "#ff7a3d", SEVERE: "var(--out)"
+  };
+
+  /* ---------- helpers ---------- */
+  function sortProfiles() {
+    profiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+  }
+  function persist() { saveDossier(profiles); saveDossierRemote(profiles); }
+  function nameOf(id) { const p = profiles.find((x) => x.id === id); return p ? p.name : null; }
+  function age(dob) {
+    if (!dob) return "â€”";
+    const d = new Date(dob); if (isNaN(d)) return "â€”";
+    const t = new Date();
+    let a = t.getFullYear() - d.getFullYear();
+    const m = t.getMonth() - d.getMonth();
+    if (m < 0 || (m === 0 && t.getDate() < d.getDate())) a--;
+    return a >= 0 ? a : "â€”";
+  }
+  function fmtDob(dob) {
+    if (!dob) return "â€”";
+    const d = new Date(dob); if (isNaN(d)) return dob;
+    return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "2-digit" });
+  }
+  function esc(s) { return (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+  /* ---------- card ---------- */
+  function photoMarkup(p, cls) {
+    if (p.photo) return `<img src="${p.photo}" alt="${esc(p.name)}" />`;
+    return `<div class="ph-empty">NO IMAGE<br>ON FILE</div>
+            <span class="ph-corner tl"></span><span class="ph-corner tr"></span>
+            <span class="ph-corner bl"></span><span class="ph-corner br"></span>`;
+  }
+
+  function buildCard(p) {
+    const card = document.createElement("div");
+    card.className = "case-card";
+    const locVal = (p.location && !/^(unknown|â€”|-)?$/i.test(p.location.trim()))
+      ? `<span class="loc-link" data-loc="${esc(p.location)}" title="Plot on SITREP map">${esc(p.location)} â—‰</span>`
+      : esc(p.location || "â€”");
+    const rels = (p.relationships || []).filter((r) => r && r.id);
+    const relsHtml = rels.length
+      ? rels.map((r) => {
+          const nm = nameOf(r.id);
+          if (!nm) return "";
+          return `<span class="assoc-chip"><span class="assoc-name" data-open="${r.id}">${esc(nm)}</span><span class="assoc-type">${esc(r.type || "associate")}</span></span>`;
+        }).join("")
+      : `<span class="assoc-empty">No known associates on file.</span>`;
+    card.innerHTML = `
+      <div class="cc-stamp">${esc(p.status || "ACTIVE")}</div>
+      <div class="cc-left">
+        <div class="cc-photo">${photoMarkup(p)}</div>
+        <div class="cc-badges">
+          <div class="cc-badge threat-${p.threat}"><span class="b-lbl">THREAT</span><span class="b-val">${esc(p.threat || "â€”")}</span></div>
+          <div class="cc-badge"><span class="b-lbl">STATUS</span><span class="b-val">${esc(p.status || "â€”")}</span></div>
+          <div class="cc-badge"><span class="b-lbl">CASE&nbsp;#</span><span class="b-val">${esc(p.caseNumber || "â€”")}</span></div>
+        </div>
+      </div>
+      <div class="cc-right">
+        <div class="cc-filehdr">
+          <span class="cc-fileno">FILE ${esc(p.caseNumber || p.id)}</span>
+          <span class="cc-class">CONFIDENTIAL</span>
+        </div>
+        <div class="cc-name">${esc(p.name)}</div>
+        <div class="cc-alias">${p.alias ? "&ldquo;" + esc(p.alias) + "&rdquo;" : ""}</div>
+        <div class="cc-grid">
+          <div class="cc-field"><div class="f-lbl">DATE OF BIRTH</div><div class="f-val">${fmtDob(p.dob)}${p.dob ? " Â· age " + age(p.dob) : ""}</div></div>
+          <div class="cc-field"><div class="f-lbl">SEX</div><div class="f-val">${esc(p.sex || "â€”")}</div></div>
+          <div class="cc-field"><div class="f-lbl">RACE / ETHNICITY</div><div class="f-val">${esc(p.ethnicity || "â€”")}</div></div>
+          <div class="cc-field"><div class="f-lbl">LAST KNOWN LOCATION</div><div class="f-val">${locVal}</div></div>
+          <div class="cc-field" style="grid-column:1/-1"><div class="f-lbl">AFFILIATIONS</div><div class="f-val">${esc(p.affiliations || "â€”")}</div></div>
+        </div>
+        <div class="cc-assoc"><div class="f-lbl">KNOWN ASSOCIATES / RELATIONSHIPS</div><div class="assoc-wrap">${relsHtml}</div></div>
+        <div class="cc-desc"><div class="f-lbl">DESCRIPTION / NOTES</div><div class="f-val">${esc(p.description || "No notes on file.")}</div></div>
+      </div>
+      <button class="btn-primary cc-edit" data-edit>EDIT FILE</button>`;
+    card.querySelector("[data-edit]").addEventListener("click", (e) => { e.stopPropagation(); openEditor(p.id); });
+    const loc = card.querySelector(".loc-link");
+    if (loc) loc.addEventListener("click", (e) => {
+      e.stopPropagation();
+      loc.classList.add("loc-loading");
+      window.App.setView("sitrep");
+      window.Sitrep.dropPin(loc.dataset.loc, p.name).then((ok) => {
+        loc.classList.remove("loc-loading");
+        if (!ok) { window.App.setView("dossier"); alert("Could not locate that address."); }
+      });
+    });
+    card.querySelectorAll(".assoc-name").forEach((el) => {
+      el.addEventListener("click", (e) => { e.stopPropagation(); openProfile(el.dataset.open); });
+    });
+    return card;
+  }
+
+  function renderCard(animateFrom) {
+    const track = $("#case-track");
+    if (!profiles.length) {
+      track.innerHTML = `<div class="case-empty"><div class="ce-glyph">â—†</div>
+        <p>NO SUBJECTS ON FILE</p>
+        <button class="btn-primary" id="empty-new">+ CREATE FIRST FILE</button></div>`;
+      const b = $("#empty-new"); if (b) b.addEventListener("click", () => openEditor(null));
+      return;
+    }
+    if (currentIndex >= profiles.length) currentIndex = profiles.length - 1;
+    if (currentIndex < 0) currentIndex = 0;
+    track.innerHTML = "";
+    const card = buildCard(profiles[currentIndex]);
+    track.appendChild(card);
+    if (animateFrom) {
+      card.style.transform = `translateX(${animateFrom === "right" ? 100 : -100}%)`;
+      requestAnimationFrame(() => { card.classList.add("slide-anim"); card.style.transform = "translateX(0)"; });
+      setTimeout(() => card.classList.remove("slide-anim"), 300);
+    }
+    updateRosterActive();
+  }
+
+  function go(dir) {
+    if (profiles.length < 2) return;
+    const oldCard = $("#case-track .case-card");
+    currentIndex = (currentIndex + dir + profiles.length) % profiles.length;
+    const track = $("#case-track");
+    const newCard = buildCard(profiles[currentIndex]);
+    newCard.style.transform = `translateX(${dir > 0 ? 100 : -100}%)`;
+    track.appendChild(newCard);
+    requestAnimationFrame(() => {
+      newCard.classList.add("slide-anim");
+      newCard.style.transform = "translateX(0)";
+      if (oldCard) {
+        oldCard.classList.add("slide-anim");
+        oldCard.style.transform = `translateX(${dir > 0 ? -100 : 100}%)`;
+        oldCard.style.opacity = "0";
+      }
+    });
+    setTimeout(() => {
+      if (oldCard && oldCard.parentNode) oldCard.remove();
+      newCard.classList.remove("slide-anim");
+    }, 300);
+    updateRosterActive();
+  }
+
+  /* ---------- roster ---------- */
+  function renderRoster() {
+    const list = $("#roster-list");
+    const q = ($("#roster-search").value || "").toLowerCase();
+    $("#roster-count").textContent = profiles.length;
+    $("#roster-count").classList.toggle("zero", profiles.length === 0);
+    const filtered = profiles.filter((p) =>
+      !q || p.name.toLowerCase().includes(q) || (p.alias || "").toLowerCase().includes(q));
+    list.innerHTML = filtered.map((p) => {
+      const idx = profiles.indexOf(p);
+      const thumb = p.photo
+        ? `<img class="ri-thumb" src="${p.photo}" alt="" />`
+        : `<div class="ri-thumb"></div>`;
+      return `<div class="roster-item ${idx === currentIndex ? "active" : ""}" data-idx="${idx}">
+        ${thumb}
+        <div class="ri-meta">
+          <div class="ri-name">${esc(p.name)}</div>
+          <div class="ri-sub">${esc(p.alias || p.caseNumber || "â€”")}</div>
+        </div>
+        <span class="ri-dot" style="background:${threatColor[p.threat] || "var(--txt-dim)"}"></span>
+      </div>`;
+    }).join("") || `<div class="alert-empty">NO MATCHES</div>`;
+    list.querySelectorAll(".roster-item").forEach((el) => {
+      el.addEventListener("click", () => {
+        const idx = +el.dataset.idx;
+        const dir = idx > currentIndex ? "right" : idx < currentIndex ? "left" : null;
+        currentIndex = idx;
+        renderCard(dir);
+      });
+    });
+  }
+  function updateRosterActive() {
+    document.querySelectorAll(".roster-item").forEach((el) => {
+      el.classList.toggle("active", +el.dataset.idx === currentIndex);
+    });
+  }
+
+  /* ---------- relationship editor ---------- */
+  function renderEditRels() {
+    const wrap = $("#ef-rels-list");
+    if (!editRels.length) { wrap.innerHTML = `<span class="assoc-empty">No relationships added.</span>`; return; }
+    wrap.innerHTML = editRels.map((r, i) => {
+      const nm = nameOf(r.id) || "(removed)";
+      return `<span class="rel-chip"><b>${esc(nm)}</b> Â· ${esc(r.type || "associate")}<button type="button" data-rm="${i}">âœ•</button></span>`;
+    }).join("");
+    wrap.querySelectorAll("[data-rm]").forEach((b) => b.addEventListener("click", () => {
+      editRels.splice(+b.dataset.rm, 1); renderEditRels();
+    }));
+  }
+  function renderRelResults(q) {
+    const box = $("#ef-rel-results");
+    q = (q || "").toLowerCase();
+    const taken = new Set(editRels.map((r) => r.id));
+    const matches = profiles.filter((p) => p.id !== editingId && !taken.has(p.id) &&
+      (!q || p.name.toLowerCase().includes(q) || (p.alias || "").toLowerCase().includes(q))).slice(0, 6);
+    if (!matches.length) { box.innerHTML = ""; box.style.display = "none"; return; }
+    box.style.display = "block";
+    box.innerHTML = matches.map((p) =>
+      `<div class="rel-result" data-id="${p.id}">${esc(p.name)} <span>${esc(p.alias || "")}</span></div>`).join("");
+    box.querySelectorAll(".rel-result").forEach((el) => el.addEventListener("click", () => {
+      pendingRelId = el.dataset.id;
+      $("#ef-rel-search").value = nameOf(pendingRelId);
+      box.innerHTML = ""; box.style.display = "none";
+      $("#ef-rel-type").focus();
+    }));
+  }
+  function addRel() {
+    const type = $("#ef-rel-type").value.trim();
+    if (!pendingRelId) { $("#ef-rel-search").focus(); return; }
+    editRels.push({ id: pendingRelId, type: type || "associate" });
+    pendingRelId = null;
+    $("#ef-rel-search").value = ""; $("#ef-rel-type").value = "";
+    renderEditRels();
+  }
+  function wireRelEditor() {
+    $("#ef-rel-search").addEventListener("input", (e) => { pendingRelId = null; renderRelResults(e.target.value); });
+    $("#ef-rel-search").addEventListener("focus", (e) => renderRelResults(e.target.value));
+    $("#ef-rel-add").addEventListener("click", addRel);
+    $("#ef-rel-type").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addRel(); } });
+  }
+
+  function openProfile(id) {
+    const idx = profiles.findIndex((x) => x.id === id);
+    if (idx < 0) return;
+    if (window.WebView) window.WebView.close();
+    window.App.setView("dossier");
+    const dir = idx > currentIndex ? "right" : idx < currentIndex ? "left" : null;
+    currentIndex = idx;
+    renderCard(dir);
+    renderRoster();
+  }
+
+  /* ---------- editor modal ---------- */
+  function setEditorPhoto(src) {
+    tempPhoto = src || "";
+    const frame = $("#ef-photo-frame");
+    frame.innerHTML = tempPhoto ? `<img src="${tempPhoto}" alt="" />` : "";
+  }
+  function openEditor(id) {
+    editingId = id;
+    const form = $("#editor-form");
+    form.reset();
+    const p = id ? profiles.find((x) => x.id === id) : null;
+    $("#editor-title").textContent = p ? "MODIFY SUBJECT" : "NEW SUBJECT";
+    $("#ef-delete").style.display = p ? "" : "none";
+    if (p) {
+      form.name.value = p.name || "";
+      form.alias.value = p.alias || "";
+      form.dob.value = p.dob || "";
+      form.sex.value = p.sex || "";
+      form.ethnicity.value = p.ethnicity || "";
+      form.threat.value = p.threat || "ELEVATED";
+      form.status.value = p.status || "ACTIVE";
+      form.location.value = p.location || "";
+      form.affiliations.value = p.affiliations || "";
+      form.description.value = p.description || "";
+      setEditorPhoto(p.photo || "");
+      editRels = (p.relationships || []).map((r) => ({ id: r.id, type: r.type }));
+    } else {
+      setEditorPhoto("");
+      editRels = [];
+    }
+    pendingRelId = null;
+    $("#ef-rel-search").value = ""; $("#ef-rel-type").value = "";
+    $("#ef-rel-results").innerHTML = ""; $("#ef-rel-results").style.display = "none";
+    renderEditRels();
+    $("#editor-scrim").classList.add("open");
+    setTimeout(() => form.name.focus(), 50);
+  }
+  function closeEditor() { $("#editor-scrim").classList.remove("open"); editingId = null; }
+
+  function saveEditor(e) {
+    e.preventDefault();
+    const form = e.target;
+    const data = {
+      name: form.name.value.trim(),
+      alias: form.alias.value.trim(),
+      dob: form.dob.value,
+      sex: form.sex.value,
+      ethnicity: form.ethnicity.value,
+      threat: form.threat.value,
+      status: form.status.value,
+      location: form.location.value.trim(),
+      affiliations: form.affiliations.value.trim(),
+      description: form.description.value.trim(),
+      photo: tempPhoto,
+      relationships: editRels.filter((r) => r.id && profiles.some((x) => x.id === r.id))
+    };
+    if (!data.name) { form.name.focus(); return; }
+    let savedId;
+    if (editingId) {
+      const p = profiles.find((x) => x.id === editingId);
+      Object.assign(p, data);
+      savedId = p.id;
+    } else {
+      savedId = "sub-" + Date.now().toString(36);
+      profiles.push(Object.assign({ id: savedId, caseNumber: "CS-" + Math.floor(1000 + Math.random() * 8999) + "-N" }, data));
+    }
+    sortProfiles();
+    persist();
+    currentIndex = profiles.findIndex((x) => x.id === savedId);
+    closeEditor();
+    renderRoster();
+    renderCard();
+  }
+
+  function deleteCurrent() {
+    if (!editingId) return;
+    if (!confirm("Permanently delete this subject file?")) return;
+    const goneId = editingId;
+    profiles = profiles.filter((x) => x.id !== goneId);
+    profiles.forEach((p) => { p.relationships = (p.relationships || []).filter((r) => r.id !== goneId); });
+    persist();
+    closeEditor();
+    if (currentIndex >= profiles.length) currentIndex = profiles.length - 1;
+    renderRoster();
+    renderCard();
+  }
+
+  /* ---------- swipe / drag ---------- */
+  function wireSwipe() {
+    const stage = $("#dossier-stage");
+    let startX = 0, dragging = false, card = null;
+    const THRESH = 80;
+
+    stage.addEventListener("pointerdown", (e) => {
+      if (e.target.closest("button")) return;
+      card = $("#case-track .case-card");
+      if (!card) return;
+      dragging = true; startX = e.clientX;
+      card.classList.add("swiping");
+      stage.setPointerCapture(e.pointerId);
+    });
+    stage.addEventListener("pointermove", (e) => {
+      if (!dragging || !card) return;
+      const dx = e.clientX - startX;
+      card.style.transform = `translateX(${dx}px)`;
+      card.style.opacity = String(Math.max(0.4, 1 - Math.abs(dx) / 700));
+    });
+    function end(e) {
+      if (!dragging || !card) return;
+      dragging = false;
+      const dx = e.clientX - startX;
+      card.classList.remove("swiping");
+      if (Math.abs(dx) > THRESH && profiles.length > 1) {
+        go(dx < 0 ? 1 : -1);
+      } else {
+        card.classList.add("slide-anim");
+        card.style.transform = "translateX(0)";
+        card.style.opacity = "1";
+        setTimeout(() => card && card.classList.remove("slide-anim"), 300);
+      }
+      card = null;
+    }
+    stage.addEventListener("pointerup", end);
+    stage.addEventListener("pointercancel", end);
+  }
+
+  function wireKeys() {
+    document.addEventListener("keydown", (e) => {
+      if (!$("#view-dossier").classList.contains("is-active")) return;
+      if ($("#editor-scrim").classList.contains("open")) return;
+      if (e.key === "ArrowLeft") go(-1);
+      else if (e.key === "ArrowRight") go(1);
+    });
+  }
+
+  /* ---------- export control ---------- */
+  function injectExport() {
+    const inner = $("#roster-panel .panel-inner");
+    const webBtn = document.createElement("button");
+    webBtn.className = "btn-ghost";
+    webBtn.id = "btn-webview";
+    webBtn.style.cssText = "margin:0 12px 8px;padding:11px;font-size:11px;letter-spacing:2px;border-color:var(--accent);color:var(--accent);";
+    webBtn.textContent = "â—ˆ RELATIONSHIP WEB VIEW";
+    inner.appendChild(webBtn);
+    webBtn.addEventListener("click", () => window.WebView && window.WebView.open());
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;gap:8px;padding:0 12px 12px;";
+    row.innerHTML = `
+      <button class="btn-ghost" id="btn-export" style="flex:1;padding:8px;font-size:10px;">â¤“ EXPORT JSON</button>
+      <button class="btn-ghost" id="btn-reset" style="flex:1;padding:8px;font-size:10px;">â†º RESET SEED</button>`;
+    inner.appendChild(row);
+    $("#btn-export").addEventListener("click", () => exportDossier(profiles));
+    $("#btn-reset").addEventListener("click", async () => {
+      if (!confirm("Reset roster to the bundled seed? Local changes will be lost.")) return;
+      localStorage.removeItem(DOSSIER_KEY);
+      profiles = await seedDossier();
+      sortProfiles(); currentIndex = 0;
+      renderRoster(); renderCard();
+    });
+  }
+
+  /* ---------- init ---------- */
+  window.Dossier = {
+    async init() {
+      profiles = await seedDossier();
+      sortProfiles();
+      $("#roster-tab").addEventListener("click", () => $("#roster-panel").classList.toggle("open"));
+      $("#roster-search").addEventListener("input", renderRoster);
+      $("#btn-new").addEventListener("click", () => openEditor(null));
+      $("#prev-subject").addEventListener("click", () => go(-1));
+      $("#next-subject").addEventListener("click", () => go(1));
+      $("#editor-close").addEventListener("click", closeEditor);
+      $("#ef-cancel").addEventListener("click", closeEditor);
+      $("#ef-delete").addEventListener("click", deleteCurrent);
+      $("#editor-form").addEventListener("submit", saveEditor);
+      $("#editor-scrim").addEventListener("click", (e) => { if (e.target === $("#editor-scrim")) closeEditor(); });
+      $("#ef-photo-input").addEventListener("change", (e) => {
+        const f = e.target.files[0];
+        if (!f) return;
+        const reader = new FileReader();
+        reader.onload = () => setEditorPhoto(reader.result);
+        reader.readAsDataURL(f);
+      });
+      $("#ef-photo-clear").addEventListener("click", () => setEditorPhoto(""));
+      wireRelEditor();
+      injectExport();
+      wireSwipe();
+      wireKeys();
+      renderRoster();
+      renderCard();
+    },
+    getProfiles() { return profiles; },
+    openProfile,
+    threatColor
+  };
+})();
+
+</script>
+<script>
+/* ===================================================================
+   CyberSOC â€” app controller: view switching, clock, boot
+   =================================================================== */
+(function () {
+  const $ = (s) => document.querySelector(s);
+
+  function setView(name) {
+    document.querySelectorAll(".view").forEach((v) => v.classList.remove("is-active"));
+    document.querySelectorAll(".nav-btn").forEach((b) => b.classList.toggle("is-active", b.dataset.view === name));
+    const view = $("#view-" + name);
+    if (view) view.classList.add("is-active");
+    if (name === "sitrep" && window.Sitrep) window.Sitrep.onShow();
+    if (name === "settings" && window.Settings) window.Settings.render();
+  }
+  window.App = { setView };
+
+  function wireNav() {
+    document.querySelectorAll(".nav-btn").forEach((b) => {
+      b.addEventListener("click", () => setView(b.dataset.view));
+    });
+  }
+
+  function startClock() {
+    const el = $("#nav-clock");
+    const tick = () => { el.textContent = new Date().toTimeString().slice(0, 8) + " Z"; };
+    tick(); setInterval(tick, 1000);
+  }
+
+  function boot() {
+    wireNav();
+    startClock();
+    if (window.Settings) window.Settings.init();
+    if (window.Sitrep) window.Sitrep.init();
+    if (window.Dossier) window.Dossier.init();
+    if (window.Ticker) window.Ticker.init();
+    if (window.Settings) window.Settings.applyAll();
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+  else boot();
+})();
+
+</script>
+<script>
+/* ===================================================================
+   CyberSOC â€” Relationship Web View
+   Draggable, rearrangeable profile cards with connector lines.
+   =================================================================== */
+(function () {
+  const $ = (s) => document.querySelector(s);
+  const POS_KEY = "soc_web_pos";
+  let pos = {}, dragId = null, moved = false, startX = 0, startY = 0, nodeStart = null;
+
+  function loadPos() { try { return JSON.parse(localStorage.getItem(POS_KEY)) || {}; } catch (e) { return {}; } }
+  function savePos() { try { localStorage.setItem(POS_KEY, JSON.stringify(pos)); } catch (e) {} }
+  function profiles() { return window.Dossier ? window.Dossier.getProfiles() : []; }
+  function escp(s) { return (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+  function layout(reset) {
+    const canvas = $("#webview-canvas");
+    const W = canvas.clientWidth, H = canvas.clientHeight;
+    const ps = profiles();
+    const saved = reset ? {} : loadPos();
+    pos = {};
+    const cx = W / 2, cy = H / 2, R = Math.max(150, Math.min(W, H) / 2 - 140);
+    ps.forEach((p, i) => {
+      if (saved[p.id]) pos[p.id] = { x: saved[p.id].x, y: saved[p.id].y };
+      else {
+        const a = (i / Math.max(1, ps.length)) * Math.PI * 2 - Math.PI / 2;
+        pos[p.id] = { x: cx + Math.cos(a) * R, y: cy + Math.sin(a) * R };
+      }
+    });
+  }
+
+  function edges() {
+    const ps = profiles(); const byId = {}; ps.forEach((p) => byId[p.id] = p);
+    const seen = {}, out = [];
+    ps.forEach((p) => (p.relationships || []).forEach((r) => {
+      if (!byId[r.id]) return;
+      const key = [p.id, r.id].sort().join("|");
+      if (seen[key]) return; seen[key] = 1;
+      out.push({ a: p.id, b: r.id, type: r.type });
+    }));
+    return out;
+  }
+
+  function drawLines() {
+    const svg = $("#wv-lines");
+    let h = "";
+    edges().forEach((e) => {
+      const A = pos[e.a], B = pos[e.b]; if (!A || !B) return;
+      h += `<line x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}" stroke="rgba(255,45,111,0.42)" stroke-width="1.5" />`;
+      const mx = A.x + (B.x - A.x) * 0.34, my = A.y + (B.y - A.y) * 0.34;
+      if (e.type) h += `<text class="wv-edge-label" x="${mx}" y="${my - 4}" text-anchor="middle">${escp(e.type.toUpperCase())}</text>`;
+    });
+    svg.innerHTML = h;
+  }
+
+  function wireNode(n) {
+    n.addEventListener("pointerdown", (e) => {
+      dragId = n.dataset.id; moved = false; startX = e.clientX; startY = e.clientY;
+      nodeStart = { x: pos[dragId].x, y: pos[dragId].y };
+      n.classList.add("dragging"); n.setPointerCapture(e.pointerId);
+    });
+    n.addEventListener("pointermove", (e) => {
+      if (dragId !== n.dataset.id) return;
+      const dx = e.clientX - startX, dy = e.clientY - startY;
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) moved = true;
+      pos[dragId] = { x: nodeStart.x + dx, y: nodeStart.y + dy };
+      n.style.left = pos[dragId].x + "px"; n.style.top = pos[dragId].y + "px";
+      drawLines();
+    });
+    const up = () => {
+      if (dragId !== n.dataset.id) return;
+      n.classList.remove("dragging");
+      if (moved) savePos();
+      else if (window.Dossier) window.Dossier.openProfile(n.dataset.id);
+      dragId = null;
+    };
+    n.addEventListener("pointerup", up);
+    n.addEventListener("pointercancel", up);
+  }
+
+  function render() {
+    const canvas = $("#webview-canvas");
+    canvas.querySelectorAll(".wv-node").forEach((n) => n.remove());
+    const tc = (window.Dossier && window.Dossier.threatColor) || {};
+    if (!profiles().length) return;
+    profiles().forEach((p) => {
+      const n = document.createElement("div");
+      n.className = "wv-node"; n.dataset.id = p.id;
+      n.style.left = pos[p.id].x + "px"; n.style.top = pos[p.id].y + "px";
+      n.innerHTML = `<div class="wv-node-top"><span class="wv-node-dot" style="background:${tc[p.threat] || 'var(--txt-dim)'}"></span><span class="wv-node-name">${escp(p.name)}</span></div><div class="wv-node-sub">${escp(p.alias || p.caseNumber || '')}</div>`;
+      canvas.appendChild(n);
+      wireNode(n);
+    });
+    drawLines();
+  }
+
+  window.WebView = {
+    open() { $("#webview-scrim").classList.add("open"); layout(false); render(); },
+    close() { $("#webview-scrim").classList.remove("open"); }
+  };
+
+  $("#wv-close").addEventListener("click", () => window.WebView.close());
+  $("#wv-relayout").addEventListener("click", () => { localStorage.removeItem(POS_KEY); layout(true); render(); });
+})();
+</script>
+<script>
+/* ===================================================================
+   CyberSOC â€” Settings (theme, ticker, ops) persisted to localStorage
+   =================================================================== */
+(function () {
+  const KEY = "soc_settings";
+  const DEFAULTS = {
+    theme: "dark", accent: "magenta",
+    tickerVisible: true, tickerSource: "both", tickerIssuesOnly: false, tickerSpeed: 3,
+    radar: true, sweepSpeed: 0.7, refreshSec: 7, reduceMotion: false
+  };
+  const ACCENTS = {
+    magenta: ["#ff2d6f", "#7a1538", "rgba(255,45,111,0.45)"],
+    cyan:    ["#00e5ff", "#0a6b78", "rgba(0,229,255,0.45)"],
+    green:   ["#39ff14", "#1a7a0d", "rgba(57,255,20,0.40)"],
+    amber:   ["#ffae00", "#7a5300", "rgba(255,174,0,0.45)"]
+  };
+  let state = load();
+  function load() { try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) { return Object.assign({}, DEFAULTS); } }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+  function get(k) { return state[k]; }
+  function tickerDuration() { return (74 - state.tickerSpeed * 11) + "s"; }
+
+  function applyTheme() { document.documentElement.dataset.theme = state.theme; if (window.Sitrep && window.Sitrep.setBasemap) window.Sitrep.setBasemap(state.theme); }
+  function applyAccent() { const a = ACCENTS[state.accent] || ACCENTS.magenta; const s = document.documentElement.style; s.setProperty("--accent", a[0]); s.setProperty("--accent-dim", a[1]); s.setProperty("--accent-glow", a[2]); }
+  function applyTicker() { document.documentElement.classList.toggle("no-ticker", !state.tickerVisible); document.documentElement.style.setProperty("--ticker-dur", tickerDuration()); if (window.Ticker) window.Ticker.refresh(); if (window.Sitrep) window.Sitrep.onShow(); }
+  function applyRadar() { if (window.Sitrep) { window.Sitrep.setSweepEnabled(state.radar && !state.reduceMotion); window.Sitrep.setSweepSpeed(state.sweepSpeed); } }
+  function applyRefresh() { if (window.Sitrep) window.Sitrep.setRefreshInterval(state.refreshSec * 1000); }
+  function applyMotion() { document.documentElement.classList.toggle("reduce-motion", state.reduceMotion); applyRadar(); }
+  function applyAll() { applyTheme(); applyAccent(); applyTicker(); applyMotion(); applyRadar(); applyRefresh(); }
+
+  function set(k, v) {
+    state[k] = v; save();
+    if (k === "theme") applyTheme();
+    else if (k === "accent") applyAccent();
+    else if (k === "tickerVisible") applyTicker();
+    else if (k === "tickerSource" || k === "tickerIssuesOnly") { if (window.Ticker) window.Ticker.refresh(); }
+    else if (k === "tickerSpeed") document.documentElement.style.setProperty("--ticker-dur", tickerDuration());
+    else if (k === "reduceMotion") applyMotion();
+    else if (k === "radar" || k === "sweepSpeed") applyRadar();
+    else if (k === "refreshSec") applyRefresh();
+  }
+
+  /* ---- view rendering ---- */
+  function row(label, desc, controlHtml) {
+    return `<div class="set-row"><div class="set-info"><div class="set-label">${label}</div><div class="set-desc">${desc}</div></div><div class="set-control">${controlHtml}</div></div>`;
+  }
+  function toggle(key) { return `<div class="toggle ${state[key] ? "on" : ""}" data-toggle="${key}"></div>`; }
+  function segmented(key, opts) { return `<div class="segmented" data-seg="${key}">${opts.map(o => `<button data-val="${o.v}" class="${state[key] === o.v ? "on" : ""}">${o.l}</button>`).join("")}</div>`; }
+  function slider(key, min, max, step, fmt) { return `<div class="set-slider"><input type="range" min="${min}" max="${max}" step="${step}" value="${state[key]}" data-slider="${key}"><span class="sv" data-sv="${key}">${fmt(state[key])}</span></div>`; }
+  function swatches() { return `<div class="swatches" data-swatch>${Object.keys(ACCENTS).map(n => `<span class="swatch ${state.accent === n ? "on" : ""}" data-accent="${n}" style="background:${ACCENTS[n][0]};color:${ACCENTS[n][0]}"></span>`).join("")}</div>`; }
+
+  function render() {
+    const wrap = document.getElementById("settings-wrap");
+    if (!wrap) return;
+    wrap.innerHTML =
+      `<h1 class="settings-title">SETTINGS</h1>
+       <div class="settings-sub">CONSOLE CONFIGURATION Â· SAVED TO THIS DEVICE</div>
+       <div class="set-section"><h3>APPEARANCE</h3>
+         ${row("Theme", "Dark tactical or light operations mode â€” also swaps the map basemap", segmented("theme", [{v:"dark",l:"DARK"},{v:"light",l:"LIGHT"}]))}
+         ${row("Accent color", "Primary highlight across the console", swatches())}
+       </div>
+       <div class="set-section"><h3>STATUS TICKER</h3>
+         ${row("Show ticker", "Scrolling status bar beneath the navigation", toggle("tickerVisible"))}
+         ${row("Data source", "Which systems feed the ticker", segmented("tickerSource", [{v:"azure",l:"AZURE"},{v:"solarwinds",l:"SOLARWINDS"},{v:"both",l:"BOTH"}]))}
+         ${row("Only show issues", "Hide operational entries; surface degraded / outages", toggle("tickerIssuesOnly"))}
+         ${row("Scroll speed", "Marquee velocity", slider("tickerSpeed", 1, 5, 1, v => ["","SLOW","RELAXED","NORMAL","BRISK","FAST"][v]))}
+       </div>
+       <div class="set-section"><h3>OPERATIONS</h3>
+         ${row("Radar sweep", "Rotating sweep + region pings on the SITREP map", toggle("radar"))}
+         ${row("Sweep speed", "Rotation rate of the radar line", slider("sweepSpeed", 0.2, 2, 0.1, v => (+v).toFixed(1) + "Â°/f"))}
+         ${row("Auto-refresh", "How often status telemetry re-syncs", slider("refreshSec", 3, 30, 1, v => v + "s"))}
+         ${row("Reduce motion", "Pause sweep, ticker and ambient animation", toggle("reduceMotion"))}
+       </div>
+       <div class="set-section"><h3>DATA</h3>
+         ${row("Reset to defaults", "Restore all settings on this device", `<button class="btn-ghost set-reset" id="set-reset">RESET</button>`)}
+       </div>
+       <div class="set-foot">CyberSOC v1.2 Â· status sources: Azure Â· SolarWinds Observability<br>live feeds require the local Node server (port 3005)</div>`;
+
+    wrap.querySelectorAll("[data-toggle]").forEach(el => el.addEventListener("click", () => {
+      const k = el.dataset.toggle; set(k, !state[k]); el.classList.toggle("on", state[k]);
+    }));
+    wrap.querySelectorAll("[data-seg]").forEach(seg => seg.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+      const k = seg.dataset.seg; let v = b.dataset.val;
+      seg.querySelectorAll("button").forEach(x => x.classList.remove("on")); b.classList.add("on");
+      set(k, v);
+    })));
+    wrap.querySelectorAll("[data-slider]").forEach(sl => sl.addEventListener("input", () => {
+      const k = sl.dataset.slider; const v = k === "sweepSpeed" ? parseFloat(sl.value) : parseInt(sl.value, 10);
+      set(k, v);
+      const sv = wrap.querySelector(`[data-sv="${k}"]`);
+      if (sv) {
+        if (k === "tickerSpeed") sv.textContent = ["","SLOW","RELAXED","NORMAL","BRISK","FAST"][v];
+        else if (k === "sweepSpeed") sv.textContent = v.toFixed(1) + "Â°/f";
+        else sv.textContent = v + "s";
+      }
+    }));
+    const sw = wrap.querySelector("[data-swatch]");
+    if (sw) sw.querySelectorAll(".swatch").forEach(s => s.addEventListener("click", () => {
+      sw.querySelectorAll(".swatch").forEach(x => x.classList.remove("on")); s.classList.add("on");
+      set("accent", s.dataset.accent);
+    }));
+    const rb = wrap.querySelector("#set-reset");
+    if (rb) rb.addEventListener("click", () => {
+      if (!confirm("Reset all console settings to defaults?")) return;
+      state = Object.assign({}, DEFAULTS); save(); applyAll(); render();
+    });
+  }
+
+  window.Settings = { init() { /* state already loaded */ }, applyAll, render, get, set };
+})();
+</script>
+<script>
+/* ===================================================================
+   CyberSOC â€” Status Ticker (Azure regions + SolarWinds components)
+   =================================================================== */
+(function () {
+  const COLOR = { operational: "var(--op)", degraded: "var(--deg)", outage: "var(--out)", maintenance: "#19c3d6" };
+  const LABEL = { operational: "OPERATIONAL", degraded: "DEGRADED", outage: "OUTAGE", maintenance: "MAINTENANCE" };
+
+  function cfg(k, d) { return window.Settings ? window.Settings.get(k) : d; }
+
+  function items() {
+    const src = cfg("tickerSource", "both");
+    const issuesOnly = cfg("tickerIssuesOnly", false);
+    let list = [];
+    if (src === "azure" || src === "both") list = list.concat(AZURE_REGIONS.map(r => ({ name: r.name, status: r.status, src: "AZ" })));
+    if (src === "solarwinds" || src === "both") list = list.concat(SOLARWINDS_COMPONENTS.map(c => ({ name: c.name, status: c.status, src: "SW" })));
+    if (issuesOnly) list = list.filter(i => i.status !== "operational");
+    return list;
+  }
+  function itemHtml(i) {
+    const c = COLOR[i.status] || "var(--txt-dim)";
+    return `<span class="tk-item"><span class="tk-dot" style="background:${c};color:${c}"></span><span class="tk-name">${i.name}</span><span class="tk-status" style="color:${c}">${LABEL[i.status] || ""}</span><span class="tk-src">${i.src}</span></span>`;
+  }
+
+  function render() {
+    const track = document.getElementById("ticker-track");
+    if (!track) return;
+    const src = cfg("tickerSource", "both");
+    const lbl = document.getElementById("ticker-label-text");
+    if (lbl) lbl.textContent = src === "azure" ? "AZURE" : src === "solarwinds" ? "SOLARWINDS" : "STATUS";
+
+    const list = items();
+    let half = list.length ? list.map(itemHtml).join("") : `<span class="tk-allgood">âœ“ ALL MONITORED SYSTEMS OPERATIONAL</span>`;
+    const unit = half;
+    track.innerHTML = half;
+    const viewport = track.parentElement.clientWidth || 600;
+    let guard = 0;
+    while (track.scrollWidth < viewport && guard < 10) { half += unit; track.innerHTML = half; guard++; }
+    track.innerHTML = half + half; // duplicate halves â†’ seamless -50% loop
+  }
+
+  let timer = null;
+  window.Ticker = {
+    init() {
+      render();
+      syncSolarWindsStatus().then(render);
+      timer = setInterval(async () => { await syncSolarWindsStatus(); render(); }, 9000);
+    },
+    refresh() { render(); }
+  };
+})();
+</script>
+</body>
+</html>
+
