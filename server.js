@@ -216,6 +216,9 @@ async function getCISA() {
   }));
 }
 
+const IPV4 = /^(?:\d{1,3}\.){3}\d{1,3}$/;
+function tsFromSpace(s) { return s ? new Date(String(s).replace(" ", "T") + "Z").getTime() : Date.now(); }
+
 /* ---- Feodo Tracker — botnet C2 / malicious IPs (carries country) ---- */
 const FEODO = "https://feodotracker.abuse.ch/downloads/ipblocklist.json";
 async function getFeodo() {
@@ -224,25 +227,20 @@ async function getFeodo() {
     .slice()
     .sort((a, b) => (a.status === "online" ? -1 : 1) - (b.status === "online" ? -1 : 1))
     .slice(0, 45);
-  return rows.map((r) => {
-    const g = geoForCountry(r.country);
-    return {
-      id: "c2-" + r.ip_address + ":" + (r.port || 0),
-      cat: "C2",
-      sev: r.status === "online" ? "outage" : "degraded",
-      title: r.ip_address + (r.port ? ":" + r.port : ""),
-      sub: (r.malware || "Botnet C2") + (r.country ? " · " + r.country : ""),
-      msg: [r.malware ? r.malware + " command-and-control node" : "Botnet C2 node",
-            r.status ? "(" + r.status + ")" : "", r.as_name ? "AS: " + r.as_name : ""]
-            .filter(Boolean).join(" "),
-      ts: r.last_online ? new Date(r.last_online.replace(" ", "T") + "Z").getTime()
-                        : (r.first_seen ? new Date(r.first_seen.replace(" ", "T") + "Z").getTime() : Date.now()),
-      src: "Feodo Tracker",
-      lat: g ? g.lat : undefined,
-      lng: g ? g.lng : undefined,
-      geo: r.country || undefined
-    };
-  });
+  return rows.map((r) => ({
+    id: "c2-" + r.ip_address + ":" + (r.port || 0),
+    cat: "C2",
+    sev: r.status === "online" ? "outage" : "degraded",
+    title: r.ip_address + (r.port ? ":" + r.port : ""),
+    sub: (r.malware || "Botnet C2") + (r.country ? " · " + r.country : ""),
+    msg: [r.malware ? r.malware + " command-and-control node" : "Botnet C2 node",
+          r.status ? "(" + r.status + ")" : "", r.as_name ? "AS: " + r.as_name : ""]
+          .filter(Boolean).join(" "),
+    ts: r.last_online ? tsFromSpace(r.last_online) : (r.first_seen ? tsFromSpace(r.first_seen) : Date.now()),
+    src: "Feodo Tracker",
+    ip: r.ip_address,            // precise geo via ip-api
+    cc: r.country || undefined   // country-centroid fallback
+  }));
 }
 
 /* ---- ThreatFox — recent IOCs (abuse.ch) ---- */
@@ -253,6 +251,7 @@ async function getThreatFox() {
   for (const key of Object.keys(j || {})) {
     const rec = Array.isArray(j[key]) ? j[key][0] : j[key];
     if (!rec || !rec.ioc_value) continue;
+    const ipPart = String(rec.ioc_value).split(":")[0];
     out.push({
       id: "iocfx-" + key,
       cat: "IOC",
@@ -264,12 +263,114 @@ async function getThreatFox() {
             rec.confidence_level != null ? "confidence " + rec.confidence_level + "%" : "",
             (rec.tags && rec.tags.length) ? "tags: " + rec.tags.slice(0, 4).join(", ") : ""]
             .filter(Boolean).join(" · "),
-      ts: rec.first_seen_utc ? new Date(rec.first_seen_utc.replace(" ", "T") + "Z").getTime() : Date.now(),
-      src: "ThreatFox"
+      ts: rec.first_seen_utc ? tsFromSpace(rec.first_seen_utc) : Date.now(),
+      src: "ThreatFox",
+      ip: IPV4.test(ipPart) ? ipPart : undefined
     });
     if (out.length >= 30) break;
   }
   return out;
+}
+
+/* ---- URLhaus — recent malicious URLs (abuse.ch) ---- */
+const URLHAUS = "https://urlhaus.abuse.ch/downloads/json_recent/";
+async function getURLhaus() {
+  const j = await fetchJSON(URLHAUS);
+  const out = [];
+  for (const key of Object.keys(j || {})) {
+    const rec = Array.isArray(j[key]) ? j[key][0] : j[key];
+    if (!rec || !rec.url) continue;
+    out.push({
+      id: "url-" + key,
+      cat: "URL",
+      sev: rec.url_status === "online" ? "outage" : "degraded",
+      title: (rec.host || rec.url || "").slice(0, 46),
+      sub: (rec.threat || "malware URL").replace(/_/g, " ") + (rec.url_status ? " · " + rec.url_status : ""),
+      msg: [String(rec.url).slice(0, 90),
+            (rec.tags && rec.tags.length) ? "tags: " + rec.tags.slice(0, 4).join(", ") : ""]
+            .filter(Boolean).join(" · "),
+      ts: rec.date_added ? tsFromSpace(rec.date_added.replace(" UTC", "")) : Date.now(),
+      src: "URLhaus",
+      ip: rec.host && IPV4.test(rec.host) ? rec.host : undefined
+    });
+    if (out.length >= 30) break;
+  }
+  return out;
+}
+
+/* ---- Tor Project — running exit relays (Onionoo, carries lat/lng) ---- */
+const ONIONOO = "https://onionoo.torproject.org/details?type=relay&running=true&flag=Exit&fields=nickname,country,country_name,latitude,longitude,as_name";
+async function getTor() {
+  const j = await fetchJSON(ONIONOO);
+  const relays = (j.relays || []).filter((r) => r.latitude != null && r.longitude != null).slice(0, 90);
+  return relays.map((r, i) => ({
+    id: "tor-" + (r.nickname || i) + "-" + i,
+    cat: "TOR",
+    sev: "info",
+    title: r.nickname || "exit relay",
+    sub: "Tor exit · " + (r.country_name || (r.country || "").toUpperCase()),
+    msg: ["Tor exit relay", r.as_name ? "AS: " + r.as_name : ""].filter(Boolean).join(" · "),
+    ts: Date.now(),
+    src: "Tor Project",
+    lat: +r.latitude,
+    lng: +r.longitude,
+    geo: (r.country || "").toUpperCase() || undefined
+  }));
+}
+
+/* ---- ransomware.live — recent ransomware victim disclosures ---- */
+const RANSOMWARE = "https://api.ransomware.live/recentvictims";
+async function getRansomware() {
+  const arr = await fetchJSON(RANSOMWARE);
+  const rows = (Array.isArray(arr) ? arr : []).slice(0, 30);
+  return rows.map((r, i) => ({
+    id: "ransom-" + (r.post_title || i) + "-" + (r.discovered || i),
+    cat: "RANSOM",
+    sev: "outage",
+    title: (r.post_title || "victim").slice(0, 46),
+    sub: (r.group_name ? r.group_name.toUpperCase() : "Ransomware") + (r.country ? " · " + r.country : ""),
+    msg: ["Ransomware victim disclosure",
+          r.group_name ? "group: " + r.group_name : "",
+          r.activity ? "sector: " + r.activity : ""].filter(Boolean).join(" · "),
+    ts: r.discovered ? tsFromSpace(r.discovered) : (r.published ? Date.parse(r.published) || Date.now() : Date.now()),
+    src: "ransomware.live",
+    cc: r.country || undefined
+  }));
+}
+
+/* ---- precise geolocation of IP-bearing items via ip-api.com (free, no key,
+   HTTP-only, batch up to 100/req) — then country-centroid fallback. ---- */
+async function geoEnrich(items) {
+  const need = items.filter((it) => it.ip && it.lat == null);
+  const ips = [...new Set(need.map((it) => it.ip))].slice(0, 100);
+  const map = {};
+  if (ips.length) {
+    try {
+      const r = await fetch("http://ip-api.com/batch?fields=status,countryCode,city,lat,lon,query", {
+        method: "POST",
+        headers: { "User-Agent": "CyberSOC/1.0 (local SOC console)", "Content-Type": "application/json" },
+        body: JSON.stringify(ips)
+      });
+      if (r.ok) {
+        const arr = await r.json();
+        (Array.isArray(arr) ? arr : []).forEach((o) => {
+          if (o && o.status === "success") map[o.query] = { lat: o.lat, lng: o.lon, cc: o.countryCode, city: o.city };
+        });
+      }
+    } catch (e) { /* offline / blocked — fall through to centroids */ }
+  }
+  let precise = 0, centroid = 0;
+  items.forEach((it) => {
+    if (it.lat != null) return;
+    if (it.ip && map[it.ip]) {
+      const g = map[it.ip];
+      it.lat = g.lat; it.lng = g.lng; it.geo = it.geo || g.cc; it.city = g.city; precise++;
+    } else if (it.cc) {
+      const g = geoForCountry(it.cc);
+      if (g) { it.lat = g.lat; it.lng = g.lng; it.geo = it.geo || it.cc; centroid++; }
+    }
+  });
+  return { precise, centroid };
 }
 
 /* In-memory cache + background refresher (every 60s; see startup). */
@@ -279,7 +380,8 @@ async function refreshThreatIntel() {
   if (_refreshing) return THREAT_INTEL;
   _refreshing = true;
   const jobs = [
-    ["cisa", getCISA], ["feodo", getFeodo], ["threatfox", getThreatFox]
+    ["cisa", getCISA], ["feodo", getFeodo], ["threatfox", getThreatFox],
+    ["urlhaus", getURLhaus], ["tor", getTor], ["ransomware", getRansomware]
   ];
   const results = await Promise.allSettled(jobs.map(([, fn]) => fn()));
   const items = [];
@@ -293,13 +395,15 @@ async function refreshThreatIntel() {
       feeds[name] = { ok: false, error: (res.reason && res.reason.message) || "failed" };
     }
   });
+  const geo = await geoEnrich(items);
   items.sort((a, b) => (b.ts || 0) - (a.ts || 0));
   THREAT_INTEL.fetchedAt = new Date().toISOString();
   THREAT_INTEL.feeds = feeds;
   THREAT_INTEL.items = items;
+  THREAT_INTEL.geo = geo;
   _refreshing = false;
   const live = Object.values(feeds).filter((f) => f.ok).length;
-  console.log(`  ◇ threat-intel refreshed @ ${THREAT_INTEL.fetchedAt} · ${items.length} items · ${live}/${jobs.length} feeds live`);
+  console.log(`  ◇ threat-intel refreshed @ ${THREAT_INTEL.fetchedAt} · ${items.length} items · ${live}/${jobs.length} feeds live · geo ${geo.precise}+${geo.centroid}`);
   return THREAT_INTEL;
 }
 

@@ -310,7 +310,8 @@ body { position: relative; }
 .af-chip:hover { color: var(--txt); border-color: var(--line); }
 .af-chip.active { background: var(--accent); color: #0a0608; border-color: var(--accent); }
 .alert-cat { font-family: var(--mono); font-size: 8px; letter-spacing: 2px; padding: 1px 6px; border: 1px solid currentColor; color: var(--txt-mut); }
-.cat-CVE { color: #ff7a3d; } .cat-C2 { color: var(--out); } .cat-IOC { color: var(--deg); } .cat-AZURE { color: var(--accent); }
+.cat-CVE { color: #e0b341; } .cat-C2 { color: var(--out); } .cat-IOC { color: var(--deg); } .cat-AZURE { color: var(--accent); }
+.cat-URL { color: #ff7a3d; } .cat-TOR { color: #9b6dff; } .cat-RANSOM { color: var(--accent); }
 .alert-card.geo { cursor: pointer; }
 .alert-card.geo:hover { border-color: var(--line); background: var(--bg-2); }
 .alert-pin { font-family: var(--mono); font-size: 8px; letter-spacing: 1px; color: var(--op); margin-top: 5px; }
@@ -318,9 +319,27 @@ body { position: relative; }
 .intel-foot { flex-shrink: 0; padding: 8px 12px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: 8px; letter-spacing: 1px; color: var(--txt-dim); line-height: 1.5; }
 .intel-foot .if-ok { color: var(--op); } .intel-foot .if-bad { color: var(--deg); }
 
-/* threat-intel map markers */
-.threat-marker { width: 12px; height: 12px; transform: rotate(45deg); border: 1.5px solid var(--out); background: rgba(255,59,59,.25); box-shadow: 0 0 8px rgba(255,59,59,.6); }
-.threat-marker.sev-degraded { border-color: var(--deg); background: rgba(245,166,35,.22); box-shadow: 0 0 8px rgba(245,166,35,.55); }
+/* threat-intel map markers â€” distinct shape + colour per source */
+.tm { width: 12px; height: 12px; box-sizing: border-box; }
+.tm-C2 { transform: rotate(45deg); border: 1.5px solid var(--out); background: rgba(255,59,59,.28); box-shadow: 0 0 8px rgba(255,59,59,.55); }
+.tm-C2.sev-degraded { border-color: var(--deg); background: rgba(245,166,35,.26); box-shadow: 0 0 8px rgba(245,166,35,.5); }
+.tm-IOC { border: 1.5px solid var(--deg); background: rgba(245,166,35,.26); box-shadow: 0 0 8px rgba(245,166,35,.5); }
+.tm-URL { width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 12px solid #ff7a3d; background: none; filter: drop-shadow(0 0 5px rgba(255,122,61,.7)); }
+.tm-TOR { border-radius: 50%; border: 1.5px solid #9b6dff; background: rgba(155,109,255,.32); box-shadow: 0 0 8px rgba(155,109,255,.6); }
+.tm-RANSOM { border: 1.5px solid var(--accent); background: rgba(255,45,111,.32); box-shadow: 0 0 9px var(--accent-glow); animation: ransomPulse 1.6s ease-in-out infinite; }
+@keyframes ransomPulse { 0%,100% { box-shadow: 0 0 6px rgba(255,45,111,.5); } 50% { box-shadow: 0 0 15px rgba(255,45,111,.95); } }
+:root.reduce-motion .tm-RANSOM { animation: none !important; }
+
+/* SITREP map legend / layer toggles */
+.map-legend { position: absolute; left: 16px; bottom: 24px; z-index: 600; background: rgba(10,6,8,.62); backdrop-filter: blur(6px); border: 1px solid var(--line); padding: 9px 11px; min-width: 158px; }
+.map-legend-h { font-family: var(--mono); font-size: 8px; letter-spacing: 2px; color: var(--txt-dim); margin-bottom: 7px; }
+.legend-row { display: flex; align-items: center; gap: 9px; padding: 3px 2px; cursor: pointer; font-family: var(--mono); font-size: 10px; color: var(--txt); user-select: none; transition: opacity .12s, color .12s; }
+.legend-row.off { opacity: .38; }
+.legend-row:hover { color: var(--accent); }
+.legend-swatch { width: 16px; height: 14px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.legend-count { margin-left: auto; font-size: 9px; color: var(--txt-dim); }
+:root[data-theme="light"] .map-legend { background: rgba(245,246,249,.78); }
+@media (max-width: 720px) { .map-legend { bottom: 12px; left: 10px; min-width: 138px; padding: 7px 9px; } }
 
 /* ===================== CLI ===================== */
 .cli-out { flex: 1; overflow-y: auto; padding: 14px; font-family: var(--mono); font-size: 12px; line-height: 1.55; }
@@ -752,6 +771,9 @@ body { position: relative; }
     <div class="hud-sync">LAST SYNC <span id="m-sync">--:--:--</span> &#xB7; <span id="m-loc">ACQUIRING POS&#x2026;</span></div>
   </div>
 
+  <!-- Map layer legend / toggles -->
+  <div class="map-legend" id="map-legend"></div>
+
   <!-- ===== LEFT PANEL: granular alerts ===== -->
   <aside id="alert-panel" class="side-panel left">
     <button class="pull-tab left" id="alert-tab" aria-label="Toggle alert feed">
@@ -769,6 +791,8 @@ body { position: relative; }
         <button class="af-chip" data-cat="CVE">CVE</button>
         <button class="af-chip" data-cat="C2">C2/IP</button>
         <button class="af-chip" data-cat="IOC">IOC</button>
+        <button class="af-chip" data-cat="URL">URL</button>
+        <button class="af-chip" data-cat="RANSOM">RANSOM</button>
       </div>
       <div class="alert-list" id="alert-list"></div>
       <div class="intel-foot" id="intel-foot">FEEDS: &#x2014;</div>
@@ -1249,7 +1273,21 @@ const INTEL_SIM = [
   { id: "iocfx-sim-2", cat: "IOC", sev: "degraded", title: "update-cdn-secure.com", sub: "Lumma Stealer \u00B7 domain",
     msg: "payload_delivery \u00B7 confidence 75% \u00B7 tags: stealer, lumma", src: "ThreatFox (sim)" },
   { id: "iocfx-sim-3", cat: "IOC", sev: "outage", title: "194.169.175.132:13782", sub: "AsyncRAT \u00B7 ip:port",
-    msg: "botnet_cc \u00B7 confidence 90% \u00B7 tags: rat, asyncrat", src: "ThreatFox (sim)" }
+    msg: "botnet_cc \u00B7 confidence 90% \u00B7 tags: rat, asyncrat", src: "ThreatFox (sim)", lat: 50.45, lng: 30.52, geo: "UA", city: "Kyiv" },
+  { id: "url-sim-1", cat: "URL", sev: "outage", title: "193.42.33.18", sub: "malware download \u00B7 online",
+    msg: "http://193.42.33.18/win/loader.exe \u00B7 tags: loader, smokeloader", src: "URLhaus (sim)", lat: 50.11, lng: 8.68, geo: "DE", city: "Frankfurt" },
+  { id: "url-sim-2", cat: "URL", sev: "degraded", title: "secure-doc-share.top", sub: "phishing \u00B7 offline",
+    msg: "https://secure-doc-share.top/login \u00B7 tags: phishing, credential", src: "URLhaus (sim)" },
+  { id: "ransom-sim-1", cat: "RANSOM", sev: "outage", title: "Acme Manufacturing Co.", sub: "LOCKBIT3 \u00B7 US",
+    msg: "Ransomware victim disclosure \u00B7 group: lockbit3 \u00B7 sector: Manufacturing", src: "ransomware.live (sim)", lat: 39.8, lng: -98.6, geo: "US" },
+  { id: "ransom-sim-2", cat: "RANSOM", sev: "outage", title: "Banque R\u00E9gionale SA", sub: "ALPHV \u00B7 FR",
+    msg: "Ransomware victim disclosure \u00B7 group: alphv \u00B7 sector: Finance", src: "ransomware.live (sim)", lat: 48.86, lng: 2.35, geo: "FR" },
+  { id: "tor-sim-1", cat: "TOR", sev: "info", title: "RelayNode7", sub: "Tor exit \u00B7 Sweden",
+    msg: "Tor exit relay \u00B7 AS: 31400", src: "Tor Project (sim)", lat: 59.33, lng: 18.06, geo: "SE" },
+  { id: "tor-sim-2", cat: "TOR", sev: "info", title: "ExitGuardian", sub: "Tor exit \u00B7 United States",
+    msg: "Tor exit relay", src: "Tor Project (sim)", lat: 38.9, lng: -77.0, geo: "US" },
+  { id: "tor-sim-3", cat: "TOR", sev: "info", title: "OnionPipe", sub: "Tor exit \u00B7 Germany",
+    msg: "Tor exit relay \u00B7 AS: 24940", src: "Tor Project (sim)", lat: 50.11, lng: 8.68, geo: "DE" }
 ];
 function simIntel() {
   const now = Date.now();
@@ -1407,8 +1445,9 @@ function exportDossier(list) {
 (function () {
   let map, radarCenterLatLng = null;
   const markers = {};        // code -> { marker, el, latlng, lastPing }
-  let alertFilter = "ALL";   // ALL | AZURE | CVE | C2 | IOC
+  let alertFilter = "ALL";   // ALL | AZURE | CVE | C2 | IOC | URL | RANSOM
   let threatLayer = null;    // Leaflet layer group for plotted threat intel
+  let threatLayers = { C2: true, IOC: true, URL: true, RANSOM: true, TOR: false };
   let lastThreatSig = "";    // avoid rebuilding pins when nothing changed
   let sweepAngle = 0, prevSweepAngle = 0;
   let SWEEP_SPEED = 0.7;   // deg per frame (~8.5s / revolution)
@@ -1631,6 +1670,7 @@ function exportDossier(list) {
       });
     });
     THREAT_FEED.items.forEach((it) => {
+      if (it.cat === "TOR") return; // Tor exit relays are a map-only layer
       out.push({
         cat: it.cat, sev: it.sev,
         time: it.ts ? ago(it.ts) + " ago" : "",
@@ -1681,7 +1721,7 @@ function exportDossier(list) {
   function renderIntelFoot() {
     const el = $("#intel-foot"); if (!el) return;
     const f = THREAT_FEED.feeds || {};
-    const names = { cisa: "CISA KEV", feodo: "Feodo", threatfox: "ThreatFox" };
+    const names = { cisa: "CISA", feodo: "Feodo", threatfox: "ThreatFox", urlhaus: "URLhaus", tor: "Tor", ransomware: "Ransom" };
     const parts = Object.keys(names).map((k) => {
       const ok = f[k] && f[k].ok;
       return `<span class="${ok ? "if-ok" : "if-bad"}">${ok ? "\u25CF" : "\u25CB"} ${names[k]}</span>`;
@@ -1690,25 +1730,48 @@ function exportDossier(list) {
     el.innerHTML = `FEEDS ${LIVE_MODE_INTEL ? "LIVE" : "SIM"} \u00B7 ${parts.join("&nbsp;&nbsp;")} \u00B7 upd ${when}`;
   }
 
-  /* Plot geo-tagged threat intel (C2 / malicious IPs) on the map. */
-  function renderThreatPins() {
+  /* Map legend with per-source layer toggles. */
+  const LEGEND_CATS = [["C2", "C2 / IP"], ["IOC", "IOC"], ["URL", "Malicious URL"], ["RANSOM", "Ransomware"], ["TOR", "Tor exit"]];
+  function renderLegend() {
+    const el = $("#map-legend"); if (!el) return;
+    const counts = {};
+    THREAT_FEED.items.forEach((it) => { if (it.lat != null) counts[it.cat] = (counts[it.cat] || 0) + 1; });
+    el.innerHTML = `<div class="map-legend-h">MAP LAYERS</div>` + LEGEND_CATS.map(([c, label]) => {
+      const on = threatLayers[c] !== false;
+      return `<div class="legend-row ${on ? "" : "off"}" data-layer="${c}">
+        <span class="legend-swatch"><span class="tm tm-${c} sev-outage"></span></span>
+        <span>${label}</span><span class="legend-count">${counts[c] || 0}</span>
+      </div>`;
+    }).join("");
+    el.querySelectorAll(".legend-row").forEach((row) => row.addEventListener("click", () => {
+      const c = row.dataset.layer;
+      threatLayers[c] = threatLayers[c] === false;
+      renderThreatPins(true);
+      renderLegend();
+    }));
+  }
+
+  /* Plot geo-tagged threat intel on the map (filtered by enabled layers). */
+  function renderThreatPins(force) {
     if (!map) return;
-    const geoItems = THREAT_FEED.items.filter((it) => it.lat != null && it.lng != null);
-    const sig = geoItems.map((it) => it.id + it.sev).join("|");
-    if (sig === lastThreatSig && threatLayer) return; // nothing changed
+    const geoItems = THREAT_FEED.items.filter((it) => it.lat != null && it.lng != null && threatLayers[it.cat] !== false);
+    const sig = geoItems.map((it) => it.id + it.sev).join("|") + "||" + JSON.stringify(threatLayers);
+    if (!force && sig === lastThreatSig && threatLayer) return; // nothing changed
     lastThreatSig = sig;
     if (threatLayer) { map.removeLayer(threatLayer); threatLayer = null; }
     if (!geoItems.length) return;
+    const palette = { C2: "var(--out)", IOC: "var(--deg)", URL: "#ff7a3d", TOR: "#9b6dff", RANSOM: "var(--accent)" };
     const layers = geoItems.map((it) => {
       const icon = L.divIcon({
         className: "",
-        html: `<div class="threat-marker sev-${it.sev}"></div>`,
-        iconSize: [12, 12], iconAnchor: [6, 6]
+        html: `<div class="tm tm-${it.cat} sev-${it.sev}"></div>`,
+        iconSize: [14, 14], iconAnchor: [7, 7]
       });
-      const color = it.sev === "outage" ? "var(--out)" : "var(--deg)";
+      const color = palette[it.cat] || "var(--accent)";
+      const loc = it.city ? (it.city + (it.geo ? ", " + it.geo : "")) : (it.geo || "");
       return L.marker([it.lat, it.lng], { icon, keyboard: false })
         .bindPopup(`<div class="rp-name">${escA(it.title)}</div>
-                    <div class="rp-meta">${escA((it.sub || "").slice(0, 54))}</div>
+                    <div class="rp-meta">${escA((it.sub || "").slice(0, 54))}${loc ? " \u00B7 " + escA(loc) : ""}</div>
                     <div class="rp-status" style="color:${color}">${escA(it.cat)} \u00B7 ${escA(it.src || "")}</div>`,
           { className: "region-popup", closeButton: false });
     });
@@ -1716,11 +1779,12 @@ function exportDossier(list) {
   }
 
   async function refreshAll() {
-    await Promise.all([syncAzureStatus(), syncThreatIntel()]);
+    await Promise.all([syncAzureStatus(), syncThreatIntel(), syncSolarWindsStatus()]);
     AZURE_REGIONS.forEach(updateMarkerStatus);
     updateHUD();
     renderAlerts();
     renderThreatPins();
+    renderLegend();
     updateFeedIndicator();
     if (window.Ticker) window.Ticker.refresh();
   }
@@ -2009,6 +2073,7 @@ function exportDossier(list) {
       acquirePosition();
       updateHUD();
       renderAlerts();
+      renderLegend();
       requestAnimationFrame(sweepLoop);
       refreshAll();
       refreshTimer = setInterval(refreshAll, 7000);
@@ -2746,7 +2811,7 @@ function exportDossier(list) {
   const DEFAULTS = {
     theme: "dark", accent: "magenta",
     tickerVisible: true, tickerSource: "both", tickerIssuesOnly: false, tickerSpeed: 3,
-    radar: true, sweepSpeed: 0.7, refreshSec: 7, reduceMotion: false
+    radar: true, sweepSpeed: 0.7, refreshSec: 30, reduceMotion: false
   };
   const ACCENTS = {
     magenta: ["#ff2d6f", "#7a1538", "rgba(255,45,111,0.45)"],
@@ -2788,6 +2853,7 @@ function exportDossier(list) {
   function segmented(key, opts) { return `<div class="segmented" data-seg="${key}">${opts.map(o => `<button data-val="${o.v}" class="${state[key] === o.v ? "on" : ""}">${o.l}</button>`).join("")}</div>`; }
   function slider(key, min, max, step, fmt) { return `<div class="set-slider"><input type="range" min="${min}" max="${max}" step="${step}" value="${state[key]}" data-slider="${key}"><span class="sv" data-sv="${key}">${fmt(state[key])}</span></div>`; }
   function swatches() { return `<div class="swatches" data-swatch>${Object.keys(ACCENTS).map(n => `<span class="swatch ${state.accent === n ? "on" : ""}" data-accent="${n}" style="background:${ACCENTS[n][0]};color:${ACCENTS[n][0]}"></span>`).join("")}</div>`; }
+  function fmtDuration(v) { v = +v; if (v < 60) return v + "s"; const m = Math.floor(v / 60), s = v % 60; return s ? m + "m " + s + "s" : m + "m"; }
 
   function render() {
     const wrap = document.getElementById("settings-wrap");
@@ -2808,7 +2874,7 @@ function exportDossier(list) {
        <div class="set-section"><h3>OPERATIONS</h3>
          ${row("Radar sweep", "Rotating sweep + region pings on the SITREP map", toggle("radar"))}
          ${row("Sweep speed", "Rotation rate of the radar line", slider("sweepSpeed", 0.2, 2, 0.1, v => (+v).toFixed(1) + "\u00B0/f"))}
-         ${row("Auto-refresh", "How often status telemetry re-syncs", slider("refreshSec", 3, 30, 1, v => v + "s"))}
+         ${row("Auto-refresh", "How often all live feeds re-sync (Azure Â· SolarWinds Â· threat intel)", slider("refreshSec", 5, 300, 5, fmtDuration))}
          ${row("Reduce motion", "Pause sweep, ticker and ambient animation", toggle("reduceMotion"))}
        </div>
        <div class="set-section"><h3>DATA</h3>
@@ -2831,6 +2897,7 @@ function exportDossier(list) {
       if (sv) {
         if (k === "tickerSpeed") sv.textContent = ["","SLOW","RELAXED","NORMAL","BRISK","FAST"][v];
         else if (k === "sweepSpeed") sv.textContent = v.toFixed(1) + "\u00B0/f";
+        else if (k === "refreshSec") sv.textContent = fmtDuration(v);
         else sv.textContent = v + "s";
       }
     }));
@@ -2895,7 +2962,8 @@ function exportDossier(list) {
     init() {
       render();
       syncSolarWindsStatus().then(render);
-      timer = setInterval(async () => { await syncSolarWindsStatus(); render(); }, 9000);
+      // SolarWinds now re-syncs with every other feed on the SITREP
+      // auto-refresh timer (see Sitrep.refreshAll) â€” no separate interval.
     },
     refresh() { render(); }
   };
