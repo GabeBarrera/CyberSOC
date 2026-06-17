@@ -133,6 +133,173 @@ async function getSolarWindsStatus() {
   return { source: "solarwinds-statuspage", fetchedAt: new Date().toISOString(), components: comps };
 }
 
+/* ===================================================================
+   THREAT INTELLIGENCE — public infosec feeds (no API keys required)
+   Sources:
+     • CISA KEV   — actively-exploited CVEs (Known Exploited Vulns)
+     • Feodo Tracker (abuse.ch) — botnet C2 / malicious IPs  [HAS GEO]
+     • ThreatFox  (abuse.ch)    — recent IOCs (C2, payloads, domains)
+   All are refreshed in the background on a timer (see startup) and
+   served instantly from THREAT_INTEL cache via /api/threat-intel.
+   Items are normalized to a single shape the client renders directly:
+     { id, cat, sev, title, sub, msg, ts, src, lat?, lng?, geo? }
+   =================================================================== */
+
+/* ISO-3166 alpha-2 → approximate country centroid [lat, lng].
+   Used to plot C2 / malicious IPs (which carry a country code, not a
+   precise location) onto the SITREP map. */
+const COUNTRY_CENTROIDS = {
+  US:[39.8,-98.6], CA:[56.1,-106.3], MX:[23.6,-102.6], BR:[-14.2,-51.9], AR:[-38.4,-63.6],
+  CL:[-35.7,-71.5], CO:[4.6,-74.3], PE:[-9.2,-75.0], VE:[6.4,-66.6], EC:[-1.8,-78.2],
+  GB:[55.4,-3.4], IE:[53.4,-8.2], FR:[46.2,2.2], DE:[51.2,10.4], NL:[52.1,5.3],
+  BE:[50.5,4.5], LU:[49.8,6.1], CH:[46.8,8.2], AT:[47.5,14.6], IT:[41.9,12.6],
+  ES:[40.5,-3.7], PT:[39.4,-8.2], SE:[60.1,18.6], NO:[60.5,8.5], FI:[61.9,25.7],
+  DK:[56.3,9.5], PL:[51.9,19.1], CZ:[49.8,15.5], SK:[48.7,19.7], HU:[47.2,19.5],
+  RO:[45.9,24.97], BG:[42.7,25.5], GR:[39.1,21.8], RS:[44.0,21.0], HR:[45.1,15.2],
+  UA:[48.4,31.2], RU:[61.5,105.3], BY:[53.7,27.9], LT:[55.2,23.9], LV:[56.9,24.6],
+  EE:[58.6,25.0], MD:[47.4,28.4], TR:[39.0,35.2], IL:[31.0,34.9], SA:[23.9,45.1],
+  AE:[23.4,53.8], QA:[25.3,51.2], KW:[29.3,47.5], IR:[32.4,53.7], IQ:[33.2,43.7],
+  EG:[26.8,30.8], ZA:[-30.6,22.9], NG:[9.1,8.7], KE:[-0.0,37.9], MA:[31.8,-7.1],
+  DZ:[28.0,1.7], TN:[33.9,9.6], GH:[7.9,-1.0], ET:[9.1,40.5], TZ:[-6.4,34.9],
+  IN:[20.6,79.0], PK:[30.4,69.3], BD:[23.7,90.4], LK:[7.9,80.8], NP:[28.4,84.1],
+  CN:[35.9,104.2], HK:[22.4,114.1], TW:[23.7,121.0], JP:[36.2,138.3], KR:[35.9,127.8],
+  KP:[40.3,127.5], VN:[14.1,108.3], TH:[15.9,100.99], MY:[4.2,101.98], SG:[1.35,103.82],
+  ID:[-0.8,113.9], PH:[12.9,121.8], MM:[21.9,95.96], KH:[12.6,104.99], LA:[19.9,102.5],
+  AU:[-25.7,133.8], NZ:[-41.8,174.9], FJ:[-17.7,178.1], KZ:[48.0,66.9], UZ:[41.4,64.6],
+  AZ:[40.1,47.6], GE:[42.3,43.4], AM:[40.1,45.0], MN:[46.9,103.8], PA:[8.5,-80.8],
+  CR:[9.7,-83.8], GT:[15.8,-90.2], DO:[18.7,-70.2], JM:[18.1,-77.3], CU:[21.5,-77.8],
+  PR:[18.2,-66.5], IS:[64.96,-19.0], CY:[35.1,33.4], MT:[35.9,14.4], SI:[46.2,15.0],
+  AL:[41.2,20.2], MK:[41.6,21.7], BA:[43.9,17.7], ME:[42.7,19.4], LB:[33.9,35.9],
+  JO:[31.3,36.2], SY:[34.8,38.99], YE:[15.6,48.0], OM:[21.5,55.9], BH:[26.0,50.6],
+  AO:[-11.2,17.9], MZ:[-18.7,35.5], ZM:[-13.1,27.8], ZW:[-19.0,29.9], UG:[1.4,32.3],
+  SN:[14.5,-14.5], CI:[7.5,-5.5], CM:[7.4,12.4], CD:[-4.0,21.8], SD:[12.9,30.2]
+};
+function geoForCountry(cc) {
+  if (!cc) return null;
+  const c = COUNTRY_CENTROIDS[String(cc).toUpperCase()];
+  if (!c) return null;
+  // small deterministic jitter so multiple IPs in one country fan out
+  const j = (s) => { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.charCodeAt(0)) & 0xffff; return ((h % 1000) / 1000 - 0.5) * 6; };
+  return { lat: c[0] + j(cc + "lat"), lng: c[1] + j(cc + "lng") };
+}
+
+async function fetchJSON(url, opts) {
+  if (typeof fetch !== "function") throw new Error("global fetch unavailable (need Node 18+)");
+  const r = await fetch(url, Object.assign({
+    headers: { "User-Agent": "CyberSOC/1.0 (local SOC console)", "Accept": "application/json" }
+  }, opts || {}));
+  if (!r.ok) throw new Error("http " + r.status);
+  return r.json();
+}
+
+/* ---- CISA Known Exploited Vulnerabilities ---- */
+const CISA_KEV = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json";
+async function getCISA() {
+  const j = await fetchJSON(CISA_KEV);
+  const vulns = (j.vulnerabilities || [])
+    .slice()
+    .sort((a, b) => (b.dateAdded || "").localeCompare(a.dateAdded || ""))
+    .slice(0, 14);
+  return vulns.map((v) => ({
+    id: "kev-" + v.cveID,
+    cat: "CVE",
+    sev: v.knownRansomwareCampaignUse === "Known" ? "outage" : "degraded",
+    title: v.cveID,
+    sub: [v.vendorProject, v.product].filter(Boolean).join(" "),
+    msg: v.vulnerabilityName + (v.shortDescription ? " — " + v.shortDescription : ""),
+    ts: v.dateAdded ? new Date(v.dateAdded + "T00:00:00Z").getTime() : Date.now(),
+    ransomware: v.knownRansomwareCampaignUse === "Known",
+    src: "CISA KEV"
+  }));
+}
+
+/* ---- Feodo Tracker — botnet C2 / malicious IPs (carries country) ---- */
+const FEODO = "https://feodotracker.abuse.ch/downloads/ipblocklist.json";
+async function getFeodo() {
+  const arr = await fetchJSON(FEODO);
+  const rows = (Array.isArray(arr) ? arr : [])
+    .slice()
+    .sort((a, b) => (a.status === "online" ? -1 : 1) - (b.status === "online" ? -1 : 1))
+    .slice(0, 45);
+  return rows.map((r) => {
+    const g = geoForCountry(r.country);
+    return {
+      id: "c2-" + r.ip_address + ":" + (r.port || 0),
+      cat: "C2",
+      sev: r.status === "online" ? "outage" : "degraded",
+      title: r.ip_address + (r.port ? ":" + r.port : ""),
+      sub: (r.malware || "Botnet C2") + (r.country ? " · " + r.country : ""),
+      msg: [r.malware ? r.malware + " command-and-control node" : "Botnet C2 node",
+            r.status ? "(" + r.status + ")" : "", r.as_name ? "AS: " + r.as_name : ""]
+            .filter(Boolean).join(" "),
+      ts: r.last_online ? new Date(r.last_online.replace(" ", "T") + "Z").getTime()
+                        : (r.first_seen ? new Date(r.first_seen.replace(" ", "T") + "Z").getTime() : Date.now()),
+      src: "Feodo Tracker",
+      lat: g ? g.lat : undefined,
+      lng: g ? g.lng : undefined,
+      geo: r.country || undefined
+    };
+  });
+}
+
+/* ---- ThreatFox — recent IOCs (abuse.ch) ---- */
+const THREATFOX = "https://threatfox.abuse.ch/export/json/recent/";
+async function getThreatFox() {
+  const j = await fetchJSON(THREATFOX);
+  const out = [];
+  for (const key of Object.keys(j || {})) {
+    const rec = Array.isArray(j[key]) ? j[key][0] : j[key];
+    if (!rec || !rec.ioc_value) continue;
+    out.push({
+      id: "iocfx-" + key,
+      cat: "IOC",
+      sev: (rec.confidence_level || 0) >= 75 ? "outage" : "degraded",
+      title: String(rec.ioc_value).slice(0, 46),
+      sub: (rec.malware_printable || rec.threat_type || "IOC") +
+           (rec.ioc_type ? " · " + rec.ioc_type : ""),
+      msg: [rec.threat_type_desc || rec.threat_type || "",
+            rec.confidence_level != null ? "confidence " + rec.confidence_level + "%" : "",
+            (rec.tags && rec.tags.length) ? "tags: " + rec.tags.slice(0, 4).join(", ") : ""]
+            .filter(Boolean).join(" · "),
+      ts: rec.first_seen_utc ? new Date(rec.first_seen_utc.replace(" ", "T") + "Z").getTime() : Date.now(),
+      src: "ThreatFox"
+    });
+    if (out.length >= 30) break;
+  }
+  return out;
+}
+
+/* In-memory cache + background refresher (every 60s; see startup). */
+const THREAT_INTEL = { fetchedAt: null, feeds: {}, items: [] };
+let _refreshing = false;
+async function refreshThreatIntel() {
+  if (_refreshing) return THREAT_INTEL;
+  _refreshing = true;
+  const jobs = [
+    ["cisa", getCISA], ["feodo", getFeodo], ["threatfox", getThreatFox]
+  ];
+  const results = await Promise.allSettled(jobs.map(([, fn]) => fn()));
+  const items = [];
+  const feeds = {};
+  results.forEach((res, i) => {
+    const name = jobs[i][0];
+    if (res.status === "fulfilled") {
+      feeds[name] = { ok: true, count: res.value.length };
+      items.push(...res.value);
+    } else {
+      feeds[name] = { ok: false, error: (res.reason && res.reason.message) || "failed" };
+    }
+  });
+  items.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  THREAT_INTEL.fetchedAt = new Date().toISOString();
+  THREAT_INTEL.feeds = feeds;
+  THREAT_INTEL.items = items;
+  _refreshing = false;
+  const live = Object.values(feeds).filter((f) => f.ok).length;
+  console.log(`  ◇ threat-intel refreshed @ ${THREAT_INTEL.fetchedAt} · ${items.length} items · ${live}/${jobs.length} feeds live`);
+  return THREAT_INTEL;
+}
+
 /* ---------- dossier file ---------- */
 function ensureDossierFile() {
   try {
@@ -193,6 +360,15 @@ const server = http.createServer(async (req, res) => {
     catch (e) { return sendJSON(res, 502, { error: "solarwinds feed unavailable", detail: e.message }); }
   }
 
+  /* Threat-intel cache — served instantly; refreshed in the background.
+     ?refresh=1 forces an immediate re-pull before responding. */
+  if (p === "/api/threat-intel" && req.method === "GET") {
+    try {
+      if (u.searchParams.get("refresh") === "1" || !THREAT_INTEL.fetchedAt) await refreshThreatIntel();
+      return sendJSON(res, 200, THREAT_INTEL);
+    } catch (e) { return sendJSON(res, 502, { error: "threat intel unavailable", detail: e.message }); }
+  }
+
   if (p === "/api/dossier" && req.method === "GET") {
     ensureDossierFile();
     return sendJSON(res, 200, readDossier());
@@ -249,11 +425,18 @@ const server = http.createServer(async (req, res) => {
 });
 
 ensureDossierFile();
+
+/* Refresh every public infosec feed in the background once per minute so
+   the page can pick up new CVEs / C2s / IOCs without a manual reload. */
+refreshThreatIntel().catch((e) => console.error("threat-intel init:", e.message));
+setInterval(() => refreshThreatIntel().catch((e) => console.error("threat-intel refresh:", e.message)), 60000);
+
 server.listen(PORT, "127.0.0.1", () => {
   console.log("\n  ◆ CyberSOC server running");
   console.log("  → http://localhost:" + PORT + "  (loopback only)\n");
   console.log("  Azure feed : GET  /api/azure-status");
   console.log("  SolarWinds : GET  /api/solarwinds-status");
+  console.log("  ThreatIntel: GET  /api/threat-intel   (CISA KEV · Feodo C2 · ThreatFox · auto-refresh 60s)");
   console.log("  Dossier    : GET/PUT /api/dossier  (writes data/soc_dossier.json)");
   console.log("  Geocode    : GET  /api/geocode?q=<address>");
   console.log("  Shell      : POST /api/exec   ⚠ runs host commands — loopback only, never expose\n");

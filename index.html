@@ -300,6 +300,28 @@ body { position: relative; }
 .alert-msg { font-size: 12px; color: var(--txt-mut); line-height: 1.45; }
 .alert-empty { text-align: center; color: var(--op); font-family: var(--mono); font-size: 11px; letter-spacing: 2px; margin-top: 40px; }
 
+/* alert filters + threat-intel cards */
+.alert-filters { display: flex; gap: 6px; padding: 10px 12px 0; flex-wrap: wrap; flex-shrink: 0; }
+.af-chip {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 1.5px; cursor: pointer;
+  padding: 4px 9px; background: var(--bg-1); color: var(--txt-mut);
+  border: 1px solid var(--line-soft); border-radius: 2px; transition: all .15s;
+}
+.af-chip:hover { color: var(--txt); border-color: var(--line); }
+.af-chip.active { background: var(--accent); color: #0a0608; border-color: var(--accent); }
+.alert-cat { font-family: var(--mono); font-size: 8px; letter-spacing: 2px; padding: 1px 6px; border: 1px solid currentColor; color: var(--txt-mut); }
+.cat-CVE { color: #ff7a3d; } .cat-C2 { color: var(--out); } .cat-IOC { color: var(--deg); } .cat-AZURE { color: var(--accent); }
+.alert-card.geo { cursor: pointer; }
+.alert-card.geo:hover { border-color: var(--line); background: var(--bg-2); }
+.alert-pin { font-family: var(--mono); font-size: 8px; letter-spacing: 1px; color: var(--op); margin-top: 5px; }
+.alert-src { font-family: var(--mono); font-size: 8px; letter-spacing: 1px; color: var(--txt-dim); margin-top: 5px; }
+.intel-foot { flex-shrink: 0; padding: 8px 12px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: 8px; letter-spacing: 1px; color: var(--txt-dim); line-height: 1.5; }
+.intel-foot .if-ok { color: var(--op); } .intel-foot .if-bad { color: var(--deg); }
+
+/* threat-intel map markers */
+.threat-marker { width: 12px; height: 12px; transform: rotate(45deg); border: 1.5px solid var(--out); background: rgba(255,59,59,.25); box-shadow: 0 0 8px rgba(255,59,59,.6); }
+.threat-marker.sev-degraded { border-color: var(--deg); background: rgba(245,166,35,.22); box-shadow: 0 0 8px rgba(245,166,35,.55); }
+
 /* ===================== CLI ===================== */
 .cli-out { flex: 1; overflow-y: auto; padding: 14px; font-family: var(--mono); font-size: 12px; line-height: 1.55; }
 .cli-line { white-space: pre-wrap; word-break: break-word; }
@@ -625,9 +647,17 @@ body { position: relative; }
     <div class="panel-inner">
       <div class="panel-head">
         <h2>ALERT FEED</h2>
-        <span class="panel-sub">GRANULAR INCIDENT DETAIL</span>
+        <span class="panel-sub">CLOUD INCIDENTS &amp; THREAT INTEL</span>
+      </div>
+      <div class="alert-filters" id="alert-filters">
+        <button class="af-chip active" data-cat="ALL">ALL</button>
+        <button class="af-chip" data-cat="AZURE">AZURE</button>
+        <button class="af-chip" data-cat="CVE">CVE</button>
+        <button class="af-chip" data-cat="C2">C2/IP</button>
+        <button class="af-chip" data-cat="IOC">IOC</button>
       </div>
       <div class="alert-list" id="alert-list"></div>
+      <div class="intel-foot" id="intel-foot">FEEDS: â€”</div>
     </div>
   </aside>
 
@@ -982,6 +1012,65 @@ function statusCounts() {
   return c;
 }
 
+/* ===================================================================
+   THREAT INTELLIGENCE (client)
+   Live: /api/threat-intel  (server refreshes public feeds every 60s).
+   Fallback: a small simulated set so the page still demos statically.
+   Item shape: { id, cat, sev, title, sub, msg, ts, src, lat?, lng?, geo? }
+   =================================================================== */
+const THREAT_FEED = { items: [], feeds: {}, fetchedAt: null };
+let LIVE_MODE_INTEL = false;
+
+const INTEL_SIM = [
+  { id: "kev-CVE-2024-3400", cat: "CVE", sev: "outage", title: "CVE-2024-3400", sub: "Palo Alto Networks PAN-OS",
+    msg: "Command Injection in GlobalProtect â€” actively exploited in the wild.", src: "CISA KEV (sim)", ransomware: true },
+  { id: "kev-CVE-2023-34362", cat: "CVE", sev: "outage", title: "CVE-2023-34362", sub: "Progress MOVEit Transfer",
+    msg: "SQL injection enabling unauthenticated RCE â€” Cl0p ransomware campaign.", src: "CISA KEV (sim)", ransomware: true },
+  { id: "kev-CVE-2024-21887", cat: "CVE", sev: "degraded", title: "CVE-2024-21887", sub: "Ivanti Connect Secure",
+    msg: "Command injection in web components allowing authenticated RCE.", src: "CISA KEV (sim)" },
+  { id: "c2-185.225.73.21:443", cat: "C2", sev: "outage", title: "185.225.73.21:443", sub: "Emotet Â· RU",
+    msg: "Emotet command-and-control node (online) AS: SELECTEL", src: "Feodo Tracker (sim)", lat: 61.5, lng: 105.3, geo: "RU" },
+  { id: "c2-45.142.212.10:8080", cat: "C2", sev: "outage", title: "45.142.212.10:8080", sub: "QakBot Â· NL",
+    msg: "QakBot command-and-control node (online) AS: DediPath", src: "Feodo Tracker (sim)", lat: 52.1, lng: 5.3, geo: "NL" },
+  { id: "c2-103.74.19.55:443", cat: "C2", sev: "degraded", title: "103.74.19.55:443", sub: "IcedID Â· CN",
+    msg: "IcedID command-and-control node (offline) AS: CHINANET", src: "Feodo Tracker (sim)", lat: 35.9, lng: 104.2, geo: "CN" },
+  { id: "c2-209.97.139.4:7080", cat: "C2", sev: "outage", title: "209.97.139.4:7080", sub: "TrickBot Â· US",
+    msg: "TrickBot command-and-control node (online) AS: DIGITALOCEAN", src: "Feodo Tracker (sim)", lat: 39.8, lng: -98.6, geo: "US" },
+  { id: "c2-91.207.183.7:443", cat: "C2", sev: "outage", title: "91.207.183.7:443", sub: "Pikabot Â· DE",
+    msg: "Pikabot command-and-control node (online) AS: HOSTKEY", src: "Feodo Tracker (sim)", lat: 51.2, lng: 10.4, geo: "DE" },
+  { id: "iocfx-sim-1", cat: "IOC", sev: "outage", title: "5.181.156.97:50050", sub: "Cobalt Strike Â· ip:port",
+    msg: "botnet_cc Â· confidence 100% Â· tags: CobaltStrike, beacon", src: "ThreatFox (sim)" },
+  { id: "iocfx-sim-2", cat: "IOC", sev: "degraded", title: "update-cdn-secure.com", sub: "Lumma Stealer Â· domain",
+    msg: "payload_delivery Â· confidence 75% Â· tags: stealer, lumma", src: "ThreatFox (sim)" },
+  { id: "iocfx-sim-3", cat: "IOC", sev: "outage", title: "194.169.175.132:13782", sub: "AsyncRAT Â· ip:port",
+    msg: "botnet_cc Â· confidence 90% Â· tags: rat, asyncrat", src: "ThreatFox (sim)" }
+];
+function simIntel() {
+  const now = Date.now();
+  return INTEL_SIM.map((it, i) => Object.assign({}, it, { ts: now - i * 1800 * 1000 }));
+}
+
+async function syncThreatIntel() {
+  try {
+    const res = await fetch("/api/threat-intel", { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.items)) {
+        THREAT_FEED.items = data.items;
+        THREAT_FEED.feeds = data.feeds || {};
+        THREAT_FEED.fetchedAt = data.fetchedAt || new Date().toISOString();
+        LIVE_MODE_INTEL = Object.values(THREAT_FEED.feeds).some((f) => f && f.ok);
+        if (LIVE_MODE_INTEL) return true;
+      }
+    }
+  } catch (e) { /* server not running */ }
+  LIVE_MODE_INTEL = false;
+  THREAT_FEED.items = simIntel();
+  THREAT_FEED.feeds = { simulated: { ok: false } };
+  THREAT_FEED.fetchedAt = new Date().toISOString();
+  return false;
+}
+
 /* ============ DOSSIER PERSISTENCE ============
    Working copy lives in localStorage('soc_dossier').
    Seeded from data/soc_dossier.json on first run.
@@ -1112,6 +1201,9 @@ function exportDossier(list) {
 (function () {
   let map, radarCenterLatLng = null;
   const markers = {};        // code -> { marker, el, latlng, lastPing }
+  let alertFilter = "ALL";   // ALL | AZURE | CVE | C2 | IOC
+  let threatLayer = null;    // Leaflet layer group for plotted threat intel
+  let lastThreatSig = "";    // avoid rebuilding pins when nothing changed
   let sweepAngle = 0, prevSweepAngle = 0;
   let SWEEP_SPEED = 0.7;   // deg per frame (~8.5s / revolution)
   let sweepEnabled = true;
@@ -1318,39 +1410,111 @@ function exportDossier(list) {
     $("#m-sync").textContent = fmtTime();
   }
 
+  function escA(s) { return (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+  /* Unified alert model: live Azure incidents + public threat-intel feeds. */
+  function buildAlertModel() {
+    const out = [];
+    AZURE_REGIONS.filter((r) => r.status !== "operational").forEach((r) => {
+      const d = ALERT_DETAIL[r.code] || {};
+      out.push({
+        cat: "AZURE", sev: r.status,
+        time: (d.id || "") + (d.since ? " Â· " + ago(d.since) + " ago" : ""),
+        title: r.name, sub: (d.service || "Multiple services") + " Â· " + r.geo,
+        msg: d.msg || "", src: "Azure Status"
+      });
+    });
+    THREAT_FEED.items.forEach((it) => {
+      out.push({
+        cat: it.cat, sev: it.sev,
+        time: it.ts ? ago(it.ts) + " ago" : "",
+        title: it.title, sub: it.sub || "", msg: it.msg || "", src: it.src || "",
+        lat: it.lat, lng: it.lng, geo: it.geo, ransomware: it.ransomware
+      });
+    });
+    return out;
+  }
+
   function renderAlerts() {
     const list = $("#alert-list");
-    const active = AZURE_REGIONS.filter((r) => r.status !== "operational");
-    const count = active.length;
+    const model = buildAlertModel();
     const badge = $("#alert-count");
-    badge.textContent = count;
-    badge.classList.toggle("zero", count === 0);
+    badge.textContent = model.length;
+    badge.classList.toggle("zero", model.length === 0);
 
-    if (!count) {
-      list.innerHTML = `<div class="alert-empty">âœ“ ALL REGIONS NOMINAL</div>`;
-      return;
+    const filtered = (alertFilter === "ALL" ? model : model.filter((a) => a.cat === alertFilter))
+      .sort((a, b) => (a.sev === "outage" ? -1 : 1) - (b.sev === "outage" ? -1 : 1));
+
+    if (!filtered.length) {
+      list.innerHTML = `<div class="alert-empty">âœ“ NO ACTIVE ALERTS</div>`;
+    } else {
+      list.innerHTML = filtered.map((a) => {
+        const hasGeo = a.lat != null && a.lng != null;
+        const sevLbl = a.cat === "AZURE" ? (a.sev === "outage" ? "OUTAGE" : "DEGRADED") : a.cat;
+        return `<div class="alert-card sev-${a.sev}${hasGeo ? " geo" : ""}"${hasGeo ? ` data-lat="${a.lat}" data-lng="${a.lng}"` : ""}>
+          <div class="alert-top">
+            <span class="alert-cat cat-${a.cat}">${sevLbl}${a.ransomware ? " âš  RANSOMWARE" : ""}</span>
+            <span class="alert-time">${escA(a.time)}</span>
+          </div>
+          <div class="alert-region">${escA(a.title)}</div>
+          <div class="alert-svc">${escA(a.sub)}</div>
+          <div class="alert-msg">${escA(a.msg)}</div>
+          ${hasGeo ? `<div class="alert-pin">â—‰ PLOTTED ON MAP${a.geo ? " Â· " + escA(a.geo) : ""} â€” click to focus</div>` : ""}
+          <div class="alert-src">SRC: ${escA(a.src)}</div>
+        </div>`;
+      }).join("");
+      list.querySelectorAll(".alert-card.geo").forEach((el) => {
+        el.addEventListener("click", () => {
+          if (map) map.flyTo([+el.dataset.lat, +el.dataset.lng], 5, { duration: 1.0 });
+        });
+      });
     }
-    // outages first, then degraded
-    active.sort((a, b) => (a.status === "outage" ? -1 : 1) - (b.status === "outage" ? -1 : 1));
-    list.innerHTML = active.map((r) => {
-      const d = ALERT_DETAIL[r.code] || {};
-      return `<div class="alert-card sev-${r.status}">
-        <div class="alert-top">
-          <span class="alert-sev">${r.status === "outage" ? "OUTAGE" : "DEGRADED"}</span>
-          <span class="alert-time">${d.id || ""} Â· ${d.since ? ago(d.since) + " ago" : ""}</span>
-        </div>
-        <div class="alert-region">${r.name}</div>
-        <div class="alert-svc">${d.service || "Multiple services"} Â· ${r.geo}</div>
-        <div class="alert-msg">${d.msg || ""}</div>
-      </div>`;
-    }).join("");
+    renderIntelFoot();
+  }
+
+  function renderIntelFoot() {
+    const el = $("#intel-foot"); if (!el) return;
+    const f = THREAT_FEED.feeds || {};
+    const names = { cisa: "CISA KEV", feodo: "Feodo", threatfox: "ThreatFox" };
+    const parts = Object.keys(names).map((k) => {
+      const ok = f[k] && f[k].ok;
+      return `<span class="${ok ? "if-ok" : "if-bad"}">${ok ? "â—" : "â—‹"} ${names[k]}</span>`;
+    });
+    const when = THREAT_FEED.fetchedAt ? new Date(THREAT_FEED.fetchedAt).toTimeString().slice(0, 8) : "â€”";
+    el.innerHTML = `FEEDS ${LIVE_MODE_INTEL ? "LIVE" : "SIM"} Â· ${parts.join("&nbsp;&nbsp;")} Â· upd ${when}`;
+  }
+
+  /* Plot geo-tagged threat intel (C2 / malicious IPs) on the map. */
+  function renderThreatPins() {
+    if (!map) return;
+    const geoItems = THREAT_FEED.items.filter((it) => it.lat != null && it.lng != null);
+    const sig = geoItems.map((it) => it.id + it.sev).join("|");
+    if (sig === lastThreatSig && threatLayer) return; // nothing changed
+    lastThreatSig = sig;
+    if (threatLayer) { map.removeLayer(threatLayer); threatLayer = null; }
+    if (!geoItems.length) return;
+    const layers = geoItems.map((it) => {
+      const icon = L.divIcon({
+        className: "",
+        html: `<div class="threat-marker sev-${it.sev}"></div>`,
+        iconSize: [12, 12], iconAnchor: [6, 6]
+      });
+      const color = it.sev === "outage" ? "var(--out)" : "var(--deg)";
+      return L.marker([it.lat, it.lng], { icon, keyboard: false })
+        .bindPopup(`<div class="rp-name">${escA(it.title)}</div>
+                    <div class="rp-meta">${escA((it.sub || "").slice(0, 54))}</div>
+                    <div class="rp-status" style="color:${color}">${escA(it.cat)} Â· ${escA(it.src || "")}</div>`,
+          { className: "region-popup", closeButton: false });
+    });
+    threatLayer = L.layerGroup(layers).addTo(map);
   }
 
   async function refreshAll() {
-    await syncAzureStatus();
+    await Promise.all([syncAzureStatus(), syncThreatIntel()]);
     AZURE_REGIONS.forEach(updateMarkerStatus);
     updateHUD();
     renderAlerts();
+    renderThreatPins();
     updateFeedIndicator();
     if (window.Ticker) window.Ticker.refresh();
   }
@@ -1373,6 +1537,13 @@ function exportDossier(list) {
       if (open) setTimeout(() => $("#cli-input").focus(), 320);
     });
     $("#alert-tab").addEventListener("click", () => $("#alert-panel").classList.toggle("open"));
+    $("#alert-filters").addEventListener("click", (e) => {
+      const b = e.target.closest(".af-chip");
+      if (!b) return;
+      alertFilter = b.dataset.cat;
+      $("#alert-filters").querySelectorAll(".af-chip").forEach((c) => c.classList.toggle("active", c === b));
+      renderAlerts();
+    });
   }
 
   /* ---------- command line ---------- */
@@ -1426,6 +1597,7 @@ function exportDossier(list) {
         ["sitrep", "full situational report â€” all region statuses"],
         ["status &lt;code&gt;", "detail for one region (e.g. status westus3)"],
         ["alerts", "list active incidents only"],
+        ["intel", "public threat intel â€” CVEs Â· C2 Â· IOCs"],
         ["regions", "list all monitored region codes"],
         ["scan", "force re-sync of the status feed"],
         ["locate &lt;keyword&gt;", "find &amp; plot matching dossier subjects on the map"],
@@ -1490,6 +1662,27 @@ function exportDossier(list) {
         const d = ALERT_DETAIL[r.code] || {};
         const cls = r.status === "outage" ? "err" : "warn";
         cliPrint(`  ${r.status === "outage" ? "âœ•" : "â–²"} ${r.name} â€” ${d.service || ""} (${d.id || ""})`, cls);
+      });
+    },
+    intel() {
+      const items = THREAT_FEED.items || [];
+      const f = THREAT_FEED.feeds || {};
+      cliPrint("â—† THREAT INTELLIGENCE", "head");
+      cliPrint(`  SOURCE ${LIVE_MODE_INTEL ? "LIVE PUBLIC FEEDS" : "LOCAL SIMULATION"} Â· ${items.length} indicator(s)`, LIVE_MODE_INTEL ? "ok" : "warn");
+      [["cisa", "CISA KEV"], ["feodo", "Feodo Tracker (C2)"], ["threatfox", "ThreatFox (IOC)"]].forEach(([k, n]) => {
+        const s = f[k];
+        cliPrint(`  ${s && s.ok ? "â—" : "â—‹"} ${n.padEnd(22)} ${s && s.ok ? (s.count + " items") : "offline"}`, s && s.ok ? "ok" : "warn");
+      });
+      cliPrint("â€”".repeat(40), "sys");
+      ["CVE", "C2", "IOC"].forEach((cat) => {
+        const group = items.filter((it) => it.cat === cat).slice(0, 8);
+        if (!group.length) return;
+        cliPrint(`  ${cat} (${items.filter((it) => it.cat === cat).length})`, "head");
+        group.forEach((it) => {
+          const cls = it.sev === "outage" ? "err" : "warn";
+          const geo = (it.lat != null) ? "  â—‰ " + (it.geo || "map") : "";
+          cliPrint(`  ${it.sev === "outage" ? "âœ•" : "â–²"} ${(it.title || "").slice(0, 26).padEnd(27)} ${(it.sub || "").slice(0, 26)}${geo}`, cls);
+        });
       });
     },
     regions() {
