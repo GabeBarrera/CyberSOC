@@ -1117,6 +1117,7 @@ function exportDossier(list) {
   let sweepEnabled = true;
   let refreshTimer = null;
   let baseLayer = null;
+  let pinPending = false;    // true while arriving at SITREP via a dossier address link
   const PING_COOLDOWN = 1500;
   const BASEMAPS = {
     dark: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
@@ -1131,7 +1132,7 @@ function exportDossier(list) {
       zoomControl: true,
       worldCopyJump: true,
       minZoom: 2,
-      maxZoom: 7,
+      maxZoom: 18,
       attributionControl: true
     }).setView([30, 5], 2);
 
@@ -1145,9 +1146,18 @@ function exportDossier(list) {
     ).addTo(map);
 
     AZURE_REGIONS.forEach(addRegionMarker);
+    fitAllRegions();
 
     map.on("move zoom moveend zoomend", positionRadar);
     map.on("zoomend moveend", refreshMarkerAngles);
+  }
+
+  /* Fit the view to all region markers (best fit, capped at zoom 6). */
+  function fitAllRegions() {
+    if (!map) return;
+    const lls = Object.values(markers).map((m) => m.latlng);
+    if (!lls.length) return;
+    map.fitBounds(L.latLngBounds(lls), { padding: [60, 60], maxZoom: 6 });
   }
 
   function markerIcon(r) {
@@ -1377,6 +1387,36 @@ function exportDossier(list) {
   function cliEcho(cmd) {
     cliPrint(`<span class="ci-prompt">soc@cybersoc:~$</span> ${cmd}`, "cmd");
   }
+  function escHtml(s) {
+    return (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  }
+
+  /* ---------- localhost shell bridge ---------- */
+  let shellMode = false;
+  async function execRemote(command) {
+    try {
+      const r = await fetch("/api/exec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cmd: command })
+      });
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}));
+        cliPrint(`âœ• ${escHtml(e.error || ("exec failed â€” http " + r.status))}`, "err");
+        return;
+      }
+      const j = await r.json();
+      const emit = (block, cls) => {
+        if (!block) return;
+        block.replace(/\s+$/, "").split("\n").forEach((l) => cliPrint("  " + escHtml(l), cls));
+      };
+      emit(j.stdout, "sys");
+      emit(j.stderr, "warn");
+      if (j.code) cliPrint(`  [exit ${j.code}]`, "warn");
+    } catch (e) {
+      cliPrint("âœ• localhost bridge unreachable â€” start the host server first (node server.js).", "err");
+    }
+  }
 
   const COMMANDS = {
     help() {
@@ -1388,7 +1428,8 @@ function exportDossier(list) {
         ["alerts", "list active incidents only"],
         ["regions", "list all monitored region codes"],
         ["scan", "force re-sync of the status feed"],
-        ["locate", "show operator / radar position"],
+        ["locate &lt;keyword&gt;", "find &amp; plot matching dossier subjects on the map"],
+        ["localhost", "open a live shell on the host running the server"],
         ["clear", "clear the console"]
       ];
       rows.forEach(([c, d]) => cliPrint(`  <span style="color:var(--accent)">${c.padEnd(16)}</span> ${d}`, "sys"));
@@ -1406,6 +1447,21 @@ function exportDossier(list) {
         group.forEach((r) => {
           const dot = st === "operational" ? "â—" : "â–²";
           cliPrint(`  ${dot} ${r.name.padEnd(22)} ${r.code.padEnd(16)} ${st.toUpperCase()}`, cls);
+        });
+      });
+      // SolarWinds Observability components
+      cliPrint("â€”".repeat(40), "sys");
+      const sw = { operational: 0, degraded: 0, outage: 0, maintenance: 0 };
+      SOLARWINDS_COMPONENTS.forEach((c) => { sw[c.status] = (sw[c.status] || 0) + 1; });
+      cliPrint("â—† SOLARWINDS OBSERVABILITY", "head");
+      cliPrint(`  ${SOLARWINDS_COMPONENTS.length} COMPONENTS Â· OPERATIONAL ${sw.operational}   DEGRADED ${sw.degraded}   OUTAGE ${sw.outage}   MAINT ${sw.maintenance}`, "sys");
+      ["outage", "degraded", "maintenance", "operational"].forEach((st) => {
+        const group = SOLARWINDS_COMPONENTS.filter((c) => c.status === st);
+        if (!group.length) return;
+        const cls = st === "outage" ? "err" : st === "operational" ? "ok" : "warn";
+        group.forEach((c) => {
+          const dot = st === "operational" ? "â—" : "â–²";
+          cliPrint(`  ${dot} ${c.name.padEnd(28)} ${st.toUpperCase()}`, cls);
         });
       });
     },
@@ -1451,23 +1507,65 @@ function exportDossier(list) {
         cliPrint(`âœ“ sync complete @ ${fmtTime()} Â· source: ${live ? "AZURE LIVE FEED" : "LOCAL SIMULATION"}`, live ? "ok" : "warn");
       });
     },
-    locate() {
-      if (!radarCenterLatLng) { cliPrint("position not yet acquired.", "warn"); return; }
-      cliPrint(`â—† OPERATOR POSITION`, "head");
-      cliPrint(`  LAT ${radarCenterLatLng.lat.toFixed(4)}  LNG ${radarCenterLatLng.lng.toFixed(4)}`, "sys");
-      cliPrint(`  radar sweep originating from this point.`, "sys");
+    locate(arg) {
+      if (!arg) {
+        if (!radarCenterLatLng) { cliPrint("usage: locate &lt;keyword&gt;  â€” search & plot dossier subjects", "warn"); return; }
+        cliPrint("â—† OPERATOR POSITION", "head");
+        cliPrint(`  LAT ${radarCenterLatLng.lat.toFixed(4)}  LNG ${radarCenterLatLng.lng.toFixed(4)}`, "sys");
+        cliPrint("  tip: 'locate <keyword>' searches the dossier and plots matches.", "sys");
+        return;
+      }
+      const profs = window.Dossier ? window.Dossier.getProfiles() : [];
+      const kw = arg.toLowerCase();
+      const plottable = (loc) => loc && !/^\s*(unknown|n\/a|â€”|-)?\s*$/i.test(loc);
+      const matches = profs.filter((p) =>
+        [p.name, p.alias, p.location, p.affiliations, p.description, p.caseNumber]
+          .some((f) => (f || "").toLowerCase().includes(kw)));
+      if (!matches.length) { cliPrint(`no subjects match '${escHtml(arg)}'. try a name, alias, city, or affiliation.`, "err"); return; }
+      cliPrint(`â—† LOCATE // ${matches.length} SUBJECT(S) MATCH '${escHtml(arg.toUpperCase())}'`, "head");
+      matches.forEach((p) => {
+        const has = plottable(p.location);
+        cliPrint(`  ${has ? "â—‰" : "Â·"} ${escHtml((p.name || "?").padEnd(24))} ${has ? escHtml(p.location) : "location unknown"}`, has ? "ok" : "warn");
+      });
+      const located = matches.filter((p) => plottable(p.location));
+      if (!located.length) { cliPrint("  no plottable last-known locations among matches.", "warn"); return; }
+      cliPrint(`> geocoding ${located.length} location(s)â€¦`, "sys");
+      window.Sitrep.plotSubjects(located).then((n) => {
+        if (!n) { cliPrint("âœ• could not geocode any matching location.", "err"); return; }
+        cliPrint(`âœ“ ${n} subject pin(s) placed Â· map fit to matches.`, "ok");
+      });
+    },
+    localhost(arg) {
+      if (arg) {
+        cliPrint(`<span class="ci-prompt" style="color:var(--out)">host:~#</span> ${escHtml(arg)}`, "cmd");
+        execRemote(arg);
+        return;
+      }
+      shellMode = true;
+      cliPrint("â—† LOCALHOST SHELL", "head");
+      cliPrint("  bridged to the host machine's native shell via the CyberSOC server.", "sys");
+      cliPrint("  every line you enter now executes on the host. type 'exit' to disconnect.", "warn");
+      cliPrint("  (requires the local Node server â€” node server.js)", "sys");
     },
     clear() { $("#cli-out").innerHTML = ""; }
   };
 
   function runCommand(raw) {
+    if (shellMode) {
+      const t = raw.trim();
+      cliPrint(`<span class="ci-prompt" style="color:var(--out)">host:~#</span> ${escHtml(raw)}`, "cmd");
+      if (t === "exit" || t === "quit") { shellMode = false; cliPrint("âœ“ disconnected from host shell.", "ok"); return; }
+      if (!t) return;
+      execRemote(t);
+      return;
+    }
     const parts = raw.trim().split(/\s+/);
     const cmd = (parts[0] || "").toLowerCase();
     const arg = parts.slice(1).join(" ");
     if (!cmd) return;
     cliEcho(raw);
     if (COMMANDS[cmd]) COMMANDS[cmd](arg);
-    else cliPrint(`command not found: ${cmd}. type 'help'.`, "err");
+    else cliPrint(`command not found: ${escHtml(cmd)}. type 'help'.`, "err");
   }
 
   function wireCLI() {
@@ -1498,7 +1596,40 @@ function exportDossier(list) {
       refreshTimer = setInterval(refreshAll, 7000);
     },
     onShow() {
-      if (map) setTimeout(() => { map.invalidateSize(); positionRadar(); refreshMarkerAngles(); }, 60);
+      if (map) setTimeout(() => {
+        map.invalidateSize();
+        if (!pinPending) fitAllRegions();
+        positionRadar();
+        refreshMarkerAngles();
+      }, 60);
+    },
+    expectPin() { pinPending = true; },
+    /* geocode & plot many dossier subjects, then fit the map to them (CLI 'locate') */
+    async plotSubjects(list) {
+      if (!map) return 0;
+      pinPending = true;
+      const found = [];
+      for (const p of list) {
+        const geo = await geocodeAddress(p.location);
+        if (geo) found.push({ ll: L.latLng(geo.lat, geo.lng), label: p.name, display: geo.display || p.location });
+      }
+      if (window.__pinLayer) { map.removeLayer(window.__pinLayer); window.__pinLayer = null; }
+      if (!found.length) { pinPending = false; return 0; }
+      const layers = [];
+      found.forEach(({ ll, label, display }) => {
+        layers.push(L.circle(ll, { radius: 1200, color: "#ff2d6f", weight: 1.5, fillColor: "#ff2d6f", fillOpacity: 0.10 }));
+        layers.push(L.circleMarker(ll, { radius: 6, color: "#ff2d6f", weight: 2, fillColor: "#ff2d6f", fillOpacity: 1 })
+          .bindPopup(`<div class="rp-name">${(label || "SUBJECT")}</div><div class="rp-meta">${(display || "").slice(0, 60)}</div>`, { className: "region-popup", closeButton: false }));
+      });
+      window.__pinLayer = L.layerGroup(layers).addTo(map);
+      const lls = found.map((f) => f.ll);
+      if (lls.length === 1) {
+        map.flyTo(lls[0], 12, { duration: 1.3 });
+        setTimeout(() => { window.__pinLayer && window.__pinLayer.getLayers()[1].openPopup(); }, 1400);
+      } else {
+        map.flyToBounds(L.latLngBounds(lls), { padding: [80, 80], maxZoom: 12, duration: 1.3 });
+      }
+      return found.length;
     },
     setSweepEnabled(on) {
       sweepEnabled = !!on;
@@ -1519,15 +1650,16 @@ function exportDossier(list) {
     /* drop a located pin on the map (used by Dossier last-known-location) */
     async dropPin(query, label) {
       const geo = await geocodeAddress(query);
-      if (!geo) return false;
+      if (!geo) { pinPending = false; return false; }
       const ll = L.latLng(geo.lat, geo.lng);
       if (window.__pinLayer) map.removeLayer(window.__pinLayer);
       window.__pinLayer = L.layerGroup([
-        L.circle(ll, { radius: 140000, color: "#ff2d6f", weight: 1.5, fillColor: "#ff2d6f", fillOpacity: 0.10 }),
+        L.circle(ll, { radius: 1200, color: "#ff2d6f", weight: 1.5, fillColor: "#ff2d6f", fillOpacity: 0.10 }),
         L.circleMarker(ll, { radius: 6, color: "#ff2d6f", weight: 2, fillColor: "#ff2d6f", fillOpacity: 1 })
           .bindPopup(`<div class="rp-name">${label || "SUBJECT"}</div><div class="rp-meta">${(geo.display || query).slice(0, 60)}</div>`, { className: "region-popup", closeButton: false })
       ]).addTo(map);
-      map.flyTo(ll, 6, { duration: 1.4 });
+      map.flyTo(ll, 12, { duration: 1.4 });
+      pinPending = false;
       setTimeout(() => { window.__pinLayer && window.__pinLayer.getLayers()[1].openPopup(); }, 1500);
       return true;
     }
@@ -1633,6 +1765,7 @@ function exportDossier(list) {
     if (loc) loc.addEventListener("click", (e) => {
       e.stopPropagation();
       loc.classList.add("loc-loading");
+      window.Sitrep.expectPin();
       window.App.setView("sitrep");
       window.Sitrep.dropPin(loc.dataset.loc, p.name).then((ok) => {
         loc.classList.remove("loc-loading");
@@ -1877,7 +2010,7 @@ function exportDossier(list) {
     const THRESH = 80;
 
     stage.addEventListener("pointerdown", (e) => {
-      if (e.target.closest("button")) return;
+      if (e.target.closest("button, a, .loc-link, .assoc-name")) return;
       card = $("#case-track .case-card");
       if (!card) return;
       dragging = true; startX = e.clientX;

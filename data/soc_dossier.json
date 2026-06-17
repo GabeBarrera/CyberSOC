@@ -8,37 +8,15 @@
     "ethnicity": "White",
     "threat": "HIGH",
     "status": "AT LARGE",
-    "location": "3165 Pacific Highway, San Diego CA 92101",
+    "location": "Lisbon, PT",
     "affiliations": "Helix Collective, ex-NSA contractor",
     "caseNumber": "CS-2241-A",
     "photo": "",
     "relationships": [
-      {
-        "id": "sub-0002",
-        "type": "Associate"
-      },
-      {
-        "id": "sub-0003",
-        "type": "Recruiter"
-      }
+      { "id": "sub-0002", "type": "Associate" },
+      { "id": "sub-0003", "type": "Recruiter" }
     ],
     "description": "Former signals analyst turned broker of zero-day exploits. Operates through layered cut-outs and disposable hardware. Known for spear-phishing campaigns against utility SCADA networks. Identifying mark: small circuit-trace tattoo, left wrist."
-  },
-  {
-    "id": "sub-0004",
-    "name": "KORHONEN, Aleksi",
-    "alias": "DEADBOLT",
-    "dob": "1979-01-30",
-    "sex": "Male",
-    "ethnicity": "White",
-    "threat": "GUARDED",
-    "status": "CLEARED",
-    "location": "Helsinki, FI",
-    "affiliations": "None (cleared)",
-    "caseNumber": "CS-1455-D",
-    "photo": "",
-    "description": "Initial person of interest in a supply-chain compromise; subsequently cleared after forensic timeline placed him offsite. File retained for reference only.",
-    "relationships": []
   },
   {
     "id": "sub-0002",
@@ -54,10 +32,7 @@
     "caseNumber": "CS-1908-C",
     "photo": "",
     "relationships": [
-      {
-        "id": "sub-0001",
-        "type": "Associate"
-      }
+      { "id": "sub-0001", "type": "Associate" }
     ],
     "description": "Believed responsible for the 'Tidewater' ransomware family. Highly disciplined OPSEC; no confirmed photograph on file. Communicates via rotating onion services. Considered a flight risk and technically sophisticated."
   },
@@ -75,11 +50,23 @@
     "caseNumber": "CS-2310-B",
     "photo": "",
     "relationships": [
-      {
-        "id": "sub-0004",
-        "type": "Coworker"
-      }
+      { "id": "sub-0004", "type": "Coworker" }
     ],
     "description": "Apprehended following a coordinated takedown of a credential-stuffing marketplace. Cooperating witness. Specializes in botnet orchestration and residential proxy laundering."
+  },
+  {
+    "id": "sub-0004",
+    "name": "KORHONEN, Aleksi",
+    "alias": "DEADBOLT",
+    "dob": "1979-01-30",
+    "sex": "Male",
+    "ethnicity": "White",
+    "threat": "GUARDED",
+    "status": "CLEARED",
+    "location": "Helsinki, FI",
+    "affiliations": "None (cleared)",
+    "caseNumber": "CS-1455-D",
+    "photo": "",
+    "description": "Initial person of interest in a supply-chain compromise; subsequently cleared after forensic timeline placed him offsite. File retained for reference only."
   }
 ]

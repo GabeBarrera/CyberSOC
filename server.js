@@ -11,6 +11,7 @@
      GET  /api/dossier          -> data/soc_dossier.json
      PUT  /api/dossier          -> overwrite data/soc_dossier.json (body = JSON array)
      GET  /api/geocode?q=...    -> Nominatim geocode (proxied, server-side)
+     POST /api/exec             -> run a shell command on the host  ⚠ LOCAL USE ONLY
      /*                         -> static files (index.html, data/, ...)
    =================================================================== */
 
@@ -18,6 +19,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { URL } = require("url");
+const { exec } = require("child_process");
 
 const PORT = 3005;
 const ROOT = __dirname;
@@ -219,15 +221,40 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return sendJSON(res, 502, { error: e.message }); }
   }
 
+  /* ---------- localhost shell bridge ----------
+     Runs an arbitrary command on the host machine and returns its output.
+     ⚠ This is a remote-code-execution endpoint. The server binds to
+     127.0.0.1 only (see server.listen below) so it is not reachable from
+     the network. Do NOT expose this server publicly or change the bind. */
+  if (p === "/api/exec" && req.method === "POST") {
+    let body = "";
+    req.on("data", (c) => { body += c; if (body.length > 1e6) req.destroy(); });
+    req.on("end", () => {
+      let cmd;
+      try { cmd = JSON.parse(body).cmd; } catch (e) { return sendJSON(res, 400, { error: "invalid JSON body" }); }
+      if (!cmd || typeof cmd !== "string") return sendJSON(res, 400, { error: "missing 'cmd' string" });
+      exec(cmd, { cwd: ROOT, timeout: 15000, maxBuffer: 4e6, windowsHide: true }, (err, stdout, stderr) => {
+        sendJSON(res, 200, {
+          cmd,
+          stdout: stdout || "",
+          stderr: stderr || (err && err.code === undefined ? String(err.message) : ""),
+          code: err ? (typeof err.code === "number" ? err.code : 1) : 0
+        });
+      });
+    });
+    return;
+  }
+
   return serveStatic(req, res, p);
 });
 
 ensureDossierFile();
-server.listen(PORT, () => {
+server.listen(PORT, "127.0.0.1", () => {
   console.log("\n  ◆ CyberSOC server running");
-  console.log("  → http://localhost:" + PORT + "\n");
+  console.log("  → http://localhost:" + PORT + "  (loopback only)\n");
   console.log("  Azure feed : GET  /api/azure-status");
   console.log("  SolarWinds : GET  /api/solarwinds-status");
   console.log("  Dossier    : GET/PUT /api/dossier  (writes data/soc_dossier.json)");
-  console.log("  Geocode    : GET  /api/geocode?q=<address>\n");
+  console.log("  Geocode    : GET  /api/geocode?q=<address>");
+  console.log("  Shell      : POST /api/exec   ⚠ runs host commands — loopback only, never expose\n");
 });
