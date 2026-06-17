@@ -343,7 +343,7 @@ body { position: relative; }
   repeating-linear-gradient(0deg, transparent 0 38px, rgba(255,255,255,0.012) 38px 39px),
   var(--bg); }
 
-.dossier-stage { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.dossier-stage { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: pan-y; }
 .case-track { width: min(760px, 92vw); height: min(78vh, 720px); position: relative; }
 
 .swipe-nav {
@@ -377,6 +377,9 @@ body { position: relative; }
   color: var(--txt-dim); font-family: var(--mono); font-size: 10px; letter-spacing: 2px;
 }
 .cc-photo .ph-corner { position: absolute; width: 14px; height: 14px; border: 2px solid var(--accent); }
+.ph-silhouette { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .9; }
+.cc-photo img.ph-fallimg { filter: none; }
+.ph-tag { position: absolute; bottom: 7px; left: 0; right: 0; text-align: center; font-family: var(--mono); font-size: 9px; letter-spacing: 2px; color: var(--txt-dim); z-index: 2; }
 .ph-corner.tl { top: 6px; left: 6px; border-right: none; border-bottom: none; }
 .ph-corner.tr { top: 6px; right: 6px; border-left: none; border-bottom: none; }
 .ph-corner.bl { bottom: 6px; left: 6px; border-right: none; border-top: none; }
@@ -392,7 +395,7 @@ body { position: relative; }
 .threat-HIGH   { color: #ff7a3d; }
 .threat-SEVERE { color: var(--out); border-color: var(--out) !important; }
 
-.cc-right { padding: 22px 26px 64px; display: flex; flex-direction: column; overflow-y: auto; }
+.cc-right { padding: 22px 26px 64px; display: flex; flex-direction: column; overflow-y: auto; min-height: 0; -webkit-overflow-scrolling: touch; }
 .cc-filehdr { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
 .cc-fileno { font-family: var(--mono); font-size: 10px; letter-spacing: 2px; color: var(--accent); }
 .cc-class { font-family: var(--mono); font-size: 9px; letter-spacing: 2px; color: var(--out); border: 1px solid var(--out); padding: 2px 7px; }
@@ -459,6 +462,8 @@ body { position: relative; }
 .ef-photo { display: flex; flex-direction: column; gap: 10px; }
 .ef-photo-frame { width: 100%; aspect-ratio: 3/4; border: 1px solid var(--line); background: repeating-linear-gradient(45deg,#0c080b 0 9px,#110c10 9px 18px); overflow: hidden; position: relative; }
 .ef-photo-frame img { width: 100%; height: 100%; object-fit: cover; }
+.ef-photo-frame .ef-silhouette { object-fit: cover; opacity: .9; }
+.ef-uploading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 11px; letter-spacing: 2px; color: var(--accent); background: rgba(10,6,8,.6); }
 .ef-photo-btn { text-align: center; cursor: pointer; font-family: var(--mono); font-size: 11px; letter-spacing: 1px; padding: 9px; border: 1px solid var(--accent); color: var(--accent); }
 .ef-photo-btn:hover { background: rgba(255,45,111,.1); }
 .ef-photo-clear { background: none; border: 1px solid var(--line-soft); color: var(--txt-dim); font-family: var(--mono); font-size: 10px; letter-spacing: 1px; padding: 7px; cursor: pointer; }
@@ -682,7 +687,7 @@ body { position: relative; }
   .hud-readout { top: 10px; padding: 8px 14px; }
   .hud-metrics { gap: 16px; }
   .metric-num { font-size: 18px; }
-  .case-card { grid-template-columns: 1fr; }
+  .case-card { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
   .cc-left { flex-direction: row; border-right: none; border-bottom: 1px solid var(--line); }
   .cc-photo { width: 110px; aspect-ratio: 3/4; flex-shrink: 0; }
   .cc-right { padding: 16px; }
@@ -2124,11 +2129,19 @@ function exportDossier(list) {
   function esc(s) { return (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 
   /* ---------- card ---------- */
+  function silhouetteFor(p) {
+    const s = ((p && p.sex) || "").toLowerCase();
+    if (s === "female") return "assets/images/female.svg";
+    if (s === "male") return "assets/images/male.svg";
+    return "assets/images/neutral.svg";
+  }
   function photoMarkup(p, cls) {
-    if (p.photo) return `<img src="${p.photo}" alt="${esc(p.name)}" />`;
-    return `<div class="ph-empty">NO IMAGE<br>ON FILE</div>
-            <span class="ph-corner tl"></span><span class="ph-corner tr"></span>
+    const sil = silhouetteFor(p);
+    const corners = `<span class="ph-corner tl"></span><span class="ph-corner tr"></span>
             <span class="ph-corner bl"></span><span class="ph-corner br"></span>`;
+    if (p.photo) return `<img src="${esc(p.photo)}" alt="${esc(p.name)}" onerror="this.onerror=null;this.src='${sil}';this.classList.add('ph-fallimg')" />${corners}`;
+    return `<img class="ph-silhouette" src="${sil}" alt="No image on file" />
+            <div class="ph-tag">NO IMAGE ON FILE</div>${corners}`;
   }
 
   function buildCard(p) {
@@ -2248,8 +2261,8 @@ function exportDossier(list) {
     list.innerHTML = filtered.map((p) => {
       const idx = profiles.indexOf(p);
       const thumb = p.photo
-        ? `<img class="ri-thumb" src="${p.photo}" alt="" />`
-        : `<div class="ri-thumb"></div>`;
+        ? `<img class="ri-thumb" src="${esc(p.photo)}" alt="" onerror="this.onerror=null;this.src='${silhouetteFor(p)}'" />`
+        : `<img class="ri-thumb" src="${silhouetteFor(p)}" alt="" />`;
       return `<div class="roster-item ${idx === currentIndex ? "active" : ""}" data-idx="${idx}">
         ${thumb}
         <div class="ri-meta">
@@ -2333,7 +2346,27 @@ function exportDossier(list) {
   function setEditorPhoto(src) {
     tempPhoto = src || "";
     const frame = $("#ef-photo-frame");
-    frame.innerHTML = tempPhoto ? `<img src="${tempPhoto}" alt="" />` : "";
+    if (tempPhoto) frame.innerHTML = `<img src="${esc(tempPhoto)}" alt="" onerror="this.onerror=null;this.src='assets/images/neutral.svg'" />`;
+    else frame.innerHTML = `<img class="ef-silhouette" src="assets/images/neutral.svg" alt="No image" />`;
+  }
+  function setEditorPhotoLoading() {
+    $("#ef-photo-frame").innerHTML = `<div class="ef-uploading">SAVING\u2026</div>`;
+  }
+  /* Upload to the server (stores assets/images/<file>, returns the path).
+     If the server is unavailable, fall back to embedding the data URL so
+     the photo still persists locally. */
+  async function uploadPhoto(file) {
+    const dataUrl = await new Promise((res, rej) => {
+      const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file);
+    });
+    try {
+      const r = await fetch("/api/upload-image", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: (editingId || "subject"), dataUrl })
+      });
+      if (r.ok) { const j = await r.json(); if (j && j.path) return j.path; }
+    } catch (e) { /* server offline */ }
+    return dataUrl;
   }
   function openEditor(id) {
     editingId = id;
@@ -2419,37 +2452,61 @@ function exportDossier(list) {
   /* ---------- swipe / drag ---------- */
   function wireSwipe() {
     const stage = $("#dossier-stage");
-    let startX = 0, dragging = false, card = null;
-    const THRESH = 80;
+    let startX = 0, startY = 0, dx = 0, card = null, pid = null;
+    let decided = false, swiping = false;
+    const SLOP = 14;     // px of movement before we lock an axis
+    const THRESH = 95;   // px of horizontal travel to commit a page turn
+    const RATIO = 1.4;   // horizontal must beat vertical by this factor
+
+    function reset() { card = null; pid = null; decided = false; swiping = false; dx = 0; }
 
     stage.addEventListener("pointerdown", (e) => {
-      if (e.target.closest("button, a, .loc-link, .assoc-name")) return;
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      if (e.target.closest("button, a, input, textarea, select, .loc-link, .assoc-name")) return;
       card = $("#case-track .case-card");
       if (!card) return;
-      dragging = true; startX = e.clientX;
-      card.classList.add("swiping");
-      stage.setPointerCapture(e.pointerId);
+      pid = e.pointerId; startX = e.clientX; startY = e.clientY;
+      decided = false; swiping = false; dx = 0;
     });
+
     stage.addEventListener("pointermove", (e) => {
-      if (!dragging || !card) return;
-      const dx = e.clientX - startX;
+      if (!card || e.pointerId !== pid) return;
+      const ddx = e.clientX - startX, ddy = e.clientY - startY;
+      if (!decided) {
+        if (Math.abs(ddx) < SLOP && Math.abs(ddy) < SLOP) return;
+        decided = true;
+        // lock to horizontal ONLY if it clearly dominates; otherwise let it scroll
+        if (Math.abs(ddx) > Math.abs(ddy) * RATIO) {
+          swiping = true;
+          card.classList.add("swiping");
+          try { stage.setPointerCapture(pid); } catch (_) {}
+        } else {
+          reset(); // vertical gesture -> hand back to native scrolling
+          return;
+        }
+      }
+      if (!swiping) return;
+      dx = ddx;
+      if (e.cancelable) e.preventDefault();
       card.style.transform = `translateX(${dx}px)`;
       card.style.opacity = String(Math.max(0.4, 1 - Math.abs(dx) / 700));
     });
+
     function end(e) {
-      if (!dragging || !card) return;
-      dragging = false;
-      const dx = e.clientX - startX;
-      card.classList.remove("swiping");
-      if (Math.abs(dx) > THRESH && profiles.length > 1) {
-        go(dx < 0 ? 1 : -1);
+      if (!card || (pid !== null && e.pointerId !== pid)) return;
+      const c = card, engaged = swiping, fdx = dx;
+      try { stage.releasePointerCapture(e.pointerId); } catch (_) {}
+      reset();
+      if (!c || !engaged) return; // tap or vertical scroll: nothing to settle
+      c.classList.remove("swiping");
+      if (Math.abs(fdx) > THRESH && profiles.length > 1) {
+        go(fdx < 0 ? 1 : -1);
       } else {
-        card.classList.add("slide-anim");
-        card.style.transform = "translateX(0)";
-        card.style.opacity = "1";
-        setTimeout(() => card && card.classList.remove("slide-anim"), 300);
+        c.classList.add("slide-anim");
+        c.style.transform = "translateX(0)";
+        c.style.opacity = "1";
+        setTimeout(() => c && c.classList.remove("slide-anim"), 300);
       }
-      card = null;
     }
     stage.addEventListener("pointerup", end);
     stage.addEventListener("pointercancel", end);
@@ -2508,9 +2565,11 @@ function exportDossier(list) {
       $("#ef-photo-input").addEventListener("change", (e) => {
         const f = e.target.files[0];
         if (!f) return;
-        const reader = new FileReader();
-        reader.onload = () => setEditorPhoto(reader.result);
-        reader.readAsDataURL(f);
+        setEditorPhotoLoading();
+        uploadPhoto(f)
+          .then((src) => setEditorPhoto(src))
+          .catch(() => setEditorPhoto(""));
+        e.target.value = "";
       });
       $("#ef-photo-clear").addEventListener("click", () => setEditorPhoto(""));
       wireRelEditor();

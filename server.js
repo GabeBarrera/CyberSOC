@@ -25,6 +25,7 @@ const PORT = 3005;
 const ROOT = __dirname;
 const DOSSIER_FILE = path.join(ROOT, "data", "soc_dossier.json");
 const FILES_FILE = path.join(ROOT, "data", "soc_files.json");
+const IMG_DIR = path.join(ROOT, "assets", "images");
 
 /* Region catalogue — must mirror the codes used in index.html */
 const REGIONS = [
@@ -43,7 +44,8 @@ const REGIONS = [
 const MIME = {
   ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8", ".json": "application/json; charset=utf-8",
-  ".png": "image/png", ".jpg": "image/jpeg", ".svg": "image/svg+xml", ".ico": "image/x-icon"
+  ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif",
+  ".webp": "image/webp", ".bmp": "image/bmp", ".svg": "image/svg+xml", ".ico": "image/x-icon"
 };
 
 function cors(res) {
@@ -333,6 +335,29 @@ function writeFiles(list) {
   fs.writeFileSync(FILES_FILE, JSON.stringify(list, null, 2));
 }
 
+/* ---------- dossier photo storage (assets/images/) ----------
+   Persists an uploaded image to disk and returns its relative path so
+   the dossier stores a file location instead of a fat base64 blob. */
+function ensureImgDir() {
+  try { if (!fs.existsSync(IMG_DIR)) fs.mkdirSync(IMG_DIR, { recursive: true }); }
+  catch (e) { console.error("img dir init:", e.message); }
+}
+const IMG_EXT = {
+  "image/png": "png", "image/jpeg": "jpg", "image/jpg": "jpg", "image/gif": "gif",
+  "image/webp": "webp", "image/bmp": "bmp", "image/svg+xml": "svg"
+};
+function saveUploadedImage(filename, dataUrl) {
+  const m = /^data:(image\/[a-zA-Z0-9.+-]+);base64,([\s\S]*)$/.exec(dataUrl || "");
+  if (!m) throw new Error("expected a base64 image data URL");
+  const ext = IMG_EXT[m[1].toLowerCase()] || "png";
+  const base = String(filename || "subject").toLowerCase()
+    .replace(/\.[a-z0-9]+$/, "").replace(/[^a-z0-9._-]/g, "-").replace(/-+/g, "-").slice(0, 40) || "subject";
+  const name = base + "-" + Date.now() + "." + ext;
+  ensureImgDir();
+  fs.writeFileSync(path.join(IMG_DIR, name), Buffer.from(m[2], "base64"));
+  return "assets/images/" + name;
+}
+
 /* ---------- geocode proxy ---------- */
 async function geocode(q) {
   if (typeof fetch !== "function") throw new Error("need Node 18+");
@@ -404,6 +429,20 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  /* ---------- dossier photo upload (writes assets/images/<file>) ---------- */
+  if (p === "/api/upload-image" && req.method === "POST") {
+    let body = "";
+    req.on("data", (c) => { body += c; if (body.length > 2e7) req.destroy(); });
+    req.on("end", () => {
+      try {
+        const { filename, dataUrl } = JSON.parse(body);
+        const rel = saveUploadedImage(filename, dataUrl);
+        sendJSON(res, 200, { ok: true, path: rel });
+      } catch (e) { sendJSON(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
   /* ---------- log documentation repository (data/soc_files.json) ---------- */
   if (p === "/api/files" && req.method === "GET") {
     ensureFilesFile();
@@ -462,6 +501,7 @@ const server = http.createServer(async (req, res) => {
 
 ensureDossierFile();
 ensureFilesFile();
+ensureImgDir();
 
 /* Refresh every public infosec feed in the background once per minute so
    the page can pick up new CVEs / C2s / IOCs without a manual reload. */
@@ -476,6 +516,7 @@ server.listen(PORT, "127.0.0.1", () => {
   console.log("  ThreatIntel: GET  /api/threat-intel   (CISA KEV · Feodo C2 · ThreatFox · auto-refresh 60s)");
   console.log("  Dossier    : GET/PUT /api/dossier  (writes data/soc_dossier.json)");
   console.log("  Log files  : GET/PUT /api/files    (writes data/soc_files.json)");
+  console.log("  Photo up   : POST /api/upload-image (writes assets/images/<file>)");
   console.log("  Geocode    : GET  /api/geocode?q=<address>");
   console.log("  Shell      : POST /api/exec   ⚠ runs host commands — loopback only, never expose\n");
 });
