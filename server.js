@@ -24,6 +24,7 @@ const { exec } = require("child_process");
 const PORT = 3005;
 const ROOT = __dirname;
 const DOSSIER_FILE = path.join(ROOT, "data", "soc_dossier.json");
+const FILES_FILE = path.join(ROOT, "data", "soc_files.json");
 
 /* Region catalogue — must mirror the codes used in index.html */
 const REGIONS = [
@@ -316,6 +317,22 @@ function writeDossier(list) {
   fs.writeFileSync(DOSSIER_FILE, JSON.stringify(list, null, 2));
 }
 
+/* ---------- log documentation file (soc_files.json) ---------- */
+function ensureFilesFile() {
+  try {
+    if (!fs.existsSync(FILES_FILE)) {
+      fs.mkdirSync(path.dirname(FILES_FILE), { recursive: true });
+      fs.writeFileSync(FILES_FILE, "[]");
+    }
+  } catch (e) { console.error("files init:", e.message); }
+}
+function readFiles() {
+  try { return JSON.parse(fs.readFileSync(FILES_FILE, "utf8")); } catch (e) { return []; }
+}
+function writeFiles(list) {
+  fs.writeFileSync(FILES_FILE, JSON.stringify(list, null, 2));
+}
+
 /* ---------- geocode proxy ---------- */
 async function geocode(q) {
   if (typeof fetch !== "function") throw new Error("need Node 18+");
@@ -387,6 +404,25 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  /* ---------- log documentation repository (data/soc_files.json) ---------- */
+  if (p === "/api/files" && req.method === "GET") {
+    ensureFilesFile();
+    return sendJSON(res, 200, readFiles());
+  }
+  if (p === "/api/files" && req.method === "PUT") {
+    let body = "";
+    req.on("data", (c) => { body += c; if (body.length > 5e7) req.destroy(); });
+    req.on("end", () => {
+      try {
+        const list = JSON.parse(body);
+        if (!Array.isArray(list)) throw new Error("expected an array");
+        writeFiles(list);
+        sendJSON(res, 200, { ok: true, count: list.length });
+      } catch (e) { sendJSON(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
   if (p === "/api/geocode" && req.method === "GET") {
     const q = u.searchParams.get("q");
     if (!q) return sendJSON(res, 400, { error: "missing q" });
@@ -425,6 +461,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 ensureDossierFile();
+ensureFilesFile();
 
 /* Refresh every public infosec feed in the background once per minute so
    the page can pick up new CVEs / C2s / IOCs without a manual reload. */
@@ -438,6 +475,7 @@ server.listen(PORT, "127.0.0.1", () => {
   console.log("  SolarWinds : GET  /api/solarwinds-status");
   console.log("  ThreatIntel: GET  /api/threat-intel   (CISA KEV · Feodo C2 · ThreatFox · auto-refresh 60s)");
   console.log("  Dossier    : GET/PUT /api/dossier  (writes data/soc_dossier.json)");
+  console.log("  Log files  : GET/PUT /api/files    (writes data/soc_files.json)");
   console.log("  Geocode    : GET  /api/geocode?q=<address>");
   console.log("  Shell      : POST /api/exec   ⚠ runs host commands — loopback only, never expose\n");
 });

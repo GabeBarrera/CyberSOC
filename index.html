@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title>CyberSOC // All-Domain Operations</title>
-<meta name="description" content="CyberSOC â€” mobile cyber deck and SOC operations console." />
+<meta name="description" content="CyberSOC &#x2014; mobile cyber deck and SOC operations console." />
 
 <!-- Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -16,9 +16,9 @@
 
 <style>
 /* ===================================================================
-   CyberSOC â€” modern minimalist cyberpunk SOC console
-   Base: near-black warm Â· Accent: magenta #ff2d6f
-   Status: green / amber / red Â· Type: IBM Plex Mono + Sans
+   CyberSOC \002014 modern minimalist cyberpunk SOC console
+   Base: near-black warm \0000B7 Accent: magenta #ff2d6f
+   Status: green / amber / red \0000B7 Type: IBM Plex Mono + Sans
    =================================================================== */
 
 :root {
@@ -503,6 +503,115 @@ body { position: relative; }
 .rel-result:hover { background: rgba(255,45,111,0.1); }
 #ef-rel-add { padding: 8px 14px; white-space: nowrap; }
 
+/* ===================== LOG / DOCUMENTATION ===================== */
+#view-log { background:
+  radial-gradient(1100px 600px at 72% -10%, rgba(255,45,111,0.05), transparent 60%),
+  repeating-linear-gradient(0deg, transparent 0 38px, rgba(255,255,255,0.012) 38px 39px),
+  var(--bg); }
+.logtree-panel { z-index: 900; }
+.logtree-actions { display: flex; gap: 8px; padding: 12px; border-bottom: 1px solid var(--line-soft); }
+.logtree-actions .btn-ghost { flex: 1; padding: 9px; font-size: 10px; letter-spacing: 1.5px; border-color: var(--accent-dim); color: var(--accent); }
+.logtree-actions .btn-ghost:hover { color: var(--accent); border-color: var(--accent); box-shadow: 0 0 14px var(--accent-glow); }
+.logtree { flex: 1; overflow-y: auto; padding: 8px 6px 14px; }
+.logtree-foot { flex-shrink: 0; padding: 9px 12px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: 8px; letter-spacing: 1px; color: var(--txt-dim); line-height: 1.5; }
+.logtree-foot .lf-ok { color: var(--op); } .logtree-foot .lf-bad { color: var(--deg); }
+
+.lt-node { user-select: none; }
+.lt-row {
+  display: flex; align-items: center; gap: 7px; padding: 7px 8px; cursor: pointer;
+  font-family: var(--mono); font-size: 12px; color: var(--txt); border: 1px solid transparent;
+  transition: background .12s, border-color .12s;
+}
+.lt-row:hover { background: var(--bg-1); }
+.lt-row.active { background: rgba(255,45,111,0.10); border-color: var(--accent-dim); }
+.lt-row.drop-target { border-color: var(--accent); background: rgba(255,45,111,0.14); }
+.lt-row.dragging { opacity: .4; }
+.lt-caret { width: 12px; flex-shrink: 0; color: var(--txt-mut); font-size: 9px; text-align: center; transition: transform .15s; }
+.lt-caret.collapsed { transform: rotate(-90deg); }
+.lt-ico { width: 14px; flex-shrink: 0; text-align: center; }
+.lt-ico.folder { color: var(--deg); }
+.lt-ico.file { color: var(--accent); }
+.lt-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lt-children { margin-left: 14px; border-left: 1px solid var(--line-soft); }
+.lt-empty { padding: 30px 14px; text-align: center; font-family: var(--mono); font-size: 10px; letter-spacing: 1px; color: var(--txt-dim); line-height: 1.8; }
+.lt-root-drop { min-height: 24px; }
+
+/* reader stage */
+.log-stage { position: absolute; inset: 0; overflow-y: auto; }
+.logpost { max-width: 760px; margin: 0 auto; padding: 48px 32px 90px; }
+.logpost-crumb { font-family: var(--mono); font-size: 10px; letter-spacing: 2px; color: var(--txt-dim); margin-bottom: 18px; }
+.logpost-crumb b { color: var(--accent); }
+.logpost-title { font-family: var(--sans); font-weight: 700; font-size: 34px; line-height: 1.15; margin: 0 0 8px; letter-spacing: -.5px; text-wrap: balance; }
+.logpost-sub { font-family: var(--sans); font-size: 16px; color: var(--txt-mut); margin: 0 0 16px; line-height: 1.5; }
+.logpost-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 4px; }
+.logpost-tag { font-family: var(--mono); font-size: 9px; letter-spacing: 1.5px; padding: 3px 9px; border: 1px solid var(--accent-dim); color: var(--accent); background: rgba(255,45,111,0.06); }
+.logpost-date { font-family: var(--mono); font-size: 9px; letter-spacing: 1px; color: var(--txt-dim); margin-left: auto; }
+.logpost-actions { display: flex; gap: 10px; margin: 20px 0 26px; padding-bottom: 22px; border-bottom: 1px solid var(--line); }
+.logpost-actions .btn-ghost { padding: 8px 16px; font-size: 11px; }
+.logpost-body { font-family: var(--sans); font-size: 15px; line-height: 1.7; color: var(--txt); }
+.logpost-body h1 { font-size: 26px; letter-spacing: -.3px; margin: 28px 0 10px; }
+.logpost-body h2 { font-size: 21px; margin: 24px 0 9px; }
+.logpost-body h3 { font-size: 17px; letter-spacing: 1px; text-transform: uppercase; color: var(--txt-mut); margin: 20px 0 8px; }
+.logpost-body p { margin: 0 0 14px; }
+.logpost-body ul, .logpost-body ol { margin: 0 0 14px; padding-left: 26px; }
+.logpost-body li { margin-bottom: 5px; }
+.logpost-body a { color: var(--accent); text-decoration: underline; }
+.logpost-body img { max-width: 100%; height: auto; border: 1px solid var(--line); margin: 8px 0; display: block; }
+.logpost-body blockquote { margin: 18px 0; padding: 12px 20px; border-left: 3px solid var(--accent); background: rgba(255,45,111,0.05); font-size: 18px; font-style: italic; color: var(--txt); }
+.logpost-body pre { background: #07050a; border: 1px solid var(--line); border-left: 3px solid var(--op); padding: 14px 16px; overflow-x: auto; font-family: var(--mono); font-size: 13px; line-height: 1.55; color: #c8f7d8; margin: 0 0 16px; }
+.logpost-body code { font-family: var(--mono); font-size: 13px; background: var(--bg-2); padding: 1px 5px; border-radius: 2px; color: var(--accent); }
+.logpost-body pre code { background: none; padding: 0; color: inherit; }
+.log-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; text-align: center; padding: 30px; }
+.log-empty .le-glyph { font-size: 38px; color: var(--accent); text-shadow: 0 0 22px var(--accent-glow); }
+.log-empty h1 { font-family: var(--mono); font-size: 22px; letter-spacing: 6px; margin: 0; }
+.log-empty p { font-family: var(--mono); font-size: 11px; letter-spacing: 2px; color: var(--txt-dim); max-width: 380px; line-height: 1.8; }
+
+/* log modals */
+.modal-wide { width: min(820px, 96vw); }
+.modal-narrow { width: min(440px, 96vw); }
+.logfile-form { padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+.logfile-form label { display: flex; flex-direction: column; gap: 5px; font-family: var(--mono); font-size: 10px; letter-spacing: 1.5px; color: var(--txt-dim); }
+.logfile-form input, .logfile-form select {
+  width: 100%; background: var(--bg); border: 1px solid var(--line-soft); color: var(--txt);
+  font-family: var(--mono); font-size: 12px; padding: 9px 10px; outline: none;
+}
+.logfile-form input:focus, .logfile-form select:focus { border-color: var(--accent); }
+.lf-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.lf-row2 label { gap: 5px; }
+.f-lbl { font-family: var(--mono); font-size: 10px; letter-spacing: 1.5px; color: var(--txt-dim); }
+.lf-tags-block { display: flex; flex-direction: column; gap: 9px; }
+.lf-tag-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.lf-tag { font-family: var(--mono); font-size: 9px; letter-spacing: 1px; padding: 5px 10px; border: 1px solid var(--line-soft); background: var(--bg-1); color: var(--txt-mut); cursor: pointer; transition: all .12s; }
+.lf-tag:hover { color: var(--txt); border-color: var(--line); }
+.lf-tag.on { background: var(--accent); color: #0a0608; border-color: var(--accent); }
+.lf-tag.custom.on { background: var(--deg); border-color: var(--deg); }
+.lf-tag-custom { display: flex; gap: 8px; }
+.lf-tag-custom input { flex: 1; }
+.lf-tag-custom .btn-ghost { white-space: nowrap; padding: 8px 14px; font-size: 10px; }
+.lf-editor-block { display: flex; flex-direction: column; gap: 8px; }
+.rte-toolbar { display: flex; flex-wrap: wrap; gap: 3px; padding: 7px; background: var(--bg-2); border: 1px solid var(--line); }
+.rte-toolbar button {
+  min-width: 30px; height: 30px; padding: 0 8px; background: var(--bg-1); border: 1px solid var(--line-soft);
+  color: var(--txt-mut); cursor: pointer; font-family: var(--mono); font-size: 12px; transition: all .12s;
+}
+.rte-toolbar button:hover { color: var(--accent); border-color: var(--accent-dim); }
+.rte-toolbar button.on { background: var(--accent); color: #0a0608; border-color: var(--accent); }
+.rte-sep { width: 1px; background: var(--line); margin: 2px 4px; }
+.rte-editor {
+  min-height: 280px; max-height: 46vh; overflow-y: auto; background: var(--bg);
+  border: 1px solid var(--line); border-top: none; padding: 16px 18px;
+  font-family: var(--sans); font-size: 15px; line-height: 1.7; color: var(--txt); outline: none;
+}
+.rte-editor:focus { border-color: var(--accent); }
+.rte-editor:empty::before { content: "Write the report body\002026"; color: var(--txt-dim); }
+.rte-editor h1 { font-size: 24px; margin: 16px 0 8px; }
+.rte-editor h2 { font-size: 19px; margin: 14px 0 7px; }
+.rte-editor h3 { font-size: 16px; letter-spacing: 1px; text-transform: uppercase; color: var(--txt-mut); margin: 12px 0 6px; }
+.rte-editor blockquote { margin: 12px 0; padding: 8px 16px; border-left: 3px solid var(--accent); background: rgba(255,45,111,0.05); font-style: italic; }
+.rte-editor pre { background: #07050a; border: 1px solid var(--line); border-left: 3px solid var(--op); padding: 12px 14px; font-family: var(--mono); font-size: 13px; color: #c8f7d8; overflow-x: auto; }
+.rte-editor img { max-width: 100%; border: 1px solid var(--line); }
+.rte-editor ul, .rte-editor ol { padding-left: 26px; }
+
 /* ===================== SETTINGS ===================== */
 #view-settings { overflow-y: auto; background:
   radial-gradient(1100px 560px at 50% -8%, rgba(255,45,111,0.05), transparent 60%), var(--bg); }
@@ -511,7 +620,7 @@ body { position: relative; }
 .settings-sub { font-family: var(--mono); font-size: 11px; letter-spacing: 2px; color: var(--txt-dim); margin-bottom: 26px; }
 .set-section { border: 1px solid var(--line); background: var(--panel); margin-bottom: 18px; }
 .set-section > h3 { margin: 0; padding: 13px 18px; font-family: var(--mono); font-size: 12px; letter-spacing: 3px; color: var(--txt); border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 9px; }
-.set-section > h3::before { content: "â—†"; color: var(--accent); font-size: 10px; }
+.set-section > h3::before { content: "\0025C6"; color: var(--accent); font-size: 10px; }
 .set-row { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 15px 18px; border-top: 1px solid var(--line-soft); }
 .set-row:first-of-type { border-top: none; }
 .set-info { min-width: 0; }
@@ -590,7 +699,7 @@ body { position: relative; }
 <!-- ===================== TOP NAV ===================== -->
 <header class="topnav">
   <div class="brand">
-    <span class="brand-glyph">â—†</span>
+    <span class="brand-glyph">&#x25C6;</span>
     <span class="brand-name">Cyber<span class="brand-accent">SOC</span></span>
     <span class="brand-sub">ALL-DOMAIN OPS</span>
   </div>
@@ -635,7 +744,7 @@ body { position: relative; }
       <div class="metric"><span class="metric-num" id="m-deg">--</span><span class="metric-lbl met-deg">DEGRADED</span></div>
       <div class="metric"><span class="metric-num" id="m-out">--</span><span class="metric-lbl met-out">OUTAGE</span></div>
     </div>
-    <div class="hud-sync">LAST SYNC <span id="m-sync">--:--:--</span> Â· <span id="m-loc">ACQUIRING POSâ€¦</span></div>
+    <div class="hud-sync">LAST SYNC <span id="m-sync">--:--:--</span> &#xB7; <span id="m-loc">ACQUIRING POS&#x2026;</span></div>
   </div>
 
   <!-- ===== LEFT PANEL: granular alerts ===== -->
@@ -657,7 +766,7 @@ body { position: relative; }
         <button class="af-chip" data-cat="IOC">IOC</button>
       </div>
       <div class="alert-list" id="alert-list"></div>
-      <div class="intel-foot" id="intel-foot">FEEDS: â€”</div>
+      <div class="intel-foot" id="intel-foot">FEEDS: &#x2014;</div>
     </div>
   </aside>
 
@@ -665,7 +774,7 @@ body { position: relative; }
   <aside id="cli-panel" class="side-panel right">
     <button class="pull-tab right" id="cli-tab" aria-label="Toggle command line">
       <span class="tab-label">CMD</span>
-      <span class="tab-caret">â€º_</span>
+      <span class="tab-caret">&#x203A;_</span>
     </button>
     <div class="panel-inner">
       <div class="panel-head">
@@ -692,10 +801,10 @@ body { position: relative; }
     <div class="panel-inner">
       <div class="panel-head">
         <h2>SUBJECT ROSTER</h2>
-        <span class="panel-sub">SORTED Aâ€“Z</span>
+        <span class="panel-sub">SORTED A&#x2013;Z</span>
       </div>
       <div class="roster-search">
-        <input type="text" id="roster-search" placeholder="filter subjectsâ€¦" spellcheck="false" />
+        <input type="text" id="roster-search" placeholder="filter subjects&#x2026;" spellcheck="false" />
       </div>
       <div class="roster-list" id="roster-list"></div>
       <button class="btn-new" id="btn-new">+ NEW SUBJECT</button>
@@ -704,24 +813,116 @@ body { position: relative; }
 
   <!-- Case file stage -->
   <section class="dossier-stage" id="dossier-stage">
-    <button class="swipe-nav prev" id="prev-subject" aria-label="Previous subject">â€¹</button>
-    <button class="swipe-nav next" id="next-subject" aria-label="Next subject">â€º</button>
+    <button class="swipe-nav prev" id="prev-subject" aria-label="Previous subject">&#x2039;</button>
+    <button class="swipe-nav next" id="next-subject" aria-label="Next subject">&#x203A;</button>
     <div class="case-track" id="case-track"><!-- card injected here --></div>
-    <div class="swipe-hint">SWIPE â€¹ â€º</div>
+    <div class="swipe-hint">SWIPE &#x2039; &#x203A;</div>
   </section>
 </main>
 
 <!-- ===================== LOG VIEW (dummy) ===================== -->
 <main id="view-log" class="view">
-  <div class="log-placeholder">
-    <div class="log-scanline"></div>
-    <div class="log-glyph">â—†</div>
-    <h1>EVENT LOG</h1>
-    <p class="log-status">MODULE OFFLINE Â· CALIBRATING TELEMETRY</p>
-    <div class="log-bar"><span id="log-bar-fill"></span></div>
-    <p class="log-note">Forensic event timeline and audit trail will mount here.</p>
-  </div>
+  <!-- Left pull-out: documentation tree -->
+  <aside id="logtree-panel" class="side-panel left logtree-panel">
+    <button class="pull-tab left" id="logtree-tab" aria-label="Toggle documentation tree">
+      <span class="tab-label">LOG</span>
+      <span class="tab-badge" id="logtree-count">0</span>
+    </button>
+    <div class="panel-inner">
+      <div class="panel-head">
+        <h2>DOCUMENTATION</h2>
+        <span class="panel-sub">CAMPAIGN &amp; RESEARCH REPOSITORY</span>
+      </div>
+      <div class="logtree-actions">
+        <button class="btn-ghost" id="lt-new-folder">+ FOLDER</button>
+        <button class="btn-ghost" id="lt-new-file">+ FILE</button>
+      </div>
+      <div class="logtree" id="logtree" data-root="1"></div>
+      <div class="logtree-foot" id="logtree-foot">&#x2014; &#xB7; drag items onto a folder to nest</div>
+    </div>
+  </aside>
+
+  <!-- Reader stage -->
+  <section class="log-stage" id="log-stage"><!-- rendered file / empty state --></section>
 </main>
+
+<!-- ===================== LOG FILE EDITOR MODAL ===================== -->
+<div class="modal-scrim" id="logfile-scrim">
+  <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="logfile-title">
+    <div class="modal-head">
+      <h2 id="logfile-title">NEW FILE</h2>
+      <button class="modal-close" id="logfile-close" aria-label="Close">&#x2715;</button>
+    </div>
+    <form id="logfile-form" class="logfile-form">
+      <div class="lf-row2">
+        <label>TITLE<input type="text" id="lf-title" required placeholder="Report / note title" /></label>
+        <label>DESTINATION FOLDER<select id="lf-dest"></select></label>
+      </div>
+      <label>SUBTITLE<input type="text" id="lf-subtitle" placeholder="Short summary line" /></label>
+      <div class="lf-tags-block">
+        <div class="f-lbl">TAGS</div>
+        <div class="lf-tag-chips" id="lf-tag-chips"></div>
+        <div class="lf-tag-custom">
+          <input type="text" id="lf-tag-input" placeholder="custom tag&#x2026;" spellcheck="false" />
+          <button type="button" class="btn-ghost" id="lf-tag-add">+ ADD</button>
+        </div>
+      </div>
+      <div class="lf-editor-block">
+        <div class="f-lbl">DESCRIPTION</div>
+        <div class="rte-toolbar" id="rte-toolbar">
+          <button type="button" data-cmd="bold" title="Bold"><b>B</b></button>
+          <button type="button" data-cmd="italic" title="Italic"><i>I</i></button>
+          <button type="button" data-cmd="underline" title="Underline"><u>U</u></button>
+          <button type="button" data-cmd="strikeThrough" title="Strikethrough"><s>S</s></button>
+          <span class="rte-sep"></span>
+          <button type="button" data-block="h1" title="Heading 1">H1</button>
+          <button type="button" data-block="h2" title="Heading 2">H2</button>
+          <button type="button" data-block="h3" title="Heading 3">H3</button>
+          <button type="button" data-block="p" title="Body text">&#xB6;</button>
+          <span class="rte-sep"></span>
+          <button type="button" data-cmd="insertUnorderedList" title="Bulleted list">&#x2022; &#x2501;</button>
+          <button type="button" data-cmd="insertOrderedList" title="Numbered list">1. &#x2501;</button>
+          <button type="button" data-block="pre" title="Code block">&lt;/&gt;</button>
+          <button type="button" data-block="blockquote" title="Pull quote">&#x275D;</button>
+          <span class="rte-sep"></span>
+          <button type="button" data-cmd="createLink" title="Insert link">&#x1F517;</button>
+          <button type="button" id="rte-img" title="Insert image">&#x1F5BC;</button>
+          <button type="button" data-cmd="removeFormat" title="Clear formatting">&#x232B;</button>
+          <input type="file" id="rte-img-input" accept="image/*" hidden />
+        </div>
+        <div class="rte-editor" id="rte-editor" contenteditable="true" spellcheck="true"></div>
+      </div>
+      <div class="ef-actions">
+        <button type="button" class="btn-ghost btn-delete" id="lf-delete">DELETE</button>
+        <div class="ef-actions-right">
+          <button type="button" class="btn-ghost" id="lf-cancel">CANCEL</button>
+          <button type="submit" class="btn-primary">SAVE FILE</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ===================== LOG FOLDER MODAL ===================== -->
+<div class="modal-scrim" id="logfolder-scrim">
+  <div class="modal modal-narrow" role="dialog" aria-modal="true" aria-labelledby="logfolder-title">
+    <div class="modal-head">
+      <h2 id="logfolder-title">NEW FOLDER</h2>
+      <button class="modal-close" id="logfolder-close" aria-label="Close">&#x2715;</button>
+    </div>
+    <form id="logfolder-form" class="logfile-form">
+      <label>FOLDER NAME<input type="text" id="fld-name" required placeholder="e.g. Operation Nightfall" /></label>
+      <label>DESTINATION FOLDER<select id="fld-dest"></select></label>
+      <div class="ef-actions">
+        <button type="button" class="btn-ghost btn-delete" id="fld-delete">DELETE</button>
+        <div class="ef-actions-right">
+          <button type="button" class="btn-ghost" id="fld-cancel">CANCEL</button>
+          <button type="submit" class="btn-primary">SAVE FOLDER</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
 
 <!-- ===================== SETTINGS VIEW ===================== -->
 <main id="view-settings" class="view">
@@ -733,7 +934,7 @@ body { position: relative; }
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editor-title">
     <div class="modal-head">
       <h2 id="editor-title">NEW SUBJECT</h2>
-      <button class="modal-close" id="editor-close" aria-label="Close">âœ•</button>
+      <button class="modal-close" id="editor-close" aria-label="Close">&#x2715;</button>
     </div>
     <form id="editor-form" class="editor-form">
       <div class="ef-photo">
@@ -746,11 +947,11 @@ body { position: relative; }
         <label>ALIAS / HANDLE<input type="text" name="alias" placeholder="known aliases" /></label>
         <div class="ef-row">
           <label>DOB<input type="date" name="dob" /></label>
-          <label>SEX<select name="sex"><option value="">â€”</option><option>Male</option><option>Female</option><option>Unknown</option></select></label>
+          <label>SEX<select name="sex"><option value="">&#x2014;</option><option>Male</option><option>Female</option><option>Unknown</option></select></label>
         </div>
         <label>RACE / ETHNICITY
           <select name="ethnicity">
-            <option value="">â€”</option>
+            <option value="">&#x2014;</option>
             <option>American Indian or Alaska Native</option>
             <option>Asian</option>
             <option>Black or African American</option>
@@ -771,14 +972,14 @@ body { position: relative; }
         </div>
         <label>LAST KNOWN LOCATION<input type="text" name="location" placeholder="city, region" /></label>
         <label>AFFILIATIONS<input type="text" name="affiliations" placeholder="comma separated" /></label>
-        <label>DESCRIPTION / NOTES<textarea name="description" rows="4" placeholder="behavioral notes, MO, identifying marksâ€¦"></textarea></label>
+        <label>DESCRIPTION / NOTES<textarea name="description" rows="4" placeholder="behavioral notes, MO, identifying marks&#x2026;"></textarea></label>
       </div>
       <div class="ef-rels">
         <div class="ef-rels-head">RELATIONSHIPS / KNOWN ASSOCIATES</div>
         <div class="ef-rels-list" id="ef-rels-list"></div>
         <div class="ef-rels-add">
           <div class="ef-rel-search">
-            <input type="text" id="ef-rel-search" placeholder="search roster subjectsâ€¦" autocomplete="off" spellcheck="false" />
+            <input type="text" id="ef-rel-search" placeholder="search roster subjects&#x2026;" autocomplete="off" spellcheck="false" />
             <div class="ef-rel-results" id="ef-rel-results"></div>
           </div>
           <input type="text" id="ef-rel-type" list="rel-types" placeholder="relationship (e.g. brother)" autocomplete="off" />
@@ -805,10 +1006,10 @@ body { position: relative; }
 <!-- ===================== RELATIONSHIP WEB VIEW ===================== -->
 <div class="webview-scrim" id="webview-scrim">
   <div class="webview-head">
-    <div class="wv-title">â—ˆ RELATIONSHIP WEB <span class="wv-sub">DRAG TO REARRANGE Â· CLICK A NODE TO OPEN FILE</span></div>
+    <div class="wv-title">&#x25C8; RELATIONSHIP WEB <span class="wv-sub">DRAG TO REARRANGE &#xB7; CLICK A NODE TO OPEN FILE</span></div>
     <div class="wv-actions">
-      <button class="btn-ghost" id="wv-relayout">â†» RE-LAYOUT</button>
-      <button class="btn-ghost" id="wv-close">âœ• CLOSE</button>
+      <button class="btn-ghost" id="wv-relayout">&#x21BB; RE-LAYOUT</button>
+      <button class="btn-ghost" id="wv-close">&#x2715; CLOSE</button>
     </div>
   </div>
   <div class="webview-canvas" id="webview-canvas">
@@ -822,7 +1023,7 @@ body { position: relative; }
 
 <script>
 /* ===================================================================
-   CyberSOC â€” data layer
+   CyberSOC \u2014 data layer
    - AZURE_REGIONS: real Azure region coordinates (mock status feed)
    - DOSSIER seed loader (data/soc_dossier.json -> localStorage)
    =================================================================== */
@@ -841,16 +1042,16 @@ const AZURE_REGIONS = [
   { code: "westus3",       name: "West US 3",          geo: "Arizona, USA",       lat: 33.45,  lng: -112.07,status: "outage"      },
   { code: "canadacentral", name: "Canada Central",     geo: "Toronto, CA",        lat: 43.65,  lng: -79.38, status: "operational" },
   { code: "canadaeast",    name: "Canada East",        geo: "Quebec, CA",         lat: 46.81,  lng: -71.21, status: "operational" },
-  { code: "brazilsouth",   name: "Brazil South",       geo: "SÃ£o Paulo, BR",      lat: -23.55, lng: -46.63, status: "operational" },
+  { code: "brazilsouth",   name: "Brazil South",       geo: "S\u00E3o Paulo, BR",      lat: -23.55, lng: -46.63, status: "operational" },
   { code: "northeurope",   name: "North Europe",       geo: "Ireland",            lat: 53.34,  lng: -6.26,  status: "operational" },
   { code: "westeurope",    name: "West Europe",        geo: "Netherlands",        lat: 52.37,  lng: 4.90,   status: "degraded"    },
   { code: "uksouth",       name: "UK South",           geo: "London, UK",         lat: 51.51,  lng: -0.13,  status: "operational" },
   { code: "ukwest",        name: "UK West",            geo: "Cardiff, UK",        lat: 51.48,  lng: -3.18,  status: "operational" },
   { code: "francecentral", name: "France Central",     geo: "Paris, FR",          lat: 48.86,  lng: 2.35,   status: "operational" },
   { code: "germanywc",     name: "Germany West Central",geo: "Frankfurt, DE",     lat: 50.11,  lng: 8.68,   status: "operational" },
-  { code: "switzerlandn",  name: "Switzerland North",  geo: "ZÃ¼rich, CH",         lat: 47.38,  lng: 8.54,   status: "operational" },
+  { code: "switzerlandn",  name: "Switzerland North",  geo: "Z\u00FCrich, CH",         lat: 47.38,  lng: 8.54,   status: "operational" },
   { code: "norwaye",       name: "Norway East",        geo: "Oslo, NO",           lat: 59.91,  lng: 10.75,  status: "operational" },
-  { code: "swedenc",       name: "Sweden Central",     geo: "GÃ¤vle, SE",          lat: 60.67,  lng: 17.14,  status: "operational" },
+  { code: "swedenc",       name: "Sweden Central",     geo: "G\u00E4vle, SE",          lat: 60.67,  lng: 17.14,  status: "operational" },
   { code: "uaenorth",      name: "UAE North",          geo: "Dubai, AE",          lat: 25.27,  lng: 55.31,  status: "operational" },
   { code: "southafrican",  name: "South Africa North", geo: "Johannesburg, ZA",   lat: -26.20, lng: 28.05,  status: "operational" },
   { code: "centralindia",  name: "Central India",      geo: "Pune, IN",           lat: 18.52,  lng: 73.86,  status: "degraded"    },
@@ -878,7 +1079,7 @@ const OUTAGE_MSGS = [
   "Loss of availability impacting multiple services. Engineers engaged.",
   "Underlying network infrastructure failure under active investigation.",
   "Datacenter cooling event triggered protective shutdown of racks.",
-  "Storage subsystem fault â€” failover initiated to secondary scale unit."
+  "Storage subsystem fault \u2014 failover initiated to secondary scale unit."
 ];
 
 /* per-region active alert detail (generated for non-operational regions) */
@@ -1023,27 +1224,27 @@ let LIVE_MODE_INTEL = false;
 
 const INTEL_SIM = [
   { id: "kev-CVE-2024-3400", cat: "CVE", sev: "outage", title: "CVE-2024-3400", sub: "Palo Alto Networks PAN-OS",
-    msg: "Command Injection in GlobalProtect â€” actively exploited in the wild.", src: "CISA KEV (sim)", ransomware: true },
+    msg: "Command Injection in GlobalProtect \u2014 actively exploited in the wild.", src: "CISA KEV (sim)", ransomware: true },
   { id: "kev-CVE-2023-34362", cat: "CVE", sev: "outage", title: "CVE-2023-34362", sub: "Progress MOVEit Transfer",
-    msg: "SQL injection enabling unauthenticated RCE â€” Cl0p ransomware campaign.", src: "CISA KEV (sim)", ransomware: true },
+    msg: "SQL injection enabling unauthenticated RCE \u2014 Cl0p ransomware campaign.", src: "CISA KEV (sim)", ransomware: true },
   { id: "kev-CVE-2024-21887", cat: "CVE", sev: "degraded", title: "CVE-2024-21887", sub: "Ivanti Connect Secure",
     msg: "Command injection in web components allowing authenticated RCE.", src: "CISA KEV (sim)" },
-  { id: "c2-185.225.73.21:443", cat: "C2", sev: "outage", title: "185.225.73.21:443", sub: "Emotet Â· RU",
+  { id: "c2-185.225.73.21:443", cat: "C2", sev: "outage", title: "185.225.73.21:443", sub: "Emotet \u00B7 RU",
     msg: "Emotet command-and-control node (online) AS: SELECTEL", src: "Feodo Tracker (sim)", lat: 61.5, lng: 105.3, geo: "RU" },
-  { id: "c2-45.142.212.10:8080", cat: "C2", sev: "outage", title: "45.142.212.10:8080", sub: "QakBot Â· NL",
+  { id: "c2-45.142.212.10:8080", cat: "C2", sev: "outage", title: "45.142.212.10:8080", sub: "QakBot \u00B7 NL",
     msg: "QakBot command-and-control node (online) AS: DediPath", src: "Feodo Tracker (sim)", lat: 52.1, lng: 5.3, geo: "NL" },
-  { id: "c2-103.74.19.55:443", cat: "C2", sev: "degraded", title: "103.74.19.55:443", sub: "IcedID Â· CN",
+  { id: "c2-103.74.19.55:443", cat: "C2", sev: "degraded", title: "103.74.19.55:443", sub: "IcedID \u00B7 CN",
     msg: "IcedID command-and-control node (offline) AS: CHINANET", src: "Feodo Tracker (sim)", lat: 35.9, lng: 104.2, geo: "CN" },
-  { id: "c2-209.97.139.4:7080", cat: "C2", sev: "outage", title: "209.97.139.4:7080", sub: "TrickBot Â· US",
+  { id: "c2-209.97.139.4:7080", cat: "C2", sev: "outage", title: "209.97.139.4:7080", sub: "TrickBot \u00B7 US",
     msg: "TrickBot command-and-control node (online) AS: DIGITALOCEAN", src: "Feodo Tracker (sim)", lat: 39.8, lng: -98.6, geo: "US" },
-  { id: "c2-91.207.183.7:443", cat: "C2", sev: "outage", title: "91.207.183.7:443", sub: "Pikabot Â· DE",
+  { id: "c2-91.207.183.7:443", cat: "C2", sev: "outage", title: "91.207.183.7:443", sub: "Pikabot \u00B7 DE",
     msg: "Pikabot command-and-control node (online) AS: HOSTKEY", src: "Feodo Tracker (sim)", lat: 51.2, lng: 10.4, geo: "DE" },
-  { id: "iocfx-sim-1", cat: "IOC", sev: "outage", title: "5.181.156.97:50050", sub: "Cobalt Strike Â· ip:port",
-    msg: "botnet_cc Â· confidence 100% Â· tags: CobaltStrike, beacon", src: "ThreatFox (sim)" },
-  { id: "iocfx-sim-2", cat: "IOC", sev: "degraded", title: "update-cdn-secure.com", sub: "Lumma Stealer Â· domain",
-    msg: "payload_delivery Â· confidence 75% Â· tags: stealer, lumma", src: "ThreatFox (sim)" },
-  { id: "iocfx-sim-3", cat: "IOC", sev: "outage", title: "194.169.175.132:13782", sub: "AsyncRAT Â· ip:port",
-    msg: "botnet_cc Â· confidence 90% Â· tags: rat, asyncrat", src: "ThreatFox (sim)" }
+  { id: "iocfx-sim-1", cat: "IOC", sev: "outage", title: "5.181.156.97:50050", sub: "Cobalt Strike \u00B7 ip:port",
+    msg: "botnet_cc \u00B7 confidence 100% \u00B7 tags: CobaltStrike, beacon", src: "ThreatFox (sim)" },
+  { id: "iocfx-sim-2", cat: "IOC", sev: "degraded", title: "update-cdn-secure.com", sub: "Lumma Stealer \u00B7 domain",
+    msg: "payload_delivery \u00B7 confidence 75% \u00B7 tags: stealer, lumma", src: "ThreatFox (sim)" },
+  { id: "iocfx-sim-3", cat: "IOC", sev: "outage", title: "194.169.175.132:13782", sub: "AsyncRAT \u00B7 ip:port",
+    msg: "botnet_cc \u00B7 confidence 90% \u00B7 tags: rat, asyncrat", src: "ThreatFox (sim)" }
 ];
 function simIntel() {
   const now = Date.now();
@@ -1092,7 +1293,7 @@ const DOSSIER_FALLBACK = [
     id: "sub-0002", name: "OKONKWO, Daniel", alias: "GHOSTWIRE",
     dob: "1986-11-02", sex: "Male", ethnicity: "Black or African American",
     threat: "SEVERE", status: "SURVEILLANCE", location: "Unknown",
-    affiliations: "Independent Â· suspected state proxy",
+    affiliations: "Independent \u00B7 suspected state proxy",
     caseNumber: "CS-1908-C", photo: "",
     relationships: [ { id: "sub-0001", type: "Associate" } ],
     description: "Believed responsible for the 'Tidewater' ransomware family. Highly disciplined OPSEC; no confirmed photograph on file. Communicates via rotating onion services. Considered a flight risk and technically sophisticated."
@@ -1152,7 +1353,7 @@ async function seedDossier() {
       const json = await res.json();
       if (Array.isArray(json) && json.length) seed = json;
     }
-  } catch (e) { /* file:// or offline â€” use fallback */ }
+  } catch (e) { /* file:// or offline \u2014 use fallback */ }
   saveDossier(seed);
   return seed.map(normalizeProfile);
 }
@@ -1194,9 +1395,9 @@ function exportDossier(list) {
 </script>
 <script>
 /* ===================================================================
-   CyberSOC â€” SITREP view
-   Leaflet dark map Â· Azure region markers Â· radar sweep (ping-on-touch)
-   Â· left alert feed Â· right command line
+   CyberSOC \u2014 SITREP view
+   Leaflet dark map \u00B7 Azure region markers \u00B7 radar sweep (ping-on-touch)
+   \u00B7 left alert feed \u00B7 right command line
    =================================================================== */
 (function () {
   let map, radarCenterLatLng = null;
@@ -1231,7 +1432,7 @@ function exportDossier(list) {
     baseLayer = L.tileLayer(
       (window.Settings && window.Settings.get("theme") === "light") ? BASEMAPS.light : BASEMAPS.dark,
       {
-        attribution: '&copy; OpenStreetMap &copy; CARTO Â· CyberSOC',
+        attribution: '&copy; OpenStreetMap &copy; CARTO \u00B7 CyberSOC',
         subdomains: "abcd",
         maxZoom: 19
       }
@@ -1272,7 +1473,7 @@ function exportDossier(list) {
   function regionPopup(r) {
     const color = r.status === "outage" ? "var(--out)" : r.status === "degraded" ? "var(--deg)" : "var(--op)";
     return `<div class="rp-name">${r.name}</div>
-            <div class="rp-meta">${r.code} Â· ${r.geo}</div>
+            <div class="rp-meta">${r.code} \u00B7 ${r.geo}</div>
             <div class="rp-status" style="color:${color}">${r.status.toUpperCase()}</div>`;
   }
 
@@ -1419,8 +1620,8 @@ function exportDossier(list) {
       const d = ALERT_DETAIL[r.code] || {};
       out.push({
         cat: "AZURE", sev: r.status,
-        time: (d.id || "") + (d.since ? " Â· " + ago(d.since) + " ago" : ""),
-        title: r.name, sub: (d.service || "Multiple services") + " Â· " + r.geo,
+        time: (d.id || "") + (d.since ? " \u00B7 " + ago(d.since) + " ago" : ""),
+        title: r.name, sub: (d.service || "Multiple services") + " \u00B7 " + r.geo,
         msg: d.msg || "", src: "Azure Status"
       });
     });
@@ -1446,20 +1647,20 @@ function exportDossier(list) {
       .sort((a, b) => (a.sev === "outage" ? -1 : 1) - (b.sev === "outage" ? -1 : 1));
 
     if (!filtered.length) {
-      list.innerHTML = `<div class="alert-empty">âœ“ NO ACTIVE ALERTS</div>`;
+      list.innerHTML = `<div class="alert-empty">\u2713 NO ACTIVE ALERTS</div>`;
     } else {
       list.innerHTML = filtered.map((a) => {
         const hasGeo = a.lat != null && a.lng != null;
         const sevLbl = a.cat === "AZURE" ? (a.sev === "outage" ? "OUTAGE" : "DEGRADED") : a.cat;
         return `<div class="alert-card sev-${a.sev}${hasGeo ? " geo" : ""}"${hasGeo ? ` data-lat="${a.lat}" data-lng="${a.lng}"` : ""}>
           <div class="alert-top">
-            <span class="alert-cat cat-${a.cat}">${sevLbl}${a.ransomware ? " âš  RANSOMWARE" : ""}</span>
+            <span class="alert-cat cat-${a.cat}">${sevLbl}${a.ransomware ? " \u26A0 RANSOMWARE" : ""}</span>
             <span class="alert-time">${escA(a.time)}</span>
           </div>
           <div class="alert-region">${escA(a.title)}</div>
           <div class="alert-svc">${escA(a.sub)}</div>
           <div class="alert-msg">${escA(a.msg)}</div>
-          ${hasGeo ? `<div class="alert-pin">â—‰ PLOTTED ON MAP${a.geo ? " Â· " + escA(a.geo) : ""} â€” click to focus</div>` : ""}
+          ${hasGeo ? `<div class="alert-pin">\u25C9 PLOTTED ON MAP${a.geo ? " \u00B7 " + escA(a.geo) : ""} \u2014 click to focus</div>` : ""}
           <div class="alert-src">SRC: ${escA(a.src)}</div>
         </div>`;
       }).join("");
@@ -1478,10 +1679,10 @@ function exportDossier(list) {
     const names = { cisa: "CISA KEV", feodo: "Feodo", threatfox: "ThreatFox" };
     const parts = Object.keys(names).map((k) => {
       const ok = f[k] && f[k].ok;
-      return `<span class="${ok ? "if-ok" : "if-bad"}">${ok ? "â—" : "â—‹"} ${names[k]}</span>`;
+      return `<span class="${ok ? "if-ok" : "if-bad"}">${ok ? "\u25CF" : "\u25CB"} ${names[k]}</span>`;
     });
-    const when = THREAT_FEED.fetchedAt ? new Date(THREAT_FEED.fetchedAt).toTimeString().slice(0, 8) : "â€”";
-    el.innerHTML = `FEEDS ${LIVE_MODE_INTEL ? "LIVE" : "SIM"} Â· ${parts.join("&nbsp;&nbsp;")} Â· upd ${when}`;
+    const when = THREAT_FEED.fetchedAt ? new Date(THREAT_FEED.fetchedAt).toTimeString().slice(0, 8) : "\u2014";
+    el.innerHTML = `FEEDS ${LIVE_MODE_INTEL ? "LIVE" : "SIM"} \u00B7 ${parts.join("&nbsp;&nbsp;")} \u00B7 upd ${when}`;
   }
 
   /* Plot geo-tagged threat intel (C2 / malicious IPs) on the map. */
@@ -1503,7 +1704,7 @@ function exportDossier(list) {
       return L.marker([it.lat, it.lng], { icon, keyboard: false })
         .bindPopup(`<div class="rp-name">${escA(it.title)}</div>
                     <div class="rp-meta">${escA((it.sub || "").slice(0, 54))}</div>
-                    <div class="rp-status" style="color:${color}">${escA(it.cat)} Â· ${escA(it.src || "")}</div>`,
+                    <div class="rp-status" style="color:${color}">${escA(it.cat)} \u00B7 ${escA(it.src || "")}</div>`,
           { className: "region-popup", closeButton: false });
     });
     threatLayer = L.layerGroup(layers).addTo(map);
@@ -1573,7 +1774,7 @@ function exportDossier(list) {
       });
       if (!r.ok) {
         const e = await r.json().catch(() => ({}));
-        cliPrint(`âœ• ${escHtml(e.error || ("exec failed â€” http " + r.status))}`, "err");
+        cliPrint(`\u2715 ${escHtml(e.error || ("exec failed \u2014 http " + r.status))}`, "err");
         return;
       }
       const j = await r.json();
@@ -1585,7 +1786,7 @@ function exportDossier(list) {
       emit(j.stderr, "warn");
       if (j.code) cliPrint(`  [exit ${j.code}]`, "warn");
     } catch (e) {
-      cliPrint("âœ• localhost bridge unreachable â€” start the host server first (node server.js).", "err");
+      cliPrint("\u2715 localhost bridge unreachable \u2014 start the host server first (node server.js).", "err");
     }
   }
 
@@ -1594,10 +1795,10 @@ function exportDossier(list) {
       cliPrint("AVAILABLE COMMANDS", "head");
       const rows = [
         ["help", "list available commands"],
-        ["sitrep", "full situational report â€” all region statuses"],
-        ["status &lt;code&gt;", "detail for one region (e.g. status westus3)"],
+        ["sitrep", "full situational report \u2014 all region statuses"],
+        ["status &lt;code&gt;", "region detail; 'status server' = node server check"],
         ["alerts", "list active incidents only"],
-        ["intel", "public threat intel â€” CVEs Â· C2 Â· IOCs"],
+        ["intel", "public threat intel \u2014 CVEs \u00B7 C2 \u00B7 IOCs"],
         ["regions", "list all monitored region codes"],
         ["scan", "force re-sync of the status feed"],
         ["locate &lt;keyword&gt;", "find &amp; plot matching dossier subjects on the map"],
@@ -1608,46 +1809,65 @@ function exportDossier(list) {
     },
     sitrep() {
       const c = statusCounts();
-      cliPrint("â—† SITREP // AZURE THREAT LANDSCAPE", "head");
-      cliPrint(`  SYNCED ${fmtTime()} Â· ${AZURE_REGIONS.length} REGIONS MONITORED`, "sys");
+      cliPrint("\u25C6 SITREP // AZURE THREAT LANDSCAPE", "head");
+      cliPrint(`  SYNCED ${fmtTime()} \u00B7 ${AZURE_REGIONS.length} REGIONS MONITORED`, "sys");
       cliPrint(`  OPERATIONAL ${c.operational}   DEGRADED ${c.degraded}   OUTAGE ${c.outage}`, "sys");
-      cliPrint("â€”".repeat(40), "sys");
+      cliPrint("\u2014".repeat(40), "sys");
       ["outage", "degraded", "operational"].forEach((st) => {
         const group = AZURE_REGIONS.filter((r) => r.status === st);
         if (!group.length) return;
         const cls = st === "outage" ? "err" : st === "degraded" ? "warn" : "ok";
         group.forEach((r) => {
-          const dot = st === "operational" ? "â—" : "â–²";
+          const dot = st === "operational" ? "\u25CF" : "\u25B2";
           cliPrint(`  ${dot} ${r.name.padEnd(22)} ${r.code.padEnd(16)} ${st.toUpperCase()}`, cls);
         });
       });
       // SolarWinds Observability components
-      cliPrint("â€”".repeat(40), "sys");
+      cliPrint("\u2014".repeat(40), "sys");
       const sw = { operational: 0, degraded: 0, outage: 0, maintenance: 0 };
       SOLARWINDS_COMPONENTS.forEach((c) => { sw[c.status] = (sw[c.status] || 0) + 1; });
-      cliPrint("â—† SOLARWINDS OBSERVABILITY", "head");
-      cliPrint(`  ${SOLARWINDS_COMPONENTS.length} COMPONENTS Â· OPERATIONAL ${sw.operational}   DEGRADED ${sw.degraded}   OUTAGE ${sw.outage}   MAINT ${sw.maintenance}`, "sys");
+      cliPrint("\u25C6 SOLARWINDS OBSERVABILITY", "head");
+      cliPrint(`  ${SOLARWINDS_COMPONENTS.length} COMPONENTS \u00B7 OPERATIONAL ${sw.operational}   DEGRADED ${sw.degraded}   OUTAGE ${sw.outage}   MAINT ${sw.maintenance}`, "sys");
       ["outage", "degraded", "maintenance", "operational"].forEach((st) => {
         const group = SOLARWINDS_COMPONENTS.filter((c) => c.status === st);
         if (!group.length) return;
         const cls = st === "outage" ? "err" : st === "operational" ? "ok" : "warn";
         group.forEach((c) => {
-          const dot = st === "operational" ? "â—" : "â–²";
+          const dot = st === "operational" ? "\u25CF" : "\u25B2";
           cliPrint(`  ${dot} ${c.name.padEnd(28)} ${st.toUpperCase()}`, cls);
         });
       });
     },
     status(arg) {
-      if (!arg) { cliPrint("usage: status &lt;region-code&gt;", "warn"); return; }
+      if (!arg) { cliPrint("usage: status &lt;region-code&gt; | status server", "warn"); return; }
+      if (arg.toLowerCase() === "server") {
+        cliPrint("\u25C6 NODE SERVER REACHABILITY", "head");
+        cliPrint("> probing http://localhost:3005/api/health \u2026", "sys");
+        const t0 = performance.now();
+        fetch("/api/health", { cache: "no-store" })
+          .then((r) => r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status)))
+          .then((j) => {
+            const ms = Math.round(performance.now() - t0);
+            cliPrint(`\u2713 SERVER ONLINE \u00B7 ${j.service || "CyberSOC"} \u00B7 ${ms}ms`, "ok");
+            cliPrint(`  live feeds, file writes & shell bridge AVAILABLE.`, "ok");
+            cliPrint(`  intel: ${LIVE_MODE_INTEL ? "LIVE" : "\u2014"} \u00B7 azure: ${LIVE_MODE ? "LIVE" : "SIM"} \u00B7 solarwinds: ${LIVE_MODE_SW ? "LIVE" : "SIM"}`, "sys");
+          })
+          .catch((e) => {
+            cliPrint(`\u2715 SERVER UNREACHABLE \u2014 ${escHtml(e.message || "no response")}`, "err");
+            cliPrint("  start it with:  node server.js   (then reload)", "warn");
+            cliPrint("  running in OFFLINE mode: simulated feeds \u00B7 log files download as JSON.", "warn");
+          });
+        return;
+      }
       const r = AZURE_REGIONS.find((x) => x.code === arg.toLowerCase() || x.name.toLowerCase() === arg.toLowerCase());
       if (!r) { cliPrint(`region '${arg}' not found. try 'regions'.`, "err"); return; }
       const cls = r.status === "outage" ? "err" : r.status === "degraded" ? "warn" : "ok";
-      cliPrint(`â—† ${r.name} [${r.code}]`, "head");
+      cliPrint(`\u25C6 ${r.name} [${r.code}]`, "head");
       cliPrint(`  LOCATION  ${r.geo}`, "sys");
       cliPrint(`  STATUS    ${r.status.toUpperCase()}`, cls);
       const d = ALERT_DETAIL[r.code];
       if (d) {
-        cliPrint(`  INCIDENT  ${d.id} Â· ${d.service}`, "sys");
+        cliPrint(`  INCIDENT  ${d.id} \u00B7 ${d.service}`, "sys");
         cliPrint(`  SINCE     ${ago(d.since)} ago`, "sys");
         cliPrint(`  DETAIL    ${d.msg}`, cls);
       } else {
@@ -1656,32 +1876,32 @@ function exportDossier(list) {
     },
     alerts() {
       const active = AZURE_REGIONS.filter((r) => r.status !== "operational");
-      if (!active.length) { cliPrint("âœ“ no active incidents â€” all regions nominal.", "ok"); return; }
-      cliPrint(`â—† ${active.length} ACTIVE INCIDENT(S)`, "head");
+      if (!active.length) { cliPrint("\u2713 no active incidents \u2014 all regions nominal.", "ok"); return; }
+      cliPrint(`\u25C6 ${active.length} ACTIVE INCIDENT(S)`, "head");
       active.forEach((r) => {
         const d = ALERT_DETAIL[r.code] || {};
         const cls = r.status === "outage" ? "err" : "warn";
-        cliPrint(`  ${r.status === "outage" ? "âœ•" : "â–²"} ${r.name} â€” ${d.service || ""} (${d.id || ""})`, cls);
+        cliPrint(`  ${r.status === "outage" ? "\u2715" : "\u25B2"} ${r.name} \u2014 ${d.service || ""} (${d.id || ""})`, cls);
       });
     },
     intel() {
       const items = THREAT_FEED.items || [];
       const f = THREAT_FEED.feeds || {};
-      cliPrint("â—† THREAT INTELLIGENCE", "head");
-      cliPrint(`  SOURCE ${LIVE_MODE_INTEL ? "LIVE PUBLIC FEEDS" : "LOCAL SIMULATION"} Â· ${items.length} indicator(s)`, LIVE_MODE_INTEL ? "ok" : "warn");
+      cliPrint("\u25C6 THREAT INTELLIGENCE", "head");
+      cliPrint(`  SOURCE ${LIVE_MODE_INTEL ? "LIVE PUBLIC FEEDS" : "LOCAL SIMULATION"} \u00B7 ${items.length} indicator(s)`, LIVE_MODE_INTEL ? "ok" : "warn");
       [["cisa", "CISA KEV"], ["feodo", "Feodo Tracker (C2)"], ["threatfox", "ThreatFox (IOC)"]].forEach(([k, n]) => {
         const s = f[k];
-        cliPrint(`  ${s && s.ok ? "â—" : "â—‹"} ${n.padEnd(22)} ${s && s.ok ? (s.count + " items") : "offline"}`, s && s.ok ? "ok" : "warn");
+        cliPrint(`  ${s && s.ok ? "\u25CF" : "\u25CB"} ${n.padEnd(22)} ${s && s.ok ? (s.count + " items") : "offline"}`, s && s.ok ? "ok" : "warn");
       });
-      cliPrint("â€”".repeat(40), "sys");
+      cliPrint("\u2014".repeat(40), "sys");
       ["CVE", "C2", "IOC"].forEach((cat) => {
         const group = items.filter((it) => it.cat === cat).slice(0, 8);
         if (!group.length) return;
         cliPrint(`  ${cat} (${items.filter((it) => it.cat === cat).length})`, "head");
         group.forEach((it) => {
           const cls = it.sev === "outage" ? "err" : "warn";
-          const geo = (it.lat != null) ? "  â—‰ " + (it.geo || "map") : "";
-          cliPrint(`  ${it.sev === "outage" ? "âœ•" : "â–²"} ${(it.title || "").slice(0, 26).padEnd(27)} ${(it.sub || "").slice(0, 26)}${geo}`, cls);
+          const geo = (it.lat != null) ? "  \u25C9 " + (it.geo || "map") : "";
+          cliPrint(`  ${it.sev === "outage" ? "\u2715" : "\u25B2"} ${(it.title || "").slice(0, 26).padEnd(27)} ${(it.sub || "").slice(0, 26)}${geo}`, cls);
         });
       });
     },
@@ -1693,39 +1913,39 @@ function exportDossier(list) {
       }
     },
     scan() {
-      cliPrint("> initiating telemetry re-syncâ€¦", "sys");
+      cliPrint("> initiating telemetry re-sync\u2026", "sys");
       syncAzureStatus().then((live) => {
         AZURE_REGIONS.forEach(updateMarkerStatus);
         updateHUD(); renderAlerts(); updateFeedIndicator();
-        cliPrint(`âœ“ sync complete @ ${fmtTime()} Â· source: ${live ? "AZURE LIVE FEED" : "LOCAL SIMULATION"}`, live ? "ok" : "warn");
+        cliPrint(`\u2713 sync complete @ ${fmtTime()} \u00B7 source: ${live ? "AZURE LIVE FEED" : "LOCAL SIMULATION"}`, live ? "ok" : "warn");
       });
     },
     locate(arg) {
       if (!arg) {
-        if (!radarCenterLatLng) { cliPrint("usage: locate &lt;keyword&gt;  â€” search & plot dossier subjects", "warn"); return; }
-        cliPrint("â—† OPERATOR POSITION", "head");
+        if (!radarCenterLatLng) { cliPrint("usage: locate &lt;keyword&gt;  \u2014 search & plot dossier subjects", "warn"); return; }
+        cliPrint("\u25C6 OPERATOR POSITION", "head");
         cliPrint(`  LAT ${radarCenterLatLng.lat.toFixed(4)}  LNG ${radarCenterLatLng.lng.toFixed(4)}`, "sys");
         cliPrint("  tip: 'locate <keyword>' searches the dossier and plots matches.", "sys");
         return;
       }
       const profs = window.Dossier ? window.Dossier.getProfiles() : [];
       const kw = arg.toLowerCase();
-      const plottable = (loc) => loc && !/^\s*(unknown|n\/a|â€”|-)?\s*$/i.test(loc);
+      const plottable = (loc) => loc && !/^\s*(unknown|n\/a|\u2014|-)?\s*$/i.test(loc);
       const matches = profs.filter((p) =>
         [p.name, p.alias, p.location, p.affiliations, p.description, p.caseNumber]
           .some((f) => (f || "").toLowerCase().includes(kw)));
       if (!matches.length) { cliPrint(`no subjects match '${escHtml(arg)}'. try a name, alias, city, or affiliation.`, "err"); return; }
-      cliPrint(`â—† LOCATE // ${matches.length} SUBJECT(S) MATCH '${escHtml(arg.toUpperCase())}'`, "head");
+      cliPrint(`\u25C6 LOCATE // ${matches.length} SUBJECT(S) MATCH '${escHtml(arg.toUpperCase())}'`, "head");
       matches.forEach((p) => {
         const has = plottable(p.location);
-        cliPrint(`  ${has ? "â—‰" : "Â·"} ${escHtml((p.name || "?").padEnd(24))} ${has ? escHtml(p.location) : "location unknown"}`, has ? "ok" : "warn");
+        cliPrint(`  ${has ? "\u25C9" : "\u00B7"} ${escHtml((p.name || "?").padEnd(24))} ${has ? escHtml(p.location) : "location unknown"}`, has ? "ok" : "warn");
       });
       const located = matches.filter((p) => plottable(p.location));
       if (!located.length) { cliPrint("  no plottable last-known locations among matches.", "warn"); return; }
-      cliPrint(`> geocoding ${located.length} location(s)â€¦`, "sys");
+      cliPrint(`> geocoding ${located.length} location(s)\u2026`, "sys");
       window.Sitrep.plotSubjects(located).then((n) => {
-        if (!n) { cliPrint("âœ• could not geocode any matching location.", "err"); return; }
-        cliPrint(`âœ“ ${n} subject pin(s) placed Â· map fit to matches.`, "ok");
+        if (!n) { cliPrint("\u2715 could not geocode any matching location.", "err"); return; }
+        cliPrint(`\u2713 ${n} subject pin(s) placed \u00B7 map fit to matches.`, "ok");
       });
     },
     localhost(arg) {
@@ -1735,10 +1955,10 @@ function exportDossier(list) {
         return;
       }
       shellMode = true;
-      cliPrint("â—† LOCALHOST SHELL", "head");
+      cliPrint("\u25C6 LOCALHOST SHELL", "head");
       cliPrint("  bridged to the host machine's native shell via the CyberSOC server.", "sys");
       cliPrint("  every line you enter now executes on the host. type 'exit' to disconnect.", "warn");
-      cliPrint("  (requires the local Node server â€” node server.js)", "sys");
+      cliPrint("  (requires the local Node server \u2014 node server.js)", "sys");
     },
     clear() { $("#cli-out").innerHTML = ""; }
   };
@@ -1747,7 +1967,7 @@ function exportDossier(list) {
     if (shellMode) {
       const t = raw.trim();
       cliPrint(`<span class="ci-prompt" style="color:var(--out)">host:~#</span> ${escHtml(raw)}`, "cmd");
-      if (t === "exit" || t === "quit") { shellMode = false; cliPrint("âœ“ disconnected from host shell.", "ok"); return; }
+      if (t === "exit" || t === "quit") { shellMode = false; cliPrint("\u2713 disconnected from host shell.", "ok"); return; }
       if (!t) return;
       execRemote(t);
       return;
@@ -1838,7 +2058,7 @@ function exportDossier(list) {
       if (!map || !baseLayer) return;
       map.removeLayer(baseLayer);
       baseLayer = L.tileLayer(theme === "light" ? BASEMAPS.light : BASEMAPS.dark,
-        { attribution: '&copy; OpenStreetMap &copy; CARTO Â· CyberSOC', subdomains: "abcd", maxZoom: 19 }).addTo(map);
+        { attribution: '&copy; OpenStreetMap &copy; CARTO \u00B7 CyberSOC', subdomains: "abcd", maxZoom: 19 }).addTo(map);
     },
     /* drop a located pin on the map (used by Dossier last-known-location) */
     async dropPin(query, label) {
@@ -1862,8 +2082,8 @@ function exportDossier(list) {
 </script>
 <script>
 /* ===================================================================
-   CyberSOC â€” DOSSIER view
-   Case-file profiles Â· roster panel Â· swipe navigation Â· CRUD
+   CyberSOC \u2014 DOSSIER view
+   Case-file profiles \u00B7 roster panel \u00B7 swipe navigation \u00B7 CRUD
    Persists to localStorage('soc_dossier'), seeded from data/soc_dossier.json
    =================================================================== */
 (function () {
@@ -1888,16 +2108,16 @@ function exportDossier(list) {
   function persist() { saveDossier(profiles); saveDossierRemote(profiles); }
   function nameOf(id) { const p = profiles.find((x) => x.id === id); return p ? p.name : null; }
   function age(dob) {
-    if (!dob) return "â€”";
-    const d = new Date(dob); if (isNaN(d)) return "â€”";
+    if (!dob) return "\u2014";
+    const d = new Date(dob); if (isNaN(d)) return "\u2014";
     const t = new Date();
     let a = t.getFullYear() - d.getFullYear();
     const m = t.getMonth() - d.getMonth();
     if (m < 0 || (m === 0 && t.getDate() < d.getDate())) a--;
-    return a >= 0 ? a : "â€”";
+    return a >= 0 ? a : "\u2014";
   }
   function fmtDob(dob) {
-    if (!dob) return "â€”";
+    if (!dob) return "\u2014";
     const d = new Date(dob); if (isNaN(d)) return dob;
     return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "2-digit" });
   }
@@ -1914,9 +2134,9 @@ function exportDossier(list) {
   function buildCard(p) {
     const card = document.createElement("div");
     card.className = "case-card";
-    const locVal = (p.location && !/^(unknown|â€”|-)?$/i.test(p.location.trim()))
-      ? `<span class="loc-link" data-loc="${esc(p.location)}" title="Plot on SITREP map">${esc(p.location)} â—‰</span>`
-      : esc(p.location || "â€”");
+    const locVal = (p.location && !/^(unknown|\u2014|-)?$/i.test(p.location.trim()))
+      ? `<span class="loc-link" data-loc="${esc(p.location)}" title="Plot on SITREP map">${esc(p.location)} \u25C9</span>`
+      : esc(p.location || "\u2014");
     const rels = (p.relationships || []).filter((r) => r && r.id);
     const relsHtml = rels.length
       ? rels.map((r) => {
@@ -1930,9 +2150,9 @@ function exportDossier(list) {
       <div class="cc-left">
         <div class="cc-photo">${photoMarkup(p)}</div>
         <div class="cc-badges">
-          <div class="cc-badge threat-${p.threat}"><span class="b-lbl">THREAT</span><span class="b-val">${esc(p.threat || "â€”")}</span></div>
-          <div class="cc-badge"><span class="b-lbl">STATUS</span><span class="b-val">${esc(p.status || "â€”")}</span></div>
-          <div class="cc-badge"><span class="b-lbl">CASE&nbsp;#</span><span class="b-val">${esc(p.caseNumber || "â€”")}</span></div>
+          <div class="cc-badge threat-${p.threat}"><span class="b-lbl">THREAT</span><span class="b-val">${esc(p.threat || "\u2014")}</span></div>
+          <div class="cc-badge"><span class="b-lbl">STATUS</span><span class="b-val">${esc(p.status || "\u2014")}</span></div>
+          <div class="cc-badge"><span class="b-lbl">CASE&nbsp;#</span><span class="b-val">${esc(p.caseNumber || "\u2014")}</span></div>
         </div>
       </div>
       <div class="cc-right">
@@ -1943,11 +2163,11 @@ function exportDossier(list) {
         <div class="cc-name">${esc(p.name)}</div>
         <div class="cc-alias">${p.alias ? "&ldquo;" + esc(p.alias) + "&rdquo;" : ""}</div>
         <div class="cc-grid">
-          <div class="cc-field"><div class="f-lbl">DATE OF BIRTH</div><div class="f-val">${fmtDob(p.dob)}${p.dob ? " Â· age " + age(p.dob) : ""}</div></div>
-          <div class="cc-field"><div class="f-lbl">SEX</div><div class="f-val">${esc(p.sex || "â€”")}</div></div>
-          <div class="cc-field"><div class="f-lbl">RACE / ETHNICITY</div><div class="f-val">${esc(p.ethnicity || "â€”")}</div></div>
+          <div class="cc-field"><div class="f-lbl">DATE OF BIRTH</div><div class="f-val">${fmtDob(p.dob)}${p.dob ? " \u00B7 age " + age(p.dob) : ""}</div></div>
+          <div class="cc-field"><div class="f-lbl">SEX</div><div class="f-val">${esc(p.sex || "\u2014")}</div></div>
+          <div class="cc-field"><div class="f-lbl">RACE / ETHNICITY</div><div class="f-val">${esc(p.ethnicity || "\u2014")}</div></div>
           <div class="cc-field"><div class="f-lbl">LAST KNOWN LOCATION</div><div class="f-val">${locVal}</div></div>
-          <div class="cc-field" style="grid-column:1/-1"><div class="f-lbl">AFFILIATIONS</div><div class="f-val">${esc(p.affiliations || "â€”")}</div></div>
+          <div class="cc-field" style="grid-column:1/-1"><div class="f-lbl">AFFILIATIONS</div><div class="f-val">${esc(p.affiliations || "\u2014")}</div></div>
         </div>
         <div class="cc-assoc"><div class="f-lbl">KNOWN ASSOCIATES / RELATIONSHIPS</div><div class="assoc-wrap">${relsHtml}</div></div>
         <div class="cc-desc"><div class="f-lbl">DESCRIPTION / NOTES</div><div class="f-val">${esc(p.description || "No notes on file.")}</div></div>
@@ -1974,7 +2194,7 @@ function exportDossier(list) {
   function renderCard(animateFrom) {
     const track = $("#case-track");
     if (!profiles.length) {
-      track.innerHTML = `<div class="case-empty"><div class="ce-glyph">â—†</div>
+      track.innerHTML = `<div class="case-empty"><div class="ce-glyph">\u25C6</div>
         <p>NO SUBJECTS ON FILE</p>
         <button class="btn-primary" id="empty-new">+ CREATE FIRST FILE</button></div>`;
       const b = $("#empty-new"); if (b) b.addEventListener("click", () => openEditor(null));
@@ -2034,7 +2254,7 @@ function exportDossier(list) {
         ${thumb}
         <div class="ri-meta">
           <div class="ri-name">${esc(p.name)}</div>
-          <div class="ri-sub">${esc(p.alias || p.caseNumber || "â€”")}</div>
+          <div class="ri-sub">${esc(p.alias || p.caseNumber || "\u2014")}</div>
         </div>
         <span class="ri-dot" style="background:${threatColor[p.threat] || "var(--txt-dim)"}"></span>
       </div>`;
@@ -2060,7 +2280,7 @@ function exportDossier(list) {
     if (!editRels.length) { wrap.innerHTML = `<span class="assoc-empty">No relationships added.</span>`; return; }
     wrap.innerHTML = editRels.map((r, i) => {
       const nm = nameOf(r.id) || "(removed)";
-      return `<span class="rel-chip"><b>${esc(nm)}</b> Â· ${esc(r.type || "associate")}<button type="button" data-rm="${i}">âœ•</button></span>`;
+      return `<span class="rel-chip"><b>${esc(nm)}</b> \u00B7 ${esc(r.type || "associate")}<button type="button" data-rm="${i}">\u2715</button></span>`;
     }).join("");
     wrap.querySelectorAll("[data-rm]").forEach((b) => b.addEventListener("click", () => {
       editRels.splice(+b.dataset.rm, 1); renderEditRels();
@@ -2251,14 +2471,14 @@ function exportDossier(list) {
     webBtn.className = "btn-ghost";
     webBtn.id = "btn-webview";
     webBtn.style.cssText = "margin:0 12px 8px;padding:11px;font-size:11px;letter-spacing:2px;border-color:var(--accent);color:var(--accent);";
-    webBtn.textContent = "â—ˆ RELATIONSHIP WEB VIEW";
+    webBtn.textContent = "\u25C8 RELATIONSHIP WEB VIEW";
     inner.appendChild(webBtn);
     webBtn.addEventListener("click", () => window.WebView && window.WebView.open());
     const row = document.createElement("div");
     row.style.cssText = "display:flex;gap:8px;padding:0 12px 12px;";
     row.innerHTML = `
-      <button class="btn-ghost" id="btn-export" style="flex:1;padding:8px;font-size:10px;">â¤“ EXPORT JSON</button>
-      <button class="btn-ghost" id="btn-reset" style="flex:1;padding:8px;font-size:10px;">â†º RESET SEED</button>`;
+      <button class="btn-ghost" id="btn-export" style="flex:1;padding:8px;font-size:10px;">\u2913 EXPORT JSON</button>
+      <button class="btn-ghost" id="btn-reset" style="flex:1;padding:8px;font-size:10px;">\u21BA RESET SEED</button>`;
     inner.appendChild(row);
     $("#btn-export").addEventListener("click", () => exportDossier(profiles));
     $("#btn-reset").addEventListener("click", async () => {
@@ -2309,7 +2529,7 @@ function exportDossier(list) {
 </script>
 <script>
 /* ===================================================================
-   CyberSOC â€” app controller: view switching, clock, boot
+   CyberSOC \u2014 app controller: view switching, clock, boot
    =================================================================== */
 (function () {
   const $ = (s) => document.querySelector(s);
@@ -2320,6 +2540,7 @@ function exportDossier(list) {
     const view = $("#view-" + name);
     if (view) view.classList.add("is-active");
     if (name === "sitrep" && window.Sitrep) window.Sitrep.onShow();
+    if (name === "log" && window.LogDocs) window.LogDocs.onShow();
     if (name === "settings" && window.Settings) window.Settings.render();
   }
   window.App = { setView };
@@ -2342,6 +2563,7 @@ function exportDossier(list) {
     if (window.Settings) window.Settings.init();
     if (window.Sitrep) window.Sitrep.init();
     if (window.Dossier) window.Dossier.init();
+    if (window.LogDocs) window.LogDocs.init();
     if (window.Ticker) window.Ticker.init();
     if (window.Settings) window.Settings.applyAll();
   }
@@ -2353,7 +2575,7 @@ function exportDossier(list) {
 </script>
 <script>
 /* ===================================================================
-   CyberSOC â€” Relationship Web View
+   CyberSOC \u2014 Relationship Web View
    Draggable, rearrangeable profile cards with connector lines.
    =================================================================== */
 (function () {
@@ -2458,7 +2680,7 @@ function exportDossier(list) {
 </script>
 <script>
 /* ===================================================================
-   CyberSOC â€” Settings (theme, ticker, ops) persisted to localStorage
+   CyberSOC \u2014 Settings (theme, ticker, ops) persisted to localStorage
    =================================================================== */
 (function () {
   const KEY = "soc_settings";
@@ -2513,9 +2735,9 @@ function exportDossier(list) {
     if (!wrap) return;
     wrap.innerHTML =
       `<h1 class="settings-title">SETTINGS</h1>
-       <div class="settings-sub">CONSOLE CONFIGURATION Â· SAVED TO THIS DEVICE</div>
+       <div class="settings-sub">CONSOLE CONFIGURATION \u00B7 SAVED TO THIS DEVICE</div>
        <div class="set-section"><h3>APPEARANCE</h3>
-         ${row("Theme", "Dark tactical or light operations mode â€” also swaps the map basemap", segmented("theme", [{v:"dark",l:"DARK"},{v:"light",l:"LIGHT"}]))}
+         ${row("Theme", "Dark tactical or light operations mode \u2014 also swaps the map basemap", segmented("theme", [{v:"dark",l:"DARK"},{v:"light",l:"LIGHT"}]))}
          ${row("Accent color", "Primary highlight across the console", swatches())}
        </div>
        <div class="set-section"><h3>STATUS TICKER</h3>
@@ -2526,14 +2748,14 @@ function exportDossier(list) {
        </div>
        <div class="set-section"><h3>OPERATIONS</h3>
          ${row("Radar sweep", "Rotating sweep + region pings on the SITREP map", toggle("radar"))}
-         ${row("Sweep speed", "Rotation rate of the radar line", slider("sweepSpeed", 0.2, 2, 0.1, v => (+v).toFixed(1) + "Â°/f"))}
+         ${row("Sweep speed", "Rotation rate of the radar line", slider("sweepSpeed", 0.2, 2, 0.1, v => (+v).toFixed(1) + "\u00B0/f"))}
          ${row("Auto-refresh", "How often status telemetry re-syncs", slider("refreshSec", 3, 30, 1, v => v + "s"))}
          ${row("Reduce motion", "Pause sweep, ticker and ambient animation", toggle("reduceMotion"))}
        </div>
        <div class="set-section"><h3>DATA</h3>
          ${row("Reset to defaults", "Restore all settings on this device", `<button class="btn-ghost set-reset" id="set-reset">RESET</button>`)}
        </div>
-       <div class="set-foot">CyberSOC v1.2 Â· status sources: Azure Â· SolarWinds Observability<br>live feeds require the local Node server (port 3005)</div>`;
+       <div class="set-foot">CyberSOC v1.2 \u00B7 status sources: Azure \u00B7 SolarWinds Observability<br>live feeds require the local Node server (port 3005)</div>`;
 
     wrap.querySelectorAll("[data-toggle]").forEach(el => el.addEventListener("click", () => {
       const k = el.dataset.toggle; set(k, !state[k]); el.classList.toggle("on", state[k]);
@@ -2549,7 +2771,7 @@ function exportDossier(list) {
       const sv = wrap.querySelector(`[data-sv="${k}"]`);
       if (sv) {
         if (k === "tickerSpeed") sv.textContent = ["","SLOW","RELAXED","NORMAL","BRISK","FAST"][v];
-        else if (k === "sweepSpeed") sv.textContent = v.toFixed(1) + "Â°/f";
+        else if (k === "sweepSpeed") sv.textContent = v.toFixed(1) + "\u00B0/f";
         else sv.textContent = v + "s";
       }
     }));
@@ -2570,7 +2792,7 @@ function exportDossier(list) {
 </script>
 <script>
 /* ===================================================================
-   CyberSOC â€” Status Ticker (Azure regions + SolarWinds components)
+   CyberSOC \u2014 Status Ticker (Azure regions + SolarWinds components)
    =================================================================== */
 (function () {
   const COLOR = { operational: "var(--op)", degraded: "var(--deg)", outage: "var(--out)", maintenance: "#19c3d6" };
@@ -2600,13 +2822,13 @@ function exportDossier(list) {
     if (lbl) lbl.textContent = src === "azure" ? "AZURE" : src === "solarwinds" ? "SOLARWINDS" : "STATUS";
 
     const list = items();
-    let half = list.length ? list.map(itemHtml).join("") : `<span class="tk-allgood">âœ“ ALL MONITORED SYSTEMS OPERATIONAL</span>`;
+    let half = list.length ? list.map(itemHtml).join("") : `<span class="tk-allgood">\u2713 ALL MONITORED SYSTEMS OPERATIONAL</span>`;
     const unit = half;
     track.innerHTML = half;
     const viewport = track.parentElement.clientWidth || 600;
     let guard = 0;
     while (track.scrollWidth < viewport && guard < 10) { half += unit; track.innerHTML = half; guard++; }
-    track.innerHTML = half + half; // duplicate halves â†’ seamless -50% loop
+    track.innerHTML = half + half; // duplicate halves \u2192 seamless -50% loop
   }
 
   let timer = null;
@@ -2617,6 +2839,475 @@ function exportDossier(list) {
       timer = setInterval(async () => { await syncSolarWindsStatus(); render(); }, 9000);
     },
     refresh() { render(); }
+  };
+})();
+</script>
+<script>
+/* ===================================================================
+   CyberSOC \u2014 LOG: campaign & research documentation repository
+   Flat node list { id, type:'folder'|'file', parent, ... } rendered as
+   a tree. Folders/files draggable to nest. Files carry title, subtitle,
+   tags and a rich-text body. Persists to data/soc_files.json via the
+   server; if the server is unavailable, downloads soc_files.json.
+   =================================================================== */
+(function () {
+  const $ = (s) => document.querySelector(s);
+  const FILES_KEY = "soc_files";
+  const COLLAPSE_KEY = "soc_files_collapsed";
+
+  const COMMON_TAGS = [
+    "APT", "Malware", "Ransomware", "Phishing", "C2", "IOC", "CVE",
+    "Vulnerability", "Exploit", "Threat Hunt", "Incident Response",
+    "Forensics", "OSINT", "Red Team", "Blue Team", "TTP", "MITRE ATT&CK",
+    "Lateral Movement", "Exfiltration", "Persistence"
+  ];
+
+  let files = [];
+  let selectedId = null;
+  let editingFileId = null;
+  let editingFolderId = null;
+  let editTags = [];
+  let collapsed = {};
+  let serverOnline = false;
+  let dlTimer = null;
+  let booted = false;
+
+  function esc(s) { return (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+  function uid(t) { return t + "-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function byId(id) { return files.find((f) => f.id === id); }
+  function children(pid) { return files.filter((f) => (f.parent || null) === (pid || null)).sort((a, b) => (a.order || 0) - (b.order || 0)); }
+  function isFolder(f) { return f && f.type === "folder"; }
+
+  /* ---------- persistence ---------- */
+  function loadLocal() { try { const r = localStorage.getItem(FILES_KEY); return r ? JSON.parse(r) : null; } catch (e) { return null; } }
+  function saveLocal() { try { localStorage.setItem(FILES_KEY, JSON.stringify(files)); } catch (e) {} }
+  function loadCollapsed() { try { return JSON.parse(localStorage.getItem(COLLAPSE_KEY)) || {}; } catch (e) { return {}; } }
+  function saveCollapsed() { try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify(collapsed)); } catch (e) {} }
+
+  async function seed() {
+    try {
+      const r = await fetch("/api/files", { cache: "no-store" });
+      if (r.ok) {
+        const j = await r.json();
+        if (Array.isArray(j)) { serverOnline = true; files = j; saveLocal(); return; }
+      }
+    } catch (e) { /* offline */ }
+    serverOnline = false;
+    const local = loadLocal();
+    if (local && local.length) { files = local; return; }
+    try {
+      const r = await fetch("data/soc_files.json", { cache: "no-store" });
+      if (r.ok) { const j = await r.json(); if (Array.isArray(j)) { files = j; saveLocal(); return; } }
+    } catch (e) { /* file:// */ }
+    files = [];
+  }
+
+  function downloadFiles() {
+    const blob = new Blob([JSON.stringify(files, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "soc_files.json";
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }
+  function scheduleDownload() { if (dlTimer) clearTimeout(dlTimer); dlTimer = setTimeout(downloadFiles, 1200); }
+
+  function persist() {
+    saveLocal();
+    fetch("/api/files", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(files) })
+      .then((r) => { if (!r.ok) throw new Error("http " + r.status); serverOnline = true; renderFoot(); })
+      .catch(() => { serverOnline = false; renderFoot(); scheduleDownload(); });
+  }
+
+  function renderFoot(msg) {
+    const el = $("#logtree-foot"); if (!el) return;
+    const n = files.filter((f) => f.type === "file").length;
+    const fl = files.filter((f) => f.type === "folder").length;
+    const status = serverOnline
+      ? `<span class="lf-ok">\u25CF SAVED TO SERVER</span>`
+      : `<span class="lf-bad">\u25CB SERVER OFFLINE \u00B7 downloads JSON</span>`;
+    el.innerHTML = `${status} \u00B7 ${fl} folders \u00B7 ${n} files`;
+  }
+
+  /* ---------- tree ---------- */
+  function renderTree() {
+    const root = $("#logtree");
+    $("#logtree-count").textContent = files.filter((f) => f.type === "file").length;
+    if (!files.length) {
+      root.innerHTML = `<div class="lt-empty">NO DOCUMENTS YET<br>\u2014 use <b style="color:var(--accent)">+ FOLDER</b> / <b style="color:var(--accent)">+ FILE</b> to begin \u2014</div>`;
+      return;
+    }
+    root.innerHTML = "";
+    root.appendChild(buildLevel(null));
+  }
+
+  function buildLevel(parentId) {
+    const frag = document.createDocumentFragment();
+    children(parentId).forEach((node) => {
+      const wrap = document.createElement("div");
+      wrap.className = "lt-node";
+      const row = document.createElement("div");
+      row.className = "lt-row" + (node.id === selectedId ? " active" : "");
+      row.draggable = true;
+      row.dataset.id = node.id;
+      const isF = isFolder(node);
+      const isCollapsed = collapsed[node.id];
+      const caret = isF ? `<span class="lt-caret ${isCollapsed ? "collapsed" : ""}">\u25BE</span>` : `<span class="lt-caret"></span>`;
+      const ico = isF ? `<span class="lt-ico folder">\u25A3</span>` : `<span class="lt-ico file">\u25E7</span>`;
+      const label = isF ? node.name : node.title;
+      row.innerHTML = `${caret}${ico}<span class="lt-name">${esc(label || "(untitled)")}</span>`;
+      wrap.appendChild(row);
+
+      // events
+      row.addEventListener("click", (e) => {
+        if (isF) {
+          if (e.target.classList.contains("lt-caret")) { toggleCollapse(node.id); return; }
+          toggleCollapse(node.id);
+        } else {
+          selectFile(node.id);
+        }
+      });
+      row.addEventListener("dblclick", () => { if (isF) openFolderEditor(node.id); else openFileEditor(node.id); });
+      wireDrag(row, node);
+
+      if (isF && !isCollapsed) {
+        const kids = document.createElement("div");
+        kids.className = "lt-children";
+        kids.appendChild(buildLevel(node.id));
+        wrap.appendChild(kids);
+      }
+      frag.appendChild(wrap);
+    });
+    return frag;
+  }
+
+  function toggleCollapse(id) {
+    collapsed[id] = !collapsed[id];
+    saveCollapsed();
+    renderTree();
+  }
+
+  /* ---------- drag & drop nesting ---------- */
+  let dragId = null;
+  function isDescendant(maybeChildId, ancestorId) {
+    let n = byId(maybeChildId);
+    while (n && n.parent) {
+      if (n.parent === ancestorId) return true;
+      n = byId(n.parent);
+    }
+    return false;
+  }
+  function wireDrag(row, node) {
+    row.addEventListener("dragstart", (e) => {
+      dragId = node.id; row.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      try { e.dataTransfer.setData("text/plain", node.id); } catch (_) {}
+    });
+    row.addEventListener("dragend", () => { dragId = null; row.classList.remove("dragging"); document.querySelectorAll(".lt-row.drop-target").forEach((r) => r.classList.remove("drop-target")); });
+    row.addEventListener("dragover", (e) => {
+      if (!dragId || dragId === node.id) return;
+      // only folders are valid drop targets; can't drop into own descendant
+      if (!isFolder(node)) return;
+      if (isDescendant(node.id, dragId)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      row.classList.add("drop-target");
+    });
+    row.addEventListener("dragleave", () => row.classList.remove("drop-target"));
+    row.addEventListener("drop", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      row.classList.remove("drop-target");
+      if (!dragId || !isFolder(node) || dragId === node.id) return;
+      if (isDescendant(node.id, dragId)) return;
+      moveNode(dragId, node.id);
+    });
+  }
+  function wireRootDrop(el) {
+    el.addEventListener("dragover", (e) => { if (dragId) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; } });
+    el.addEventListener("drop", (e) => {
+      // dropping on empty tree area \u2192 move to root (only if not landing on a row)
+      if (!dragId) return;
+      if (e.target.closest(".lt-row")) return;
+      e.preventDefault();
+      moveNode(dragId, null);
+    });
+  }
+  function moveNode(id, newParent) {
+    const node = byId(id);
+    if (!node) return;
+    node.parent = newParent || null;
+    node.order = Date.now();
+    if (newParent) collapsed[newParent] = false;
+    saveCollapsed();
+    renderTree(); persist();
+  }
+
+  /* ---------- reader ---------- */
+  function pathOf(id) {
+    const parts = [];
+    let n = byId(id);
+    while (n) { parts.unshift(isFolder(n) ? n.name : n.title); n = n.parent ? byId(n.parent) : null; }
+    return parts;
+  }
+  function fmtDate(ts) {
+    if (!ts) return "\u2014";
+    const d = new Date(ts);
+    return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "2-digit" }) + " \u00B7 " + d.toTimeString().slice(0, 5);
+  }
+
+  function selectFile(id) {
+    selectedId = id;
+    renderTree();
+    renderPost();
+  }
+
+  function renderPost() {
+    const stage = $("#log-stage");
+    const f = selectedId ? byId(selectedId) : null;
+    if (!f || f.type !== "file") {
+      stage.innerHTML = `<div class="log-empty">
+        <div class="le-glyph">\u25C6</div>
+        <h1>LOG</h1>
+        <p>Campaign &amp; research documentation. Select a file from the LOG tab, or create one with <b style="color:var(--accent)">+ FILE</b>.</p>
+      </div>`;
+      return;
+    }
+    const crumb = pathOf(f.id).slice(0, -1).map(esc).join(" <b>/</b> ") || "ROOT";
+    const tags = (f.tags || []).map((t) => `<span class="logpost-tag">${esc(t)}</span>`).join("");
+    stage.innerHTML = `<article class="logpost">
+      <div class="logpost-crumb">${crumb} <b>/</b> ${esc(f.title || "")}</div>
+      <h1 class="logpost-title">${esc(f.title || "(untitled)")}</h1>
+      ${f.subtitle ? `<p class="logpost-sub">${esc(f.subtitle)}</p>` : ""}
+      <div class="logpost-meta">${tags}<span class="logpost-date">EDITED ${fmtDate(f.updated || f.created)}</span></div>
+      <div class="logpost-actions">
+        <button class="btn-ghost" id="lp-edit">\u270E EDIT</button>
+        <button class="btn-ghost btn-delete" id="lp-del">DELETE</button>
+      </div>
+      <div class="logpost-body">${f.body || "<p style='color:var(--txt-dim)'>No content.</p>"}</div>
+    </article>`;
+    $("#lp-edit").addEventListener("click", () => openFileEditor(f.id));
+    $("#lp-del").addEventListener("click", () => deleteNode(f.id));
+  }
+
+  /* ---------- destination <select> ---------- */
+  function fillDestSelect(sel, excludeId) {
+    sel.innerHTML = `<option value="">\u2014 ROOT \u2014</option>`;
+    const add = (pid, depth) => {
+      children(pid).filter(isFolder).forEach((fo) => {
+        if (fo.id === excludeId || isDescendant(fo.id, excludeId)) return; // can't nest into self/descendant
+        const opt = document.createElement("option");
+        opt.value = fo.id;
+        opt.textContent = "  ".repeat(depth) + (depth ? "\u2514 " : "") + fo.name;
+        sel.appendChild(opt);
+        add(fo.id, depth + 1);
+      });
+    };
+    add(null, 0);
+  }
+
+  /* ---------- folder modal ---------- */
+  function openFolderEditor(id) {
+    editingFolderId = id || null;
+    const fo = id ? byId(id) : null;
+    $("#logfolder-title").textContent = fo ? "RENAME / MOVE FOLDER" : "NEW FOLDER";
+    $("#fld-name").value = fo ? fo.name : "";
+    fillDestSelect($("#fld-dest"), id);
+    $("#fld-dest").value = fo ? (fo.parent || "") : (defaultDest());
+    $("#fld-delete").style.display = fo ? "" : "none";
+    $("#logfolder-scrim").classList.add("open");
+    setTimeout(() => $("#fld-name").focus(), 50);
+  }
+  function closeFolderEditor() { $("#logfolder-scrim").classList.remove("open"); editingFolderId = null; }
+  function saveFolder(e) {
+    e.preventDefault();
+    const name = $("#fld-name").value.trim();
+    if (!name) return;
+    const dest = $("#fld-dest").value || null;
+    if (editingFolderId) {
+      const fo = byId(editingFolderId);
+      fo.name = name; fo.parent = dest; fo.updated = Date.now();
+    } else {
+      files.push({ id: uid("fld"), type: "folder", name, parent: dest, order: Date.now() });
+    }
+    if (dest) collapsed[dest] = false; saveCollapsed();
+    closeFolderEditor(); renderTree(); persist();
+  }
+
+  /* default destination = selected folder, or parent folder of selected file */
+  function defaultDest() {
+    const f = selectedId ? byId(selectedId) : null;
+    if (!f) return "";
+    return isFolder(f) ? f.id : (f.parent || "");
+  }
+
+  /* ---------- file modal + rich text ---------- */
+  function renderTagChips() {
+    const wrap = $("#lf-tag-chips");
+    const customs = editTags.filter((t) => !COMMON_TAGS.includes(t));
+    const all = COMMON_TAGS.concat(customs);
+    wrap.innerHTML = all.map((t) => {
+      const on = editTags.includes(t);
+      const custom = !COMMON_TAGS.includes(t);
+      return `<span class="lf-tag${on ? " on" : ""}${custom ? " custom" : ""}" data-tag="${esc(t)}">${esc(t)}${custom ? " \u2715" : ""}</span>`;
+    }).join("");
+    wrap.querySelectorAll(".lf-tag").forEach((el) => el.addEventListener("click", () => {
+      const t = el.dataset.tag;
+      const custom = !COMMON_TAGS.includes(t);
+      if (custom && editTags.includes(t)) { editTags = editTags.filter((x) => x !== t); }
+      else if (editTags.includes(t)) { editTags = editTags.filter((x) => x !== t); }
+      else { editTags.push(t); }
+      renderTagChips();
+    }));
+  }
+  function addCustomTag() {
+    const inp = $("#lf-tag-input");
+    const v = inp.value.trim();
+    if (!v) return;
+    if (!editTags.includes(v)) editTags.push(v);
+    inp.value = "";
+    renderTagChips();
+  }
+
+  function openFileEditor(id) {
+    editingFileId = id || null;
+    const f = id ? byId(id) : null;
+    $("#logfile-title").textContent = f ? "EDIT FILE" : "NEW FILE";
+    $("#lf-title").value = f ? (f.title || "") : "";
+    $("#lf-subtitle").value = f ? (f.subtitle || "") : "";
+    fillDestSelect($("#lf-dest"), null);
+    $("#lf-dest").value = f ? (f.parent || "") : defaultDest();
+    editTags = f ? (f.tags || []).slice() : [];
+    renderTagChips();
+    $("#rte-editor").innerHTML = f ? (f.body || "") : "";
+    $("#lf-delete").style.display = f ? "" : "none";
+    $("#logfile-scrim").classList.add("open");
+    setTimeout(() => $("#lf-title").focus(), 50);
+  }
+  function closeFileEditor() { $("#logfile-scrim").classList.remove("open"); editingFileId = null; }
+
+  function saveFile(e) {
+    e.preventDefault();
+    const title = $("#lf-title").value.trim();
+    if (!title) return;
+    const dest = $("#lf-dest").value || null;
+    const body = $("#rte-editor").innerHTML;
+    const subtitle = $("#lf-subtitle").value.trim();
+    const now = Date.now();
+    if (editingFileId) {
+      const f = byId(editingFileId);
+      Object.assign(f, { title, subtitle, tags: editTags.slice(), body, parent: dest, updated: now });
+      selectedId = f.id;
+    } else {
+      const f = { id: uid("file"), type: "file", title, subtitle, tags: editTags.slice(), body, parent: dest, order: now, created: now, updated: now };
+      files.push(f);
+      selectedId = f.id;
+    }
+    if (dest) collapsed[dest] = false; saveCollapsed();
+    closeFileEditor(); renderTree(); renderPost(); persist();
+  }
+
+  function deleteNode(id) {
+    const n = byId(id);
+    if (!n) return;
+    const isF = isFolder(n);
+    const descendants = [];
+    const collect = (pid) => children(pid).forEach((c) => { descendants.push(c.id); collect(c.id); });
+    if (isF) collect(id);
+    const msg = isF
+      ? `Delete folder "${n.name}"${descendants.length ? " and its " + descendants.length + " item(s)" : ""}? This cannot be undone.`
+      : `Delete file "${n.title}"? This cannot be undone.`;
+    if (!confirm(msg)) return;
+    const remove = new Set([id, ...descendants]);
+    files = files.filter((f) => !remove.has(f.id));
+    if (remove.has(selectedId)) selectedId = null;
+    closeFileEditor(); closeFolderEditor();
+    renderTree(); renderPost(); persist();
+  }
+
+  /* ---------- rich text toolbar ---------- */
+  function exec(cmd, val) {
+    $("#rte-editor").focus();
+    try { document.execCommand(cmd, false, val || null); } catch (e) {}
+    updateToolbarState();
+  }
+  function setBlock(tag) {
+    $("#rte-editor").focus();
+    // toggle: if already in this block, revert to <p>
+    let cur = "";
+    try { cur = (document.queryCommandValue("formatBlock") || "").toLowerCase(); } catch (e) {}
+    const target = (cur === tag && tag !== "p") ? "p" : tag;
+    try { document.execCommand("formatBlock", false, target.toUpperCase()); } catch (e) {
+      try { document.execCommand("formatBlock", false, "<" + target + ">"); } catch (_) {}
+    }
+    updateToolbarState();
+  }
+  function updateToolbarState() {
+    const tb = $("#rte-toolbar"); if (!tb) return;
+    tb.querySelectorAll("button[data-cmd]").forEach((b) => {
+      const c = b.dataset.cmd;
+      let on = false;
+      try { on = document.queryCommandState(c); } catch (e) {}
+      b.classList.toggle("on", !!on);
+    });
+    let block = "";
+    try { block = (document.queryCommandValue("formatBlock") || "").toLowerCase(); } catch (e) {}
+    tb.querySelectorAll("button[data-block]").forEach((b) => b.classList.toggle("on", b.dataset.block === block));
+  }
+  function wireToolbar() {
+    const tb = $("#rte-toolbar");
+    tb.querySelectorAll("button[data-cmd]").forEach((b) => b.addEventListener("click", (e) => {
+      e.preventDefault();
+      const c = b.dataset.cmd;
+      if (c === "createLink") { const url = prompt("Link URL:", "https://"); if (url) exec("createLink", url); return; }
+      exec(c);
+    }));
+    tb.querySelectorAll("button[data-block]").forEach((b) => b.addEventListener("mousedown", (e) => e.preventDefault()));
+    tb.querySelectorAll("button[data-block]").forEach((b) => b.addEventListener("click", (e) => { e.preventDefault(); setBlock(b.dataset.block); }));
+    tb.querySelectorAll("button[data-cmd]").forEach((b) => b.addEventListener("mousedown", (e) => e.preventDefault()));
+    $("#rte-img").addEventListener("mousedown", (e) => e.preventDefault());
+    $("#rte-img").addEventListener("click", () => $("#rte-img-input").click());
+    $("#rte-img-input").addEventListener("change", (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => { exec("insertImage", reader.result); };
+      reader.readAsDataURL(file);
+      e.target.value = "";
+    });
+    const ed = $("#rte-editor");
+    ed.addEventListener("keyup", updateToolbarState);
+    ed.addEventListener("mouseup", updateToolbarState);
+  }
+
+  /* ---------- init ---------- */
+  window.LogDocs = {
+    async init() {
+      collapsed = loadCollapsed();
+      await seed();
+      renderTree(); renderPost(); renderFoot();
+      $("#logtree-tab").addEventListener("click", () => $("#logtree-panel").classList.toggle("open"));
+      wireRootDrop($("#logtree"));
+      $("#lt-new-folder").addEventListener("click", () => openFolderEditor(null));
+      $("#lt-new-file").addEventListener("click", () => openFileEditor(null));
+      // folder modal
+      $("#logfolder-close").addEventListener("click", closeFolderEditor);
+      $("#fld-cancel").addEventListener("click", closeFolderEditor);
+      $("#fld-delete").addEventListener("click", () => { if (editingFolderId) deleteNode(editingFolderId); });
+      $("#logfolder-form").addEventListener("submit", saveFolder);
+      $("#logfolder-scrim").addEventListener("click", (e) => { if (e.target === $("#logfolder-scrim")) closeFolderEditor(); });
+      // file modal
+      $("#logfile-close").addEventListener("click", closeFileEditor);
+      $("#lf-cancel").addEventListener("click", closeFileEditor);
+      $("#lf-delete").addEventListener("click", () => { if (editingFileId) deleteNode(editingFileId); });
+      $("#logfile-form").addEventListener("submit", saveFile);
+      $("#logfile-scrim").addEventListener("click", (e) => { if (e.target === $("#logfile-scrim")) closeFileEditor(); });
+      $("#lf-tag-add").addEventListener("click", addCustomTag);
+      $("#lf-tag-input").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addCustomTag(); } });
+      wireToolbar();
+    },
+    onShow() {
+      if (!booted) { booted = true; if (!selectedId) $("#logtree-panel").classList.add("open"); }
+    }
   };
 })();
 </script>

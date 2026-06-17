@@ -1,0 +1,53 @@
+[
+  {
+    "id": "fld-campaigns",
+    "type": "folder",
+    "name": "Active Campaigns",
+    "parent": null,
+    "order": 1
+  },
+  {
+    "id": "fld-nightfall",
+    "type": "folder",
+    "name": "Operation Nightfall",
+    "parent": "fld-campaigns",
+    "order": 2
+  },
+  {
+    "id": "fld-research",
+    "type": "folder",
+    "name": "Research & Tradecraft",
+    "parent": null,
+    "order": 3
+  },
+  {
+    "id": "file-nightfall-intake",
+    "type": "file",
+    "parent": "fld-nightfall",
+    "order": 4,
+    "title": "Nightfall — Initial Intrusion Analysis",
+    "subtitle": "Spear-phishing to domain compromise across a 9-day dwell window.",
+    "tags": ["APT", "Phishing", "Lateral Movement", "MITRE ATT&CK"],
+    "body": "<p>On <strong>04 JUN</strong> the SOC observed anomalous OAuth consent grants against the finance tenant. Pivoting on the source ASN tied the activity to a known intrusion set tracked internally as <strong>NIGHTFALL</strong>.</p><h2>Initial Access</h2><p>Delivery was a tailored <em>spear-phishing</em> email impersonating a payroll vendor. The lure carried an HTML smuggling attachment that wrote a signed loader to disk.</p><blockquote>\"The operator waited 36 hours after foothold before the first hands-on-keyboard action — patience consistent with a mature crew.\"</blockquote><h3>Observed TTPs</h3><ul><li>T1566.001 — Spearphishing Attachment</li><li>T1027 — Obfuscated Files (HTML smuggling)</li><li>T1021.001 — Remote Services: RDP</li></ul><h3>Containment Snippet</h3><pre><code>Get-MailboxRule -Mailbox finance@corp | Where {$_.ForwardTo}\nRevoke-AzureADUserAllRefreshToken -ObjectId &lt;user&gt;</code></pre><p>Recommend immediate credential reset for the three impacted identities and conditional-access enforcement on legacy auth.</p>"
+  },
+  {
+    "id": "file-nightfall-ioc",
+    "type": "file",
+    "parent": "fld-nightfall",
+    "order": 5,
+    "title": "Nightfall — Indicators of Compromise",
+    "subtitle": "Consolidated IOC set for blocklisting and threat hunting.",
+    "tags": ["IOC", "C2", "Threat Hunt"],
+    "body": "<p>The following indicators are <strong>high-confidence</strong> and cleared for blocklist deployment.</p><h3>Network</h3><pre><code>185.225.73.21:443    Emotet C2\n45.142.212.10:8080   QakBot C2\nupdate-cdn-secure.com payload delivery</code></pre><h3>Hunting Query (KQL)</h3><pre><code>DeviceNetworkEvents\n| where RemoteIP in (\"185.225.73.21\",\"45.142.212.10\")\n| project Timestamp, DeviceName, RemoteIP, RemotePort</code></pre><p>Pair with the <em>Initial Intrusion Analysis</em> file for full narrative context.</p>"
+  },
+  {
+    "id": "file-rte-playbook",
+    "type": "file",
+    "parent": "fld-research",
+    "order": 6,
+    "title": "Ransomware Triage Playbook",
+    "subtitle": "First-hour actions for a suspected ransomware detonation.",
+    "tags": ["Ransomware", "Incident Response", "Forensics"],
+    "body": "<h2>First 60 Minutes</h2><ol><li>Isolate — pull affected hosts from the network, <strong>do not power off</strong> (preserve volatile memory).</li><li>Identify the strain via ransom note + extension; check known-decryptor availability.</li><li>Scope blast radius through EDR; pivot on the earliest detonation host.</li></ol><blockquote>Preserve a memory image before remediation — it is the single most valuable artifact and the first one lost.</blockquote><h3>Evidence Capture</h3><pre><code>winpmem -o mem.raw\nveeam_restore --point pre-incident</code></pre>"
+  }
+]
