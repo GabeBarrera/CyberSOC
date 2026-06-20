@@ -338,6 +338,54 @@ async function getRansomware() {
   }));
 }
 
+/* ---- OpenSky Network — live aircraft state vectors (anonymous, no key,
+   carries lat/lng directly). Cached for ~5 min so the 60s feed cycle does
+   not blow the anonymous rate limit; on 429/error we serve the last snapshot.
+   State-vector indices: 0 icao24 · 1 callsign · 2 origin_country · 4 last_contact
+   · 5 lon · 6 lat · 7 baro_alt · 8 on_ground · 9 velocity(m/s) · 10 true_track
+   · 13 geo_alt. We sample evenly to ~70 airborne flights to spread them globally
+   and keep the payload small. */
+const OPENSKY = "https://opensky-network.org/api/states/all";
+let _openskyCache = { ts: 0, data: [] };
+async function getOpenSky() {
+  if (Date.now() - _openskyCache.ts < 290000 && _openskyCache.data.length) return _openskyCache.data;
+  try {
+    const j = await fetchJSON(OPENSKY);
+    const states = Array.isArray(j.states) ? j.states : [];
+    const flying = states.filter((s) => s[5] != null && s[6] != null && !s[8] && s[1] && String(s[1]).trim());
+    const step = Math.max(1, Math.floor(flying.length / 70));
+    const picked = [];
+    for (let i = 0; i < flying.length && picked.length < 70; i += step) picked.push(flying[i]);
+    const mapped = picked.map((s) => {
+      const cs = String(s[1] || "").trim();
+      const alt = s[13] != null ? s[13] : s[7];
+      const kt = s[9] != null ? Math.round(s[9] * 1.94384) : null;
+      const trk = s[10] != null ? Math.round(s[10]) : null;
+      return {
+        id: "air-" + s[0],
+        cat: "AIR",
+        sev: "info",
+        title: cs || s[0],
+        sub: "Aircraft \u00B7 " + (s[2] || "unknown origin"),
+        msg: ["Live aircraft", alt != null ? "alt " + Math.round(alt) + " m" : "",
+              kt != null ? kt + " kt" : "", trk != null ? "track " + trk + "\u00B0" : ""]
+              .filter(Boolean).join(" \u00B7 "),
+        ts: s[4] ? s[4] * 1000 : Date.now(),
+        src: "OpenSky Network",
+        lat: +s[6],
+        lng: +s[5],
+        hdg: trk != null ? trk : 0,
+        geo: s[2] || undefined
+      };
+    });
+    _openskyCache = { ts: Date.now(), data: mapped };
+    return mapped;
+  } catch (e) {
+    if (_openskyCache.data.length) return _openskyCache.data; // serve stale on rate-limit / error
+    throw e;
+  }
+}
+
 /* ---- precise geolocation of IP-bearing items via ip-api.com (free, no key,
    HTTP-only, batch up to 100/req) — then country-centroid fallback. ---- */
 async function geoEnrich(items) {
@@ -381,7 +429,8 @@ async function refreshThreatIntel() {
   _refreshing = true;
   const jobs = [
     ["cisa", getCISA], ["feodo", getFeodo], ["threatfox", getThreatFox],
-    ["urlhaus", getURLhaus], ["tor", getTor], ["ransomware", getRansomware]
+    ["urlhaus", getURLhaus], ["tor", getTor], ["ransomware", getRansomware],
+    ["opensky", getOpenSky]
   ];
   const results = await Promise.allSettled(jobs.map(([, fn]) => fn()));
   const items = [];
@@ -617,7 +666,7 @@ server.listen(PORT, "127.0.0.1", () => {
   console.log("  → http://localhost:" + PORT + "  (loopback only)\n");
   console.log("  Azure feed : GET  /api/azure-status");
   console.log("  SolarWinds : GET  /api/solarwinds-status");
-  console.log("  ThreatIntel: GET  /api/threat-intel   (CISA KEV · Feodo C2 · ThreatFox · auto-refresh 60s)");
+  console.log("  ThreatIntel: GET  /api/threat-intel   (CISA KEV · Feodo C2 · ThreatFox · URLhaus · Tor · OpenSky · auto-refresh 60s)");
   console.log("  Dossier    : GET/PUT /api/dossier  (writes data/soc_dossier.json)");
   console.log("  Log files  : GET/PUT /api/files    (writes data/soc_files.json)");
   console.log("  Photo up   : POST /api/upload-image (writes assets/images/<file>)");

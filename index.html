@@ -1,10 +1,22 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title>CyberSOC // All-Domain Operations</title>
 <meta name="description" content="CyberSOC &#x2014; mobile cyber deck and SOC operations console." />
+
+<!-- Favicon + PWA -->
+<link rel="icon" type="image/png" href="assets/favicon/favicon.png" />
+<link rel="shortcut icon" type="image/png" href="assets/favicon/favicon.png" />
+<link rel="apple-touch-icon" href="assets/favicon/favicon.png" />
+<link rel="manifest" href="assets/favicon/manifest.json" />
+<meta name="theme-color" content="#0a0608" />
+<!-- iOS standalone (Add to Home Screen) -->
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="CyberSOC" />
 
 <!-- Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -312,6 +324,7 @@ body { position: relative; }
 .alert-cat { font-family: var(--mono); font-size: 8px; letter-spacing: 2px; padding: 1px 6px; border: 1px solid currentColor; color: var(--txt-mut); }
 .cat-CVE { color: #e0b341; } .cat-C2 { color: var(--out); } .cat-IOC { color: var(--deg); } .cat-AZURE { color: var(--accent); }
 .cat-URL { color: #ff7a3d; } .cat-TOR { color: #9b6dff; } .cat-RANSOM { color: var(--accent); }
+.cat-AIR { color: #38d6ff; } .cat-CISA { color: #5b8def; }
 .alert-card.geo { cursor: pointer; }
 .alert-card.geo:hover { border-color: var(--line); background: var(--bg-2); }
 .alert-pin { font-family: var(--mono); font-size: 8px; letter-spacing: 1px; color: var(--op); margin-top: 5px; }
@@ -319,7 +332,7 @@ body { position: relative; }
 .intel-foot { flex-shrink: 0; padding: 8px 12px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: 8px; letter-spacing: 1px; color: var(--txt-dim); line-height: 1.5; }
 .intel-foot .if-ok { color: var(--op); } .intel-foot .if-bad { color: var(--deg); }
 
-/* threat-intel map markers â€” distinct shape + colour per source */
+/* threat-intel map markers — distinct shape + colour per source */
 .tm { width: 12px; height: 12px; box-sizing: border-box; }
 .tm-C2 { transform: rotate(45deg); border: 1.5px solid var(--out); background: rgba(255,59,59,.28); box-shadow: 0 0 8px rgba(255,59,59,.55); }
 .tm-C2.sev-degraded { border-color: var(--deg); background: rgba(245,166,35,.26); box-shadow: 0 0 8px rgba(245,166,35,.5); }
@@ -329,6 +342,8 @@ body { position: relative; }
 .tm-RANSOM { border: 1.5px solid var(--accent); background: rgba(255,45,111,.32); box-shadow: 0 0 9px var(--accent-glow); animation: ransomPulse 1.6s ease-in-out infinite; }
 @keyframes ransomPulse { 0%,100% { box-shadow: 0 0 6px rgba(255,45,111,.5); } 50% { box-shadow: 0 0 15px rgba(255,45,111,.95); } }
 :root.reduce-motion .tm-RANSOM { animation: none !important; }
+.tm-AIR { width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 13px solid #38d6ff; background: none; filter: drop-shadow(0 0 5px rgba(56,214,255,.75)); transform-origin: 50% 65%; }
+.tm-CISA { border: 1.5px solid #5b8def; background: rgba(91,141,239,.30); box-shadow: 0 0 8px rgba(91,141,239,.6); border-radius: 2px; }
 
 /* SITREP map legend / layer toggles */
 .map-legend { position: absolute; left: 16px; bottom: 24px; z-index: 600; background: rgba(10,6,8,.62); backdrop-filter: blur(6px); border: 1px solid var(--line); padding: 9px 11px; min-width: 158px; }
@@ -1287,7 +1302,15 @@ const INTEL_SIM = [
   { id: "tor-sim-2", cat: "TOR", sev: "info", title: "ExitGuardian", sub: "Tor exit \u00B7 United States",
     msg: "Tor exit relay", src: "Tor Project (sim)", lat: 38.9, lng: -77.0, geo: "US" },
   { id: "tor-sim-3", cat: "TOR", sev: "info", title: "OnionPipe", sub: "Tor exit \u00B7 Germany",
-    msg: "Tor exit relay \u00B7 AS: 24940", src: "Tor Project (sim)", lat: 50.11, lng: 8.68, geo: "DE" }
+    msg: "Tor exit relay \u00B7 AS: 24940", src: "Tor Project (sim)", lat: 50.11, lng: 8.68, geo: "DE" },
+  { id: "air-sim-1", cat: "AIR", sev: "info", title: "UAL245", sub: "Aircraft \u00B7 United States",
+    msg: "Live aircraft \u00B7 alt 11277 m \u00B7 451 kt \u00B7 track 270\u00B0", src: "OpenSky Network (sim)", lat: 39.5, lng: -104.7, geo: "US", hdg: 270 },
+  { id: "air-sim-2", cat: "AIR", sev: "info", title: "BAW117", sub: "Aircraft \u00B7 United Kingdom",
+    msg: "Live aircraft \u00B7 alt 10668 m \u00B7 478 kt \u00B7 track 95\u00B0", src: "OpenSky Network (sim)", lat: 51.3, lng: -0.5, geo: "GB", hdg: 95 },
+  { id: "air-sim-3", cat: "AIR", sev: "info", title: "DLH401", sub: "Aircraft \u00B7 Germany",
+    msg: "Live aircraft \u00B7 alt 11582 m \u00B7 462 kt \u00B7 track 200\u00B0", src: "OpenSky Network (sim)", lat: 50.0, lng: 8.6, geo: "DE", hdg: 200 },
+  { id: "air-sim-4", cat: "AIR", sev: "info", title: "AAL88", sub: "Aircraft \u00B7 United States",
+    msg: "Live aircraft \u00B7 alt 10363 m \u00B7 488 kt \u00B7 track 80\u00B0", src: "OpenSky Network (sim)", lat: 41.9, lng: -79.0, geo: "US", hdg: 80 }
 ];
 function simIntel() {
   const now = Date.now();
@@ -1447,7 +1470,7 @@ function exportDossier(list) {
   const markers = {};        // code -> { marker, el, latlng, lastPing }
   let alertFilter = "ALL";   // ALL | AZURE | CVE | C2 | IOC | URL | RANSOM
   let threatLayer = null;    // Leaflet layer group for plotted threat intel
-  let threatLayers = { C2: true, IOC: true, URL: true, RANSOM: true, TOR: false };
+  let threatLayers = { C2: true, IOC: true, URL: true, RANSOM: true, TOR: false, AIR: true, CISA: true };
   let lastThreatSig = "";    // avoid rebuilding pins when nothing changed
   let sweepAngle = 0, prevSweepAngle = 0;
   let SWEEP_SPEED = 0.7;   // deg per frame (~8.5s / revolution)
@@ -1670,7 +1693,7 @@ function exportDossier(list) {
       });
     });
     THREAT_FEED.items.forEach((it) => {
-      if (it.cat === "TOR") return; // Tor exit relays are a map-only layer
+      if (it.cat === "TOR" || it.cat === "AIR" || it.cat === "CISA") return; // map-only layers
       out.push({
         cat: it.cat, sev: it.sev,
         time: it.ts ? ago(it.ts) + " ago" : "",
@@ -1721,7 +1744,7 @@ function exportDossier(list) {
   function renderIntelFoot() {
     const el = $("#intel-foot"); if (!el) return;
     const f = THREAT_FEED.feeds || {};
-    const names = { cisa: "CISA", feodo: "Feodo", threatfox: "ThreatFox", urlhaus: "URLhaus", tor: "Tor", ransomware: "Ransom" };
+    const names = { cisa: "CISA KEV", feodo: "Feodo", threatfox: "ThreatFox", urlhaus: "URLhaus", tor: "Tor", ransomware: "Ransom", opensky: "OpenSky" };
     const parts = Object.keys(names).map((k) => {
       const ok = f[k] && f[k].ok;
       return `<span class="${ok ? "if-ok" : "if-bad"}">${ok ? "\u25CF" : "\u25CB"} ${names[k]}</span>`;
@@ -1730,12 +1753,28 @@ function exportDossier(list) {
     el.innerHTML = `FEEDS ${LIVE_MODE_INTEL ? "LIVE" : "SIM"} \u00B7 ${parts.join("&nbsp;&nbsp;")} \u00B7 upd ${when}`;
   }
 
+  /* CISA regional offices (10 regions + HQ) — static reference markers plotted
+     across the US. Same item shape as threat intel so the legend/pin code reuses. */
+  const CISA_OFFICES = [
+    { id: "cisa-hq", cat: "CISA", sev: "info", title: "CISA Headquarters", sub: "HQ \u00B7 Arlington, VA", msg: "Cybersecurity & Infrastructure Security Agency \u2014 National Headquarters", src: "CISA", lat: 38.8801, lng: -77.1067, geo: "US" },
+    { id: "cisa-r1", cat: "CISA", sev: "info", title: "CISA Region 1", sub: "Regional Office \u00B7 Boston, MA", msg: "Region 1 \u2014 CT, ME, MA, NH, RI, VT", src: "CISA", lat: 42.3601, lng: -71.0589, geo: "US" },
+    { id: "cisa-r2", cat: "CISA", sev: "info", title: "CISA Region 2", sub: "Regional Office \u00B7 New York, NY", msg: "Region 2 \u2014 NJ, NY, PR, US Virgin Islands", src: "CISA", lat: 40.7128, lng: -74.0060, geo: "US" },
+    { id: "cisa-r3", cat: "CISA", sev: "info", title: "CISA Region 3", sub: "Regional Office \u00B7 Philadelphia, PA", msg: "Region 3 \u2014 DE, DC, MD, PA, VA, WV", src: "CISA", lat: 39.9526, lng: -75.1652, geo: "US" },
+    { id: "cisa-r4", cat: "CISA", sev: "info", title: "CISA Region 4", sub: "Regional Office \u00B7 Atlanta, GA", msg: "Region 4 \u2014 AL, FL, GA, KY, MS, NC, SC, TN", src: "CISA", lat: 33.7490, lng: -84.3880, geo: "US" },
+    { id: "cisa-r5", cat: "CISA", sev: "info", title: "CISA Region 5", sub: "Regional Office \u00B7 Chicago, IL", msg: "Region 5 \u2014 IL, IN, MI, MN, OH, WI", src: "CISA", lat: 41.8781, lng: -87.6298, geo: "US" },
+    { id: "cisa-r6", cat: "CISA", sev: "info", title: "CISA Region 6", sub: "Regional Office \u00B7 Dallas, TX", msg: "Region 6 \u2014 AR, LA, NM, OK, TX", src: "CISA", lat: 32.7767, lng: -96.7970, geo: "US" },
+    { id: "cisa-r7", cat: "CISA", sev: "info", title: "CISA Region 7", sub: "Regional Office \u00B7 Kansas City, MO", msg: "Region 7 \u2014 IA, KS, MO, NE", src: "CISA", lat: 39.0997, lng: -94.5786, geo: "US" },
+    { id: "cisa-r8", cat: "CISA", sev: "info", title: "CISA Region 8", sub: "Regional Office \u00B7 Denver, CO", msg: "Region 8 \u2014 CO, MT, ND, SD, UT, WY", src: "CISA", lat: 39.7392, lng: -104.9903, geo: "US" },
+    { id: "cisa-r9", cat: "CISA", sev: "info", title: "CISA Region 9", sub: "Regional Office \u00B7 Oakland, CA", msg: "Region 9 \u2014 AZ, CA, HI, NV, Guam, American Samoa, CNMI", src: "CISA", lat: 37.8044, lng: -122.2712, geo: "US" },
+    { id: "cisa-r10", cat: "CISA", sev: "info", title: "CISA Region 10", sub: "Regional Office \u00B7 Seattle, WA", msg: "Region 10 \u2014 AK, ID, OR, WA", src: "CISA", lat: 47.6062, lng: -122.3321, geo: "US" }
+  ];
+
   /* Map legend with per-source layer toggles. */
-  const LEGEND_CATS = [["C2", "C2 / IP"], ["IOC", "IOC"], ["URL", "Malicious URL"], ["RANSOM", "Ransomware"], ["TOR", "Tor exit"]];
+  const LEGEND_CATS = [["C2", "C2 / IP"], ["IOC", "IOC"], ["URL", "Malicious URL"], ["RANSOM", "Ransomware"], ["TOR", "Tor exit"], ["AIR", "Aircraft (OpenSky)"], ["CISA", "CISA offices (US)"]];
   function renderLegend() {
     const el = $("#map-legend"); if (!el) return;
     const counts = {};
-    THREAT_FEED.items.forEach((it) => { if (it.lat != null) counts[it.cat] = (counts[it.cat] || 0) + 1; });
+    THREAT_FEED.items.concat(CISA_OFFICES).forEach((it) => { if (it.lat != null) counts[it.cat] = (counts[it.cat] || 0) + 1; });
     el.innerHTML = `<div class="map-legend-h">MAP LAYERS</div>` + LEGEND_CATS.map(([c, label]) => {
       const on = threatLayers[c] !== false;
       return `<div class="legend-row ${on ? "" : "off"}" data-layer="${c}">
@@ -1754,17 +1793,18 @@ function exportDossier(list) {
   /* Plot geo-tagged threat intel on the map (filtered by enabled layers). */
   function renderThreatPins(force) {
     if (!map) return;
-    const geoItems = THREAT_FEED.items.filter((it) => it.lat != null && it.lng != null && threatLayers[it.cat] !== false);
+    const geoItems = THREAT_FEED.items.concat(CISA_OFFICES).filter((it) => it.lat != null && it.lng != null && threatLayers[it.cat] !== false);
     const sig = geoItems.map((it) => it.id + it.sev).join("|") + "||" + JSON.stringify(threatLayers);
     if (!force && sig === lastThreatSig && threatLayer) return; // nothing changed
     lastThreatSig = sig;
     if (threatLayer) { map.removeLayer(threatLayer); threatLayer = null; }
     if (!geoItems.length) return;
-    const palette = { C2: "var(--out)", IOC: "var(--deg)", URL: "#ff7a3d", TOR: "#9b6dff", RANSOM: "var(--accent)" };
+    const palette = { C2: "var(--out)", IOC: "var(--deg)", URL: "#ff7a3d", TOR: "#9b6dff", RANSOM: "var(--accent)", AIR: "#38d6ff", CISA: "#5b8def" };
     const layers = geoItems.map((it) => {
+      const rot = (it.cat === "AIR" && it.hdg != null) ? ` style="transform:rotate(${Math.round(it.hdg)}deg)"` : "";
       const icon = L.divIcon({
         className: "",
-        html: `<div class="tm tm-${it.cat} sev-${it.sev}"></div>`,
+        html: `<div class="tm tm-${it.cat} sev-${it.sev}"${rot}></div>`,
         iconSize: [14, 14], iconAnchor: [7, 7]
       });
       const color = palette[it.cat] || "var(--accent)";
@@ -1871,6 +1911,7 @@ function exportDossier(list) {
         ["regions", "list all monitored region codes"],
         ["scan", "force re-sync of the status feed"],
         ["locate &lt;keyword&gt;", "find &amp; plot matching dossier subjects on the map"],
+        ["flight &lt;code&gt;", "locate a live aircraft by call sign on the map"],
         ["localhost", "open a live shell on the host running the server"],
         ["clear", "clear the console"]
       ];
@@ -2016,6 +2057,47 @@ function exportDossier(list) {
         if (!n) { cliPrint("\u2715 could not geocode any matching location.", "err"); return; }
         cliPrint(`\u2713 ${n} subject pin(s) placed \u00B7 map fit to matches.`, "ok");
       });
+    },
+    flight(arg) {
+      const air = (THREAT_FEED.items || []).filter((it) => it.cat === "AIR");
+      const tele = (m) => escHtml((m || "").replace("Live aircraft \u00B7 ", ""));
+      if (!arg) {
+        cliPrint("\u25C6 LIVE AIRCRAFT // OPENSKY NETWORK", "head");
+        cliPrint(`  ${air.length} aircraft tracked \u00B7 source ${LIVE_MODE_INTEL ? "LIVE" : "SIMULATION"}`, air.length ? "ok" : "warn");
+        if (!air.length) { cliPrint("  no aircraft in the current feed snapshot.", "warn"); return; }
+        air.slice(0, 12).forEach((it) => {
+          cliPrint(`  \u2708 ${escHtml((it.title || "?").padEnd(10))} ${escHtml((it.geo || "").padEnd(16))} ${tele(it.msg)}`, "sys");
+        });
+        if (air.length > 12) cliPrint(`  \u2026 +${air.length - 12} more`, "sys");
+        cliPrint("  usage: flight &lt;call-sign&gt;  \u2014 e.g. 'flight " + escHtml(air[0].title || "UAL245") + "'", "sys");
+        return;
+      }
+      const kw = arg.trim().toLowerCase().replace(/\s+/g, "");
+      const matches = air.filter((it) => (it.title || "").toLowerCase().replace(/\s+/g, "").includes(kw));
+      if (!matches.length) {
+        cliPrint(`\u2715 no tracked flight matches '${escHtml(arg.toUpperCase())}'.`, "err");
+        cliPrint("  run 'flight' with no argument to list tracked aircraft.", "warn");
+        return;
+      }
+      const f = matches[0];
+      cliPrint(`\u25C6 FLIGHT // ${escHtml((f.title || "?").toUpperCase())}`, "head");
+      cliPrint(`  ORIGIN    ${escHtml(f.geo || f.sub || "unknown")}`, "sys");
+      cliPrint(`  TELEMETRY ${tele(f.msg)}`, "sys");
+      cliPrint(`  POSITION  LAT ${f.lat.toFixed(4)}  LNG ${f.lng.toFixed(4)}`, "sys");
+      cliPrint(`  SOURCE    ${escHtml(f.src || "OpenSky Network")}`, "ok");
+      if (matches.length > 1) cliPrint(`  (+${matches.length - 1} more match \u2014 showing first)`, "warn");
+      if (threatLayers.AIR === false) { threatLayers.AIR = true; renderThreatPins(true); renderLegend(); }
+      if (map) {
+        map.flyTo([f.lat, f.lng], 7, { duration: 1.2 });
+        setTimeout(() => {
+          L.popup({ className: "region-popup", closeButton: false })
+            .setLatLng([f.lat, f.lng])
+            .setContent(`<div class="rp-name">\u2708 ${escHtml(f.title || "FLIGHT")}</div>
+                         <div class="rp-meta">${escHtml((f.sub || "").slice(0, 54))}</div>
+                         <div class="rp-status" style="color:#38d6ff">${tele(f.msg)}</div>`)
+            .openOn(map);
+        }, 1300);
+      }
     },
     localhost(arg) {
       if (arg) {
@@ -2874,7 +2956,7 @@ function exportDossier(list) {
        <div class="set-section"><h3>OPERATIONS</h3>
          ${row("Radar sweep", "Rotating sweep + region pings on the SITREP map", toggle("radar"))}
          ${row("Sweep speed", "Rotation rate of the radar line", slider("sweepSpeed", 0.2, 2, 0.1, v => (+v).toFixed(1) + "\u00B0/f"))}
-         ${row("Auto-refresh", "How often all live feeds re-sync (Azure Â· SolarWinds Â· threat intel)", slider("refreshSec", 5, 300, 5, fmtDuration))}
+         ${row("Auto-refresh", "How often all live feeds re-sync (Azure · SolarWinds · threat intel)", slider("refreshSec", 5, 300, 5, fmtDuration))}
          ${row("Reduce motion", "Pause sweep, ticker and ambient animation", toggle("reduceMotion"))}
        </div>
        <div class="set-section"><h3>DATA</h3>
@@ -2963,7 +3045,7 @@ function exportDossier(list) {
       render();
       syncSolarWindsStatus().then(render);
       // SolarWinds now re-syncs with every other feed on the SITREP
-      // auto-refresh timer (see Sitrep.refreshAll) â€” no separate interval.
+      // auto-refresh timer (see Sitrep.refreshAll) — no separate interval.
     },
     refresh() { render(); }
   };
@@ -3440,4 +3522,3 @@ function exportDossier(list) {
 </script>
 </body>
 </html>
-

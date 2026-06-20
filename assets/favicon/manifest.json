@@ -1,0 +1,31 @@
+{
+  "name": "CyberSOC // All-Domain Operations",
+  "short_name": "CyberSOC",
+  "description": "CyberSOC — mobile cyber deck and SOC operations console.",
+  "start_url": "../../index.html",
+  "scope": "../../",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0608",
+  "theme_color": "#0a0608",
+  "icons": [
+    {
+      "src": "favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

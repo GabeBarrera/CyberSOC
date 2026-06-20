@@ -1,5 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Unidentified female subject silhouette">
-  <ellipse cx="150" cy="152" rx="80" ry="94" fill="#564953"></ellipse>
-  <circle cx="150" cy="146" r="56" fill="#564953"></circle>
-  <path d="M44 400 C44 300 92 250 150 250 C208 250 256 300 256 400 Z" fill="#564953"></path>
+  <circle cx="150" cy="138" r="66" fill="#564953"></circle>
+  <path d="M28 400 C28 292 82 238 150 238 C218 238 272 292 272 400 Z" fill="#564953"></path>
 </svg>
