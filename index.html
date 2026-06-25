@@ -2699,36 +2699,137 @@ function exportDossier(list) {
     });
   }
 
+  function isHelpFlag(q) { return /^(-h|-help|--help)$/i.test((q || "").trim()); }
+  function printFlagHelp(title, rows) {
+    cliPrint(title, "head");
+    rows.forEach(([c, d]) => {
+      const disp = c.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+      const pad = " ".repeat(Math.max(1, 26 - disp.length));
+      cliPrint(`  <span style="color:var(--accent)">${c}</span>${pad}${d}`, "sys");
+    });
+  }
+
+  function resyncFeed() {
+    cliPrint("> initiating telemetry re-sync\u2026", "sys");
+    syncAzureStatus().then((live) => {
+      AZURE_REGIONS.forEach(updateMarkerStatus);
+      updateHUD(); renderAlerts(); updateFeedIndicator();
+      cliPrint(`\u2713 sync complete @ ${fmtTime()} \u00B7 source: ${live ? "AZURE LIVE FEED" : "LOCAL SIMULATION"}`, live ? "ok" : "warn");
+    });
+  }
+
+  function serverReachability() {
+    cliPrint("\u25C6 NODE SERVER REACHABILITY", "head");
+    cliPrint("> probing http://localhost:3005/api/health \u2026", "sys");
+    const t0 = performance.now();
+    fetch("/api/health", { cache: "no-store" })
+      .then((r) => r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status)))
+      .then((j) => {
+        const ms = Math.round(performance.now() - t0);
+        cliPrint(`\u2713 SERVER ONLINE \u00B7 ${j.service || "CyberSOC"} \u00B7 ${ms}ms`, "ok");
+        cliPrint(`  live feeds, file writes & shell bridge AVAILABLE.`, "ok");
+        cliPrint(`  intel: ${LIVE_MODE_INTEL ? "LIVE" : "\u2014"} \u00B7 azure: ${LIVE_MODE ? "LIVE" : "SIM"} \u00B7 solarwinds: ${LIVE_MODE_SW ? "LIVE" : "SIM"}`, "sys");
+      })
+      .catch((e) => {
+        cliPrint(`\u2715 SERVER UNREACHABLE \u2014 ${escHtml(e.message || "no response")}`, "err");
+        cliPrint("  start it with:  node server.js   (then reload)", "warn");
+        cliPrint("  running in OFFLINE mode: simulated feeds \u00B7 log files download as JSON.", "warn");
+      });
+  }
+
+  function sitrepCountry(arg) {
+    let edit = false;
+    let q = (arg || "").trim();
+    q = q.replace(/(^|\s)-m(\s|$)/i, () => { edit = true; return " "; }).trim();
+    q = q.replace(/^["'\u201C\u2018]|["'\u201D\u2019]$/g, "").trim();
+    if (!q) {
+      cliPrint('usage: sitrep &lt;country&gt;  \u00B7  sitrep -m &lt;country&gt;  (edit intel)', "warn");
+      cliPrint('  e.g. sitrep US  \u00B7  sitrep "United States"  \u00B7  sitrep -m RU', "sys");
+      return;
+    }
+    const country = resolveCountry(q);
+    if (!country) {
+      cliPrint(`\u2715 '${escHtml(q)}' not recognized as a country or region.`, "err");
+      cliPrint('  try an ISO code or name \u2014 e.g. US, RU, CN, "United Kingdom".', "warn");
+      return;
+    }
+    if (edit) openCountryEditor(country);
+    else showCountryStatus(country);
+  }
+
+  function locateFlight(arg) {
+    const air = (THREAT_FEED.items || []).filter((it) => it.cat === "AIR");
+    const tele = (m) => escHtml((m || "").replace("Live aircraft \u00B7 ", ""));
+    if (!arg) {
+      cliPrint("\u25C6 LIVE AIRCRAFT // OPENSKY NETWORK", "head");
+      cliPrint(`  ${air.length} aircraft tracked \u00B7 source ${LIVE_MODE_INTEL ? "LIVE" : "SIMULATION"}`, air.length ? "ok" : "warn");
+      if (!air.length) { cliPrint("  no aircraft in the current feed snapshot.", "warn"); return; }
+      air.slice(0, 12).forEach((it) => {
+        cliPrint(`  \u2708 ${escHtml((it.title || "?").padEnd(10))} ${escHtml((it.geo || "").padEnd(16))} ${tele(it.msg)}`, "sys");
+      });
+      if (air.length > 12) cliPrint(`  \u2026 +${air.length - 12} more`, "sys");
+      cliPrint("  usage: locate -f &lt;call-sign&gt;  \u2014 e.g. 'locate -f " + escHtml(air[0].title || "UAL245") + "'", "sys");
+      return;
+    }
+    const kw = arg.trim().toLowerCase().replace(/\s+/g, "");
+    const matches = air.filter((it) => (it.title || "").toLowerCase().replace(/\s+/g, "").includes(kw));
+    if (!matches.length) {
+      cliPrint(`\u2715 no tracked flight matches '${escHtml(arg.toUpperCase())}'.`, "err");
+      cliPrint("  run 'locate -f' with no code to list tracked aircraft.", "warn");
+      return;
+    }
+    const f = matches[0];
+    cliPrint(`\u25C6 FLIGHT // ${escHtml((f.title || "?").toUpperCase())}`, "head");
+    cliPrint(`  ORIGIN    ${escHtml(f.geo || f.sub || "unknown")}`, "sys");
+    cliPrint(`  TELEMETRY ${tele(f.msg)}`, "sys");
+    cliPrint(`  POSITION  LAT ${f.lat.toFixed(4)}  LNG ${f.lng.toFixed(4)}`, "sys");
+    cliPrint(`  SOURCE    ${escHtml(f.src || "OpenSky Network")}`, "ok");
+    if (matches.length > 1) cliPrint(`  (+${matches.length - 1} more match \u2014 showing first)`, "warn");
+    if (threatLayers.AIR === false) { threatLayers.AIR = true; renderThreatPins(true); renderLegend(); }
+    if (map) {
+      map.flyTo([f.lat, f.lng], 7, { duration: 1.2 });
+      setTimeout(() => {
+        L.popup({ className: "region-popup", closeButton: false })
+          .setLatLng([f.lat, f.lng])
+          .setContent(`<div class="rp-name">\u2708 ${escHtml(f.title || "FLIGHT")}</div>
+                       <div class="rp-meta">${escHtml((f.sub || "").slice(0, 54))}</div>
+                       <div class="rp-status" style="color:#38d6ff">${tele(f.msg)}</div>`)
+          .openOn(map);
+      }, 1300);
+    }
+  }
+
   const COMMANDS = {
     help() {
       cliPrint("AVAILABLE COMMANDS", "head");
       const rows = [
-        ["alerts", "list active incidents only"],
+        ["alerts", "active incidents only"],
         ["clear", "clear the console"],
-        ["flight &lt;code&gt;", "locate a live aircraft by call sign on the map"],
         ["help", "list available commands"],
         ["intel", "public threat intel \u2014 CVEs \u00B7 C2 \u00B7 IOCs"],
-        ["localhost", "open a live shell on the host running the server"],
-        ["locate &lt;keyword&gt;", "find &amp; plot matching dossier subjects on the map"],
-        ["scan", "force re-sync of the status feed"],
-        ["server", "full situational report \u2014 azure + solarwinds status"],
-        ["server -h", "node server reachability check"],
-        ["sitrep", "country alerts created/modified in the last 24h"],
-        ["sitrep &lt;country&gt;", "country threat posture \u2014 zoom + outline border"],
-        ["sitrep -m &lt;country&gt;", "open intel editor (posture \u00B7 diplomacy \u00B7 alerts)"],
-        ["status &lt;country&gt;", "country threat posture (alias of sitrep)"],
-        ["status -m &lt;country&gt;", "open intel editor"]
+        ["localhost", "open a live shell on the host"],
+        ["locate", "find &amp; plot dossier subjects, or center a flight"],
+        ["server", "full report \u2014 azure + solarwinds status"],
+        ["sitrep", "country posture, 24h alerts &amp; intel editor"]
       ];
-      rows.sort((a, b) => a[0].replace(/&[a-z]+;/g, "<").localeCompare(b[0].replace(/&[a-z]+;/g, "<")));
       rows.forEach(([c, d]) => {
-        const disp = c.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
-        const pad = " ".repeat(Math.max(1, 22 - disp.length));
+        const pad = " ".repeat(Math.max(1, 12 - c.length));
         cliPrint(`  <span style="color:var(--accent)">${c}</span>${pad}${d}`, "sys");
       });
+      cliPrint("\u2014".repeat(40), "sys");
+      cliPrint("  add -h after a command to list its flags &amp; parameters \u2014 e.g. 'locate -h'", "sys");
     },
     server(arg) {
       const q = (arg || "").trim().toLowerCase();
-      if (q === "-h" || q === "--help") { COMMANDS.status("server"); return; }
+      if (isHelpFlag(q)) {
+        printFlagHelp("SERVER // FLAGS", [
+          ["server", "full situational report \u2014 azure + solarwinds status"],
+          ["server -s", "node server reachability check"],
+          ["server -h", "show this flag reference"]
+        ]);
+        return;
+      }
+      if (q === "-s") { serverReachability(); return; }
       const c = statusCounts();
       cliPrint("\u25C6 SERVER // AZURE THREAT LANDSCAPE", "head");
       cliPrint(`  SYNCED ${fmtTime()} \u00B7 ${AZURE_REGIONS.length} REGIONS MONITORED`, "sys");
@@ -2760,70 +2861,19 @@ function exportDossier(list) {
       });
     },
     sitrep(arg) {
-      const q = (arg || "").trim();
-      if (!q) { sitrep24h(); return; }
-      COMMANDS.status(arg);
-    },
-    status(arg) {
-      /* parse: optional -m flag + (quoted) country/region query */
-      let edit = false;
-      let q = (arg || "").trim();
-      q = q.replace(/(^|\s)-m(\s|$)/i, () => { edit = true; return " "; }).trim();
-      q = q.replace(/^["'\u201C\u2018]|["'\u201D\u2019]$/g, "").trim();
-
-      if (!q) {
-        cliPrint('usage: status &lt;country&gt;  \u00B7  status -m &lt;country&gt;  (edit intel)', "warn");
-        cliPrint('  e.g. status US  \u00B7  status "United States"  \u00B7  status -m RU', "sys");
-        cliPrint('  also: status server (node check) \u00B7 status &lt;region-code&gt; (azure)', "sys");
+      const raw = (arg || "").trim();
+      if (isHelpFlag(raw)) {
+        printFlagHelp("SITREP // FLAGS &amp; PARAMETERS", [
+          ["sitrep", "country alerts created/modified in the last 24h"],
+          ["sitrep &lt;country&gt;", "country threat posture \u2014 zoom + outline border"],
+          ["sitrep -m &lt;country&gt;", "open intel editor (posture \u00B7 diplomacy \u00B7 alerts)"],
+          ["sitrep -s", "force a re-sync of the status feed"]
+        ]);
         return;
       }
-      /* server health check (legacy) */
-      if (!edit && q.toLowerCase() === "server") {
-        cliPrint("\u25C6 NODE SERVER REACHABILITY", "head");
-        cliPrint("> probing http://localhost:3005/api/health \u2026", "sys");
-        const t0 = performance.now();
-        fetch("/api/health", { cache: "no-store" })
-          .then((r) => r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status)))
-          .then((j) => {
-            const ms = Math.round(performance.now() - t0);
-            cliPrint(`\u2713 SERVER ONLINE \u00B7 ${j.service || "CyberSOC"} \u00B7 ${ms}ms`, "ok");
-            cliPrint(`  live feeds, file writes & shell bridge AVAILABLE.`, "ok");
-            cliPrint(`  intel: ${LIVE_MODE_INTEL ? "LIVE" : "\u2014"} \u00B7 azure: ${LIVE_MODE ? "LIVE" : "SIM"} \u00B7 solarwinds: ${LIVE_MODE_SW ? "LIVE" : "SIM"}`, "sys");
-          })
-          .catch((e) => {
-            cliPrint(`\u2715 SERVER UNREACHABLE \u2014 ${escHtml(e.message || "no response")}`, "err");
-            cliPrint("  start it with:  node server.js   (then reload)", "warn");
-            cliPrint("  running in OFFLINE mode: simulated feeds \u00B7 log files download as JSON.", "warn");
-          });
-        return;
-      }
-      /* legacy: exact Azure region code/name (only when not editing) */
-      const r = AZURE_REGIONS.find((x) => x.code === q.toLowerCase() || x.name.toLowerCase() === q.toLowerCase());
-      if (r && !edit) {
-        const cls = r.status === "outage" ? "err" : r.status === "degraded" ? "warn" : "ok";
-        cliPrint(`\u25C6 ${r.name} [${r.code}]`, "head");
-        cliPrint(`  LOCATION  ${r.geo}`, "sys");
-        cliPrint(`  STATUS    ${r.status.toUpperCase()}`, cls);
-        const d = ALERT_DETAIL[r.code];
-        if (d) {
-          cliPrint(`  INCIDENT  ${d.id} \u00B7 ${d.service}`, "sys");
-          cliPrint(`  SINCE     ${ago(d.since)} ago`, "sys");
-          cliPrint(`  DETAIL    ${d.msg}`, cls);
-        } else {
-          cliPrint("  no active incidents.", "ok");
-        }
-        return;
-      }
-
-      /* country threat posture */
-      const country = resolveCountry(q);
-      if (!country) {
-        cliPrint(`\u2715 '${escHtml(q)}' not recognized as a country or region.`, "err");
-        cliPrint('  try an ISO code or name \u2014 e.g. US, RU, CN, "United Kingdom".', "warn");
-        return;
-      }
-      if (edit) openCountryEditor(country);
-      else showCountryStatus(country);
+      if (/^-s$/i.test(raw)) { resyncFeed(); return; }
+      if (!raw) { sitrep24h(); return; }
+      sitrepCountry(arg);
     },
     alerts() {
       const active = AZURE_REGIONS.filter((r) => r.status !== "operational");
@@ -2856,15 +2906,17 @@ function exportDossier(list) {
         });
       });
     },
-    scan() {
-      cliPrint("> initiating telemetry re-sync\u2026", "sys");
-      syncAzureStatus().then((live) => {
-        AZURE_REGIONS.forEach(updateMarkerStatus);
-        updateHUD(); renderAlerts(); updateFeedIndicator();
-        cliPrint(`\u2713 sync complete @ ${fmtTime()} \u00B7 source: ${live ? "AZURE LIVE FEED" : "LOCAL SIMULATION"}`, live ? "ok" : "warn");
-      });
-    },
     locate(arg) {
+      const raw = (arg || "").trim();
+      if (isHelpFlag(raw)) {
+        printFlagHelp("LOCATE // FLAGS &amp; PARAMETERS", [
+          ["locate &lt;keyword&gt;", "find &amp; plot matching dossier subjects on the map"],
+          ["locate -f &lt;flight&gt;", "center the map on a live flight pin \u2014 e.g. locate -f UAL245"]
+        ]);
+        return;
+      }
+      const fm = raw.match(/^-f\b\s*(.*)$/i);
+      if (fm) { locateFlight(fm[1].trim()); return; }
       if (!arg) {
         if (!radarCenterLatLng) { cliPrint("usage: locate &lt;keyword&gt;  \u2014 search & plot dossier subjects", "warn"); return; }
         cliPrint("\u25C6 OPERATOR POSITION", "head");
@@ -2891,47 +2943,6 @@ function exportDossier(list) {
         if (!n) { cliPrint("\u2715 could not geocode any matching location.", "err"); return; }
         cliPrint(`\u2713 ${n} subject pin(s) placed \u00B7 map fit to matches.`, "ok");
       });
-    },
-    flight(arg) {
-      const air = (THREAT_FEED.items || []).filter((it) => it.cat === "AIR");
-      const tele = (m) => escHtml((m || "").replace("Live aircraft \u00B7 ", ""));
-      if (!arg) {
-        cliPrint("\u25C6 LIVE AIRCRAFT // OPENSKY NETWORK", "head");
-        cliPrint(`  ${air.length} aircraft tracked \u00B7 source ${LIVE_MODE_INTEL ? "LIVE" : "SIMULATION"}`, air.length ? "ok" : "warn");
-        if (!air.length) { cliPrint("  no aircraft in the current feed snapshot.", "warn"); return; }
-        air.slice(0, 12).forEach((it) => {
-          cliPrint(`  \u2708 ${escHtml((it.title || "?").padEnd(10))} ${escHtml((it.geo || "").padEnd(16))} ${tele(it.msg)}`, "sys");
-        });
-        if (air.length > 12) cliPrint(`  \u2026 +${air.length - 12} more`, "sys");
-        cliPrint("  usage: flight &lt;call-sign&gt;  \u2014 e.g. 'flight " + escHtml(air[0].title || "UAL245") + "'", "sys");
-        return;
-      }
-      const kw = arg.trim().toLowerCase().replace(/\s+/g, "");
-      const matches = air.filter((it) => (it.title || "").toLowerCase().replace(/\s+/g, "").includes(kw));
-      if (!matches.length) {
-        cliPrint(`\u2715 no tracked flight matches '${escHtml(arg.toUpperCase())}'.`, "err");
-        cliPrint("  run 'flight' with no argument to list tracked aircraft.", "warn");
-        return;
-      }
-      const f = matches[0];
-      cliPrint(`\u25C6 FLIGHT // ${escHtml((f.title || "?").toUpperCase())}`, "head");
-      cliPrint(`  ORIGIN    ${escHtml(f.geo || f.sub || "unknown")}`, "sys");
-      cliPrint(`  TELEMETRY ${tele(f.msg)}`, "sys");
-      cliPrint(`  POSITION  LAT ${f.lat.toFixed(4)}  LNG ${f.lng.toFixed(4)}`, "sys");
-      cliPrint(`  SOURCE    ${escHtml(f.src || "OpenSky Network")}`, "ok");
-      if (matches.length > 1) cliPrint(`  (+${matches.length - 1} more match \u2014 showing first)`, "warn");
-      if (threatLayers.AIR === false) { threatLayers.AIR = true; renderThreatPins(true); renderLegend(); }
-      if (map) {
-        map.flyTo([f.lat, f.lng], 7, { duration: 1.2 });
-        setTimeout(() => {
-          L.popup({ className: "region-popup", closeButton: false })
-            .setLatLng([f.lat, f.lng])
-            .setContent(`<div class="rp-name">\u2708 ${escHtml(f.title || "FLIGHT")}</div>
-                         <div class="rp-meta">${escHtml((f.sub || "").slice(0, 54))}</div>
-                         <div class="rp-status" style="color:#38d6ff">${tele(f.msg)}</div>`)
-            .openOn(map);
-        }, 1300);
-      }
     },
     localhost(arg) {
       if (arg) {
