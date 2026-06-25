@@ -351,6 +351,32 @@ body { position: relative; }
 .tm-AIR { width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 13px solid #38d6ff; background: none; filter: drop-shadow(0 0 5px rgba(56,214,255,.75)); transform-origin: 50% 65%; }
 .tm-CISA { border: 1.5px solid #5b8def; background: rgba(91,141,239,.30); box-shadow: 0 0 8px rgba(91,141,239,.6); border-radius: 2px; }
 
+/* country-alert pins (analyst) — coloured by alert severity */
+.ca-pin { width: 12px; height: 12px; box-sizing: border-box; border-radius: 50%; border: 2px solid; }
+.ca-pin.sev-outage   { border-color: #ff3b3b; background: rgba(255,59,59,.40);  box-shadow: 0 0 9px rgba(255,59,59,.7); }
+.ca-pin.sev-degraded { border-color: #ffd23d; background: rgba(255,210,61,.36); box-shadow: 0 0 9px rgba(255,210,61,.62); }
+.ca-pin.sev-unconf   { border-color: #9b6dff; background: rgba(155,109,255,.36); box-shadow: 0 0 9px rgba(155,109,255,.62); }
+.ca-pin.sev-info     { border-color: #4ea3ff; background: rgba(78,163,255,.36); box-shadow: 0 0 9px rgba(78,163,255,.62); }
+
+/* hover highlight square around any map pinpoint */
+.pin-wrap { position: relative; width: 14px; height: 14px; display: flex; align-items: center; justify-content: center; }
+.pin-wrap::after {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 28px; height: 28px;
+  transform: translate(-50%, -50%); border: 1px solid var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow), inset 0 0 6px var(--accent-glow);
+  opacity: 0; transition: opacity .12s ease; pointer-events: none;
+}
+.pin-wrap:hover::after { opacity: 1; }
+
+/* themed arrow cursor (flips with light/dark theme) */
+html, body, .leaflet-grab, .leaflet-container, .leaflet-interactive {
+  cursor: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='26'%20height='26'%20viewBox='0%200%2026%2026'%3E%3Cpath%20d='M4%203V21L9.2%2016L12.7%2023L15.8%2021.6L12.3%2015H19Z'%20fill='%23f3e8ee'%20stroke='%230a0608'%20stroke-width='1.4'%20stroke-linejoin='round'/%3E%3C/svg%3E") 4 3, default;
+}
+:root[data-theme="light"] html, :root[data-theme="light"] body,
+:root[data-theme="light"] .leaflet-grab, :root[data-theme="light"] .leaflet-container, :root[data-theme="light"] .leaflet-interactive {
+  cursor: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='26'%20height='26'%20viewBox='0%200%2026%2026'%3E%3Cpath%20d='M4%203V21L9.2%2016L12.7%2023L15.8%2021.6L12.3%2015H19Z'%20fill='%231a1822'%20stroke='%23eceef3'%20stroke-width='1.4'%20stroke-linejoin='round'/%3E%3C/svg%3E") 4 3, default;
+}
+
 /* SITREP map legend / layer toggles */
 .map-legend { position: absolute; left: 16px; bottom: 24px; z-index: 600; background: rgba(10,6,8,.62); backdrop-filter: blur(6px); border: 1px solid var(--line); padding: 9px 11px; min-width: 158px; }
 .map-legend-h { font-family: var(--mono); font-size: 8px; letter-spacing: 2px; color: var(--txt-dim); margin-bottom: 7px; }
@@ -1517,6 +1543,123 @@ function exportDossier(list) {
 
     map.on("move zoom moveend zoomend", positionRadar);
     map.on("zoomend moveend", refreshMarkerAngles);
+
+    setupLongPress();
+  }
+
+  /* ---------- long-press to drop an alert ---------- */
+  /* Press-and-hold (mouse or touch) on the map opens the country intel
+     editor with the alert coordinates auto-populated, resolved to the
+     country whose borders contain the press point. */
+  function pointInRing(lng, lat, ring) {
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const xi = ring[i][0], yi = ring[i][1];
+      const xj = ring[j][0], yj = ring[j][1];
+      const hit = ((yi > lat) !== (yj > lat)) &&
+        (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi);
+      if (hit) inside = !inside;
+    }
+    return inside;
+  }
+  function pointInPolygon(lng, lat, rings) {
+    if (!rings.length || !pointInRing(lng, lat, rings[0])) return false;
+    for (let k = 1; k < rings.length; k++) {
+      if (pointInRing(lng, lat, rings[k])) return false; // inside a hole
+    }
+    return true;
+  }
+  /* iso3 of the country containing (lat,lng), or null over open water */
+  function countryAt(lat, lng) {
+    return ensureGeo().then((feat) => {
+      for (const iso3 in feat) {
+        const g = feat[iso3] && feat[iso3].geometry;
+        if (!g) continue;
+        if (g.type === "Polygon") {
+          if (pointInPolygon(lng, lat, g.coordinates)) return iso3;
+        } else if (g.type === "MultiPolygon") {
+          for (const poly of g.coordinates) {
+            if (pointInPolygon(lng, lat, poly)) return iso3;
+          }
+        }
+      }
+      return null;
+    });
+  }
+
+  function triggerLongPress(latlng) {
+    const lat = latlng.lat;
+    const lng = ((latlng.lng + 540) % 360) - 180; // normalise to [-180,180]
+    countryAt(lat, lng).then((iso3) => {
+      if (!iso3) {
+        cliPrint(`\u2715 long-press @ ${lat.toFixed(3)}, ${lng.toFixed(3)} \u2014 no country boundary here (open water / unrecognised).`, "warn");
+        return;
+      }
+      const c = resolveCountry(iso3);
+      if (!c) { cliPrint(`\u2715 could not resolve country ${iso3}.`, "warn"); return; }
+      cliPrint(`\u25C9 drop alert @ ${lat.toFixed(3)}, ${lng.toFixed(3)} \u2014 ${escHtml(c.name.toUpperCase())} [${iso3}]`, "head");
+      openCountryEditor(c, { lat, lng });
+    });
+  }
+
+  function setupLongPress() {
+    if (!document.getElementById("lp-style")) {
+      const s = document.createElement("style");
+      s.id = "lp-style";
+      s.textContent = `
+        .lp-ind { position: fixed; z-index: 2000; width: 54px; height: 54px;
+          margin: -27px 0 0 -27px; border-radius: 50%; pointer-events: none;
+          border: 2px solid var(--accent);
+          box-shadow: 0 0 14px var(--accent-glow), inset 0 0 10px var(--accent-glow);
+          transform: scale(.18); opacity: .35;
+          animation: lp-grow .55s cubic-bezier(.4,0,.2,1) forwards; }
+        @keyframes lp-grow { to { transform: scale(1); opacity: 1; } }
+        :root.reduce-motion .lp-ind { animation: none; transform: scale(1); opacity: 1; }`;
+      document.head.appendChild(s);
+    }
+    const el = map.getContainer();
+    const HOLD = 550, MOVE_TOL = 12;
+    let timer = null, startPt = null, startLatLng = null, ind = null;
+
+    function clearPress() {
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (ind) { ind.remove(); ind = null; }
+      startPt = null;
+    }
+    function down(e) {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      // ignore presses on controls, popups, links, buttons, inputs
+      if (e.target.closest && e.target.closest(".leaflet-control, .leaflet-popup, a, button, input, select, textarea")) return;
+      const rect = el.getBoundingClientRect();
+      const x = e.clientX - rect.left, y = e.clientY - rect.top;
+      startPt = { x, y };
+      startLatLng = map.containerPointToLatLng([x, y]);
+      ind = document.createElement("div");
+      ind.className = "lp-ind";
+      ind.style.left = e.clientX + "px";
+      ind.style.top = e.clientY + "px";
+      document.body.appendChild(ind);
+      timer = setTimeout(() => {
+        timer = null;
+        if (ind) { ind.remove(); ind = null; }
+        const ll = startLatLng;
+        startPt = null;
+        triggerLongPress(ll);
+      }, HOLD);
+    }
+    function move(e) {
+      if (!startPt) return;
+      const rect = el.getBoundingClientRect();
+      const dx = (e.clientX - rect.left) - startPt.x;
+      const dy = (e.clientY - rect.top) - startPt.y;
+      if (Math.hypot(dx, dy) > MOVE_TOL) clearPress();
+    }
+    el.addEventListener("pointerdown", down);
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", clearPress);
+    el.addEventListener("pointercancel", clearPress);
+    el.addEventListener("pointerleave", clearPress);
+    el.addEventListener("contextmenu", (e) => e.preventDefault());
   }
 
   /* Fit the view to all region markers (best fit, capped at zoom 6). */
@@ -1767,6 +1910,7 @@ function exportDossier(list) {
       });
     }
     renderIntelFoot();
+    renderCountryAlertPins();
   }
 
   function renderIntelFoot() {
@@ -1832,7 +1976,7 @@ function exportDossier(list) {
       const rot = (it.cat === "AIR" && it.hdg != null) ? ` style="transform:rotate(${Math.round(it.hdg)}deg)"` : "";
       const icon = L.divIcon({
         className: "",
-        html: `<div class="tm tm-${it.cat} sev-${it.sev}"${rot}></div>`,
+        html: `<div class="pin-wrap"><div class="tm tm-${it.cat} sev-${it.sev}"${rot}></div></div>`,
         iconSize: [14, 14], iconAnchor: [7, 7]
       });
       const color = palette[it.cat] || "var(--accent)";
@@ -1844,6 +1988,36 @@ function exportDossier(list) {
           { className: "region-popup", closeButton: false });
     });
     threatLayer = L.layerGroup(layers).addTo(map);
+  }
+
+  /* Plot analyst country-intel alerts that carry coordinates, coloured by
+     alert severity. Rebuilt whenever the alert feed re-renders. */
+  let countryAlertLayer = null;
+  function renderCountryAlertPins() {
+    if (!map) return;
+    if (countryAlertLayer) { map.removeLayer(countryAlertLayer); countryAlertLayer = null; }
+    const layers = [];
+    Object.keys(COUNTRY_INTEL).forEach((iso3) => {
+      const rec = COUNTRY_INTEL[iso3];
+      (rec.alerts || []).forEach((a) => {
+        const lat = a.lat != null ? a.lat : rec.lat;
+        const lng = a.lng != null ? a.lng : rec.lng;
+        if (lat == null || lng == null) return;
+        const sev = ALERT_SEV[a.sev] ? a.sev : "degraded";
+        const s = ALERT_SEV[sev];
+        const icon = L.divIcon({
+          className: "",
+          html: `<div class="pin-wrap"><div class="ca-pin sev-${sev}"></div></div>`,
+          iconSize: [14, 14], iconAnchor: [7, 7]
+        });
+        layers.push(L.marker([lat, lng], { icon, keyboard: false })
+          .bindPopup(`<div class="rp-name">${escA(rec.name || iso3)}</div>
+                      <div class="rp-meta">${escA((a.text || "").slice(0, 80))}</div>
+                      <div class="rp-status" style="color:${s.color}">${s.label} \u00B7 SOC ANALYST</div>`,
+            { className: "region-popup", closeButton: false }));
+      });
+    });
+    if (layers.length) countryAlertLayer = L.layerGroup(layers).addTo(map);
   }
 
   async function refreshAll() {
@@ -2168,7 +2342,7 @@ function exportDossier(list) {
     document.head.appendChild(s);
   }
 
-  function openCountryEditor(c) {
+  function openCountryEditor(c, prefill) {
     injectCIntelStyle();
     const existing = document.getElementById("cintel-ov");
     if (existing) existing.remove();
@@ -2294,6 +2468,13 @@ function exportDossier(list) {
     $$("#ci-addbtn").addEventListener("click", addAlert);
     $$("#ci-atext").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addAlert(); } });
     $$("#ci-aurl").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addAlert(); } });
+
+    /* long-press drop: auto-populate the coordinates and focus the entry */
+    if (prefill && isFinite(prefill.lat) && isFinite(prefill.lng)) {
+      $$("#ci-alat").value = (+prefill.lat).toFixed(4);
+      $$("#ci-alng").value = (+prefill.lng).toFixed(4);
+      setTimeout(() => { try { $$("#ci-atext").focus(); } catch (e) {} }, 80);
+    }
 
     function close() { ov.remove(); }
     $$("#ci-close").addEventListener("click", close);
@@ -2592,12 +2773,36 @@ function exportDossier(list) {
   }
 
   function wireCLI() {
+    const input = $("#cli-input");
+    const history = [];   // most-recent first, capped at 5
+    let histIdx = -1;     // -1 = live (blank) line
+    const caretEnd = () => requestAnimationFrame(() => { const n = input.value.length; try { input.setSelectionRange(n, n); } catch (e) {} });
+
     $("#cli-form").addEventListener("submit", (e) => {
       e.preventDefault();
-      const input = $("#cli-input");
       const v = input.value;
-      if (v.trim()) runCommand(v);
+      if (v.trim()) {
+        runCommand(v);
+        if (history[0] !== v) { history.unshift(v); if (history.length > 5) history.pop(); }
+      }
+      histIdx = -1;
       input.value = "";
+    });
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowUp") {
+        if (!history.length) return;
+        e.preventDefault();
+        histIdx = Math.min(histIdx + 1, history.length - 1);
+        input.value = history[histIdx];
+        caretEnd();
+      } else if (e.key === "ArrowDown") {
+        if (histIdx < 0) return;
+        e.preventDefault();
+        histIdx -= 1;
+        input.value = histIdx < 0 ? "" : history[histIdx];
+        caretEnd();
+      }
     });
     // boot banner
     cliPrint("CyberSOC operator shell v1.0", "head");
