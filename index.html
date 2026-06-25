@@ -302,6 +302,11 @@ body { position: relative; }
 .alert-card { border: 1px solid var(--line-soft); border-left-width: 3px; background: var(--bg-1); padding: 11px 12px; }
 .alert-card.sev-degraded { border-left-color: var(--deg); }
 .alert-card.sev-outage   { border-left-color: var(--out); }
+.alert-card.sev-info     { border-left-color: #4ea3ff; }
+.alert-card.sev-unconf   { border-left-color: #9b6dff; }
+.alert-link { margin-top: 6px; font-family: var(--mono); font-size: 9px; letter-spacing: .5px; }
+.alert-link a { color: var(--accent); text-decoration: none; word-break: break-all; }
+.alert-link a:hover { text-decoration: underline; }
 .alert-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
 .alert-sev { font-family: var(--mono); font-size: 9px; letter-spacing: 2px; padding: 2px 7px; }
 .sev-degraded .alert-sev { color: var(--deg); border: 1px solid var(--deg); }
@@ -325,6 +330,7 @@ body { position: relative; }
 .cat-CVE { color: #e0b341; } .cat-C2 { color: var(--out); } .cat-IOC { color: var(--deg); } .cat-AZURE { color: var(--accent); }
 .cat-URL { color: #ff7a3d; } .cat-TOR { color: #9b6dff; } .cat-RANSOM { color: var(--accent); }
 .cat-AIR { color: #38d6ff; } .cat-CISA { color: #5b8def; }
+.cat-COUNTRY { color: #4ea3ff; }
 .alert-card.geo { cursor: pointer; }
 .alert-card.geo:hover { border-color: var(--line); background: var(--bg-2); }
 .alert-pin { font-family: var(--mono); font-size: 8px; letter-spacing: 1px; color: var(--op); margin-top: 5px; }
@@ -808,6 +814,7 @@ body { position: relative; }
         <button class="af-chip" data-cat="IOC">IOC</button>
         <button class="af-chip" data-cat="URL">URL</button>
         <button class="af-chip" data-cat="RANSOM">RANSOM</button>
+        <button class="af-chip" data-cat="COUNTRY">COUNTRY</button>
       </div>
       <div class="alert-list" id="alert-list"></div>
       <div class="intel-foot" id="intel-foot">FEEDS: &#x2014;</div>
@@ -1701,6 +1708,26 @@ function exportDossier(list) {
         lat: it.lat, lng: it.lng, geo: it.geo, ransomware: it.ransomware
       });
     });
+    /* analyst country intel alerts */
+    Object.keys(COUNTRY_INTEL).forEach((iso3) => {
+      const rec = COUNTRY_INTEL[iso3];
+      const p = rec.status ? POSTURE[rec.status] : null;
+      (rec.alerts || []).forEach((a) => {
+        const sev = ALERT_SEV[a.sev] ? a.sev : "degraded";
+        const s = ALERT_SEV[sev];
+        out.push({
+          cat: "COUNTRY", catLabel: s.label, catColor: s.color,
+          sev: sev,
+          time: a.ts ? ago(a.ts) + " ago" : "",
+          title: (p ? p.label + " \u00B7 " : "") + (rec.name || iso3),
+          sub: rec.summary || "", msg: a.text || "", url: a.url || "",
+          src: "SOC ANALYST",
+          lat: (a.lat != null ? a.lat : rec.lat),
+          lng: (a.lng != null ? a.lng : rec.lng),
+          geo: rec.name
+        });
+      });
+    });
     return out;
   }
 
@@ -1719,15 +1746,16 @@ function exportDossier(list) {
     } else {
       list.innerHTML = filtered.map((a) => {
         const hasGeo = a.lat != null && a.lng != null;
-        const sevLbl = a.cat === "AZURE" ? (a.sev === "outage" ? "OUTAGE" : "DEGRADED") : a.cat;
+        const sevLbl = a.cat === "AZURE" ? (a.sev === "outage" ? "OUTAGE" : "DEGRADED") : (a.catLabel || a.cat);
         return `<div class="alert-card sev-${a.sev}${hasGeo ? " geo" : ""}"${hasGeo ? ` data-lat="${a.lat}" data-lng="${a.lng}"` : ""}>
           <div class="alert-top">
-            <span class="alert-cat cat-${a.cat}">${sevLbl}${a.ransomware ? " \u26A0 RANSOMWARE" : ""}</span>
+            <span class="alert-cat cat-${a.cat}"${a.catColor ? ` style="color:${a.catColor}"` : ""}>${sevLbl}${a.ransomware ? " \u26A0 RANSOMWARE" : ""}</span>
             <span class="alert-time">${escA(a.time)}</span>
           </div>
           <div class="alert-region">${escA(a.title)}</div>
           <div class="alert-svc">${escA(a.sub)}</div>
           <div class="alert-msg">${escA(a.msg)}</div>
+          ${a.url ? `<div class="alert-link"><a href="${escA(a.url)}" target="_blank" rel="noopener">${escA(a.url.replace(/^https?:\/\//, "").slice(0, 48))} \u2197</a></div>` : ""}
           ${hasGeo ? `<div class="alert-pin">\u25C9 PLOTTED ON MAP${a.geo ? " \u00B7 " + escA(a.geo) : ""} \u2014 click to focus</div>` : ""}
           <div class="alert-src">SRC: ${escA(a.src)}</div>
         </div>`;
@@ -1899,13 +1927,419 @@ function exportDossier(list) {
     }
   }
 
+  /* ===================================================================
+     COUNTRY THREAT POSTURE  (status <country>  /  status -m <country>)
+     - resolve a country by ISO-2 code, ISO-3 code, or name
+     - outline its border (red=hostile, yellow=watchlist, blue=allied)
+     - print / edit intel + alerts; alerts surface in the ALERTS feed
+     =================================================================== */
+  const POSTURE = {
+    hostile:  { label: "HOSTILE",   color: "#ff3b3b", sev: "outage",   blurb: "Confirmed adversary \u2014 active hostile activity" },
+    watch:    { label: "WATCHLIST", color: "#ffd23d", sev: "degraded", blurb: "Potential threat \u2014 under active monitoring" },
+    friendly: { label: "ALLIED",    color: "#4ea3ff", sev: "info",     blurb: "Friendly / partner nation" }
+  };
+  const POSTURE_ORDER = ["hostile", "watch", "friendly"];
+
+  /* analyst alert severities (in escalation order for the picker) */
+  const ALERT_SEV = {
+    outage:   { label: "CRITICAL",      short: "CRIT",   color: "#ff3b3b", glyph: "\u2715" },
+    degraded: { label: "WARNING",       short: "WARN",   color: "#ffd23d", glyph: "\u25B2" },
+    unconf:   { label: "UNCONFIRMED",   short: "UNCON",  color: "#9b6dff", glyph: "?" },
+    info:     { label: "INFORMATIONAL", short: "INFO",   color: "#4ea3ff", glyph: "\u25CF" }
+  };
+  const ALERT_SEV_ORDER = ["outage", "degraded", "unconf", "info"];
+
+  /* ISO 3166: [ISO-2, ISO-3, common name] */
+  const COUNTRY_DB = [
+    ["AF","AFG","Afghanistan"],["AL","ALB","Albania"],["DZ","DZA","Algeria"],["AO","AGO","Angola"],["AR","ARG","Argentina"],["AM","ARM","Armenia"],["AU","AUS","Australia"],["AT","AUT","Austria"],["AZ","AZE","Azerbaijan"],
+    ["BS","BHS","Bahamas"],["BH","BHR","Bahrain"],["BD","BGD","Bangladesh"],["BY","BLR","Belarus"],["BE","BEL","Belgium"],["BZ","BLZ","Belize"],["BJ","BEN","Benin"],["BT","BTN","Bhutan"],["BO","BOL","Bolivia"],["BA","BIH","Bosnia and Herzegovina"],["BW","BWA","Botswana"],["BR","BRA","Brazil"],["BN","BRN","Brunei"],["BG","BGR","Bulgaria"],["BF","BFA","Burkina Faso"],["BI","BDI","Burundi"],
+    ["KH","KHM","Cambodia"],["CM","CMR","Cameroon"],["CA","CAN","Canada"],["CF","CAF","Central African Republic"],["TD","TCD","Chad"],["CL","CHL","Chile"],["CN","CHN","China"],["CO","COL","Colombia"],["CG","COG","Republic of the Congo"],["CD","COD","Democratic Republic of the Congo"],["CR","CRI","Costa Rica"],["CI","CIV","Ivory Coast"],["HR","HRV","Croatia"],["CU","CUB","Cuba"],["CY","CYP","Cyprus"],["CZ","CZE","Czechia"],
+    ["DK","DNK","Denmark"],["DJ","DJI","Djibouti"],["DO","DOM","Dominican Republic"],
+    ["EC","ECU","Ecuador"],["EG","EGY","Egypt"],["SV","SLV","El Salvador"],["GQ","GNQ","Equatorial Guinea"],["ER","ERI","Eritrea"],["EE","EST","Estonia"],["SZ","SWZ","Eswatini"],["ET","ETH","Ethiopia"],
+    ["FJ","FJI","Fiji"],["FI","FIN","Finland"],["FR","FRA","France"],
+    ["GA","GAB","Gabon"],["GM","GMB","Gambia"],["GE","GEO","Georgia"],["DE","DEU","Germany"],["GH","GHA","Ghana"],["GR","GRC","Greece"],["GL","GRL","Greenland"],["GT","GTM","Guatemala"],["GN","GIN","Guinea"],["GW","GNB","Guinea-Bissau"],["GY","GUY","Guyana"],
+    ["HT","HTI","Haiti"],["HN","HND","Honduras"],["HU","HUN","Hungary"],
+    ["IS","ISL","Iceland"],["IN","IND","India"],["ID","IDN","Indonesia"],["IR","IRN","Iran"],["IQ","IRQ","Iraq"],["IE","IRL","Ireland"],["IL","ISR","Israel"],["IT","ITA","Italy"],
+    ["JM","JAM","Jamaica"],["JP","JPN","Japan"],["JO","JOR","Jordan"],
+    ["KZ","KAZ","Kazakhstan"],["KE","KEN","Kenya"],["XK","KOS","Kosovo"],["KW","KWT","Kuwait"],["KG","KGZ","Kyrgyzstan"],
+    ["LA","LAO","Laos"],["LV","LVA","Latvia"],["LB","LBN","Lebanon"],["LS","LSO","Lesotho"],["LR","LBR","Liberia"],["LY","LBY","Libya"],["LT","LTU","Lithuania"],["LU","LUX","Luxembourg"],
+    ["MG","MDG","Madagascar"],["MW","MWI","Malawi"],["MY","MYS","Malaysia"],["ML","MLI","Mali"],["MR","MRT","Mauritania"],["MX","MEX","Mexico"],["MD","MDA","Moldova"],["MN","MNG","Mongolia"],["ME","MNE","Montenegro"],["MA","MAR","Morocco"],["MZ","MOZ","Mozambique"],["MM","MMR","Myanmar"],
+    ["NA","NAM","Namibia"],["NP","NPL","Nepal"],["NL","NLD","Netherlands"],["NZ","NZL","New Zealand"],["NI","NIC","Nicaragua"],["NE","NER","Niger"],["NG","NGA","Nigeria"],["KP","PRK","North Korea"],["MK","MKD","North Macedonia"],["NO","NOR","Norway"],
+    ["OM","OMN","Oman"],
+    ["PK","PAK","Pakistan"],["PS","PSE","Palestine"],["PA","PAN","Panama"],["PG","PNG","Papua New Guinea"],["PY","PRY","Paraguay"],["PE","PER","Peru"],["PH","PHL","Philippines"],["PL","POL","Poland"],["PT","PRT","Portugal"],["PR","PRI","Puerto Rico"],
+    ["QA","QAT","Qatar"],
+    ["RO","ROU","Romania"],["RU","RUS","Russia"],["RW","RWA","Rwanda"],
+    ["SA","SAU","Saudi Arabia"],["SN","SEN","Senegal"],["RS","SRB","Serbia"],["SL","SLE","Sierra Leone"],["SG","SGP","Singapore"],["SK","SVK","Slovakia"],["SI","SVN","Slovenia"],["SB","SLB","Solomon Islands"],["SO","SOM","Somalia"],["ZA","ZAF","South Africa"],["KR","KOR","South Korea"],["SS","SSD","South Sudan"],["ES","ESP","Spain"],["LK","LKA","Sri Lanka"],["SD","SDN","Sudan"],["SR","SUR","Suriname"],["SE","SWE","Sweden"],["CH","CHE","Switzerland"],["SY","SYR","Syria"],
+    ["TW","TWN","Taiwan"],["TJ","TJK","Tajikistan"],["TZ","TZA","Tanzania"],["TH","THA","Thailand"],["TL","TLS","Timor-Leste"],["TG","TGO","Togo"],["TT","TTO","Trinidad and Tobago"],["TN","TUN","Tunisia"],["TR","TUR","Turkey"],["TM","TKM","Turkmenistan"],
+    ["UG","UGA","Uganda"],["UA","UKR","Ukraine"],["AE","ARE","United Arab Emirates"],["GB","GBR","United Kingdom"],["US","USA","United States"],["UY","URY","Uruguay"],["UZ","UZB","Uzbekistan"],
+    ["VE","VEN","Venezuela"],["VN","VNM","Vietnam"],
+    ["YE","YEM","Yemen"],
+    ["ZM","ZMB","Zambia"],["ZW","ZWE","Zimbabwe"]
+  ];
+  /* informal names -> ISO-3 */
+  const COUNTRY_ALIASES = {
+    "usa":"USA","us":"USA","u.s.":"USA","u.s.a.":"USA","america":"USA","united states of america":"USA",
+    "uk":"GBR","u.k.":"GBR","britain":"GBR","great britain":"GBR","england":"GBR",
+    "uae":"ARE","emirates":"ARE","drc":"COD","dr congo":"COD","congo-kinshasa":"COD","congo":"COG",
+    "south korea":"KOR","s korea":"KOR","rok":"KOR","north korea":"PRK","n korea":"PRK","dprk":"PRK",
+    "russia":"RUS","russian federation":"RUS","burma":"MMR","ivory coast":"CIV","cote d'ivoire":"CIV",
+    "czech republic":"CZE","macedonia":"MKD","swaziland":"SWZ","cape verde":"CPV","holland":"NLD",
+    "palestine":"PSE","vatican":"VAT","laos":"LAO","syria":"SYR","iran":"IRN","viet nam":"VNM"
+  };
+
+  const GEO_URL = "https://cdn.jsdelivr.net/gh/johan/world.geo.json@master/countries.geo.json";
+  let GEO_FEATURES = null;          // iso3 -> GeoJSON feature
+  let geoPromise = null;
+  function ensureGeo() {
+    if (GEO_FEATURES) return Promise.resolve(GEO_FEATURES);
+    if (geoPromise) return geoPromise;
+    geoPromise = fetch(GEO_URL)
+      .then((r) => r.json())
+      .then((j) => {
+        GEO_FEATURES = {};
+        (j.features || []).forEach((f) => { if (f.id) GEO_FEATURES[f.id] = f; });
+        return GEO_FEATURES;
+      })
+      .catch(() => { GEO_FEATURES = {}; return GEO_FEATURES; });
+    return geoPromise;
+  }
+
+  const CINTEL_KEY = "cybersoc_country_intel";
+  function loadCIntel() { try { return JSON.parse(localStorage.getItem(CINTEL_KEY)) || {}; } catch (e) { return {}; } }
+  function saveCIntel() {
+    try { localStorage.setItem(CINTEL_KEY, JSON.stringify(COUNTRY_INTEL)); } catch (e) {}
+    /* mirror to the server -> data/soc_sitrep.json (silent fallback when offline) */
+    return fetch("/api/sitrep", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(COUNTRY_INTEL) })
+      .then((r) => { CINTEL_REMOTE = r.ok; return r.ok; })
+      .catch(() => { CINTEL_REMOTE = false; return false; });
+  }
+  /* pull authoritative sitrep from the server on boot, if it is running */
+  function loadCIntelRemote() {
+    return fetch("/api/sitrep", { cache: "no-store" })
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((obj) => {
+        if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+          COUNTRY_INTEL = obj;
+          CINTEL_REMOTE = true;
+          try { localStorage.setItem(CINTEL_KEY, JSON.stringify(COUNTRY_INTEL)); } catch (e) {}
+          renderAlerts();
+        }
+      })
+      .catch(() => { CINTEL_REMOTE = false; });
+  }
+  let CINTEL_REMOTE = false;
+  let COUNTRY_INTEL = loadCIntel();
+
+  function resolveCountry(q) {
+    if (!q) return null;
+    const k = q.trim().toLowerCase().replace(/\s+/g, " ");
+    let iso3 = COUNTRY_ALIASES[k];
+    let row = null;
+    if (iso3) row = COUNTRY_DB.find((r) => r[1] === iso3);
+    if (!row && k.length === 2) row = COUNTRY_DB.find((r) => r[0].toLowerCase() === k);
+    if (!row && k.length === 3) row = COUNTRY_DB.find((r) => r[1].toLowerCase() === k);
+    if (!row) row = COUNTRY_DB.find((r) => r[2].toLowerCase() === k);
+    if (!row && k.length >= 4) row = COUNTRY_DB.find((r) => r[2].toLowerCase().includes(k));
+    if (!row) return null;
+    return { iso2: row[0], iso3: row[1], name: row[2] };
+  }
+
+  function wrapText(s, n) {
+    const words = (s || "").replace(/\s+/g, " ").trim().split(" ");
+    const lines = []; let cur = "";
+    words.forEach((w) => {
+      if ((cur + " " + w).trim().length > n) { if (cur) lines.push(cur); cur = w; }
+      else cur = (cur + " " + w).trim();
+    });
+    if (cur) lines.push(cur);
+    return lines.slice(0, 14);
+  }
+
+  let countryLayer = null;
+  /* outline a country's border + best-fit zoom; resolves to its center latlng */
+  function outlineCountry(iso3, postureKey) {
+    return ensureGeo().then((feat) => {
+      if (countryLayer) { map.removeLayer(countryLayer); countryLayer = null; }
+      const f = feat[iso3];
+      if (!f) return null;
+      const p = POSTURE[postureKey] || { color: "#aab0bb" };
+      countryLayer = L.geoJSON(f, {
+        style: { color: p.color, weight: 2.5, opacity: 1, fillColor: p.color, fillOpacity: 0.10, className: "country-outline" }
+      }).addTo(map);
+      const b = countryLayer.getBounds();
+      map.flyToBounds(b, { padding: [70, 70], maxZoom: 6, duration: 1.2 });
+      return b.getCenter();
+    });
+  }
+  function centroidOf(iso3) {
+    return ensureGeo().then((feat) => {
+      const f = feat[iso3]; if (!f) return null;
+      const c = L.geoJSON(f).getBounds().getCenter();
+      return { lat: c.lat, lng: c.lng };
+    });
+  }
+
+  function showCountryStatus(c) {
+    const rec = COUNTRY_INTEL[c.iso3];
+    const postureKey = rec && rec.status ? rec.status : null;
+    const p = postureKey ? POSTURE[postureKey] : null;
+    cliPrint(`\u25C6 ${escHtml(c.name.toUpperCase())} [${c.iso3} \u00B7 ${c.iso2}]`, "head");
+    if (p) cliPrint(`  POSTURE   <span style="color:${p.color};font-weight:600">${p.label}</span> \u2014 ${p.blurb}`, "sys");
+    else   cliPrint(`  POSTURE   <span style="color:#9aa3af;font-weight:600">UNCLASSIFIED</span> \u2014 no posture on file`, "warn");
+    if (rec && rec.summary) cliPrint(`  SUMMARY   ${escHtml(rec.summary)}`, "sys");
+    if (rec && rec.description) {
+      cliPrint(`  BRIEF`, "sys");
+      wrapText(rec.description, 62).forEach((l) => cliPrint("    " + escHtml(l), "sys"));
+    }
+    const alerts = (rec && rec.alerts) || [];
+    if (alerts.length) {
+      cliPrint("\u2014".repeat(40), "sys");
+      cliPrint(`  ${alerts.length} ALERT(S) ON FILE`, "head");
+      alerts.forEach((a) => {
+        const s = ALERT_SEV[a.sev] || ALERT_SEV.degraded;
+        const cls = a.sev === "outage" ? "err" : a.sev === "info" ? "ok" : "warn";
+        cliPrint(`  ${s.glyph} <span style="color:${s.color}">[${s.short}]</span> ${escHtml(a.text)} <span style="color:var(--txt-dim)">\u00B7 ${ago(a.ts)} ago</span>`, cls);
+        const bits = [];
+        if (a.lat != null && a.lng != null) bits.push(`\u25C9 ${(+a.lat).toFixed(3)}, ${(+a.lng).toFixed(3)}`);
+        if (a.url) bits.push(`\u2197 <a href="${escHtml(a.url)}" target="_blank" rel="noopener" style="color:var(--accent)">${escHtml(a.url.replace(/^https?:\/\//, "").slice(0, 42))}</a>`);
+        if (bits.length) cliPrint(`      ${bits.join("   ")}`, "sys");
+      });
+    } else {
+      cliPrint("  no alerts on file.", "ok");
+    }
+    cliPrint(`  edit: <span style="color:var(--accent)">status -m ${c.iso2}</span>`, "sys");
+    if (map) {
+      outlineCountry(c.iso3, postureKey).then((center) => {
+        if (center === null) cliPrint(`  (no map boundary available for ${c.iso3})`, "warn");
+      });
+    }
+  }
+
+  /* ---------- intel editor modal (status -m) ---------- */
+  function injectCIntelStyle() {
+    if (document.getElementById("cintel-style")) return;
+    const s = document.createElement("style");
+    s.id = "cintel-style";
+    s.textContent = `
+      #cintel-ov { position: fixed; inset: 0; z-index: 6000; background: rgba(4,3,5,.72); backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; padding: 24px; }
+      #cintel-panel { width: min(560px, 96vw); max-height: 90vh; overflow-y: auto; background: var(--bg-1); border: 1px solid var(--line); box-shadow: 0 24px 80px rgba(0,0,0,.8); font-family: var(--mono); }
+      #cintel-panel .ci-hd { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+      #cintel-panel .ci-ttl { font-size: 12px; letter-spacing: 2px; color: var(--txt); }
+      #cintel-panel .ci-ttl b { color: var(--accent); }
+      #cintel-panel .ci-x { cursor: pointer; color: var(--txt-mut); font-size: 16px; line-height: 1; background: none; border: none; }
+      #cintel-panel .ci-x:hover { color: var(--accent); }
+      #cintel-panel .ci-body { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+      #cintel-panel .ci-lbl { font-size: 9px; letter-spacing: 2px; color: var(--txt-mut); margin-bottom: 7px; }
+      #cintel-panel .ci-seg { display: flex; gap: 8px; }
+      #cintel-panel .ci-seg button { flex: 1; padding: 9px 6px; background: var(--bg-2); border: 1px solid var(--line-soft); color: var(--txt-mut); font-family: var(--mono); font-size: 10px; letter-spacing: 1.5px; cursor: pointer; transition: all .12s; }
+      #cintel-panel .ci-seg button:hover { color: var(--txt); }
+      #cintel-panel .ci-seg button.on { color: #0a0608; font-weight: 700; border-color: transparent; }
+      #cintel-panel input, #cintel-panel textarea, #cintel-panel select { width: 100%; background: var(--bg-2); border: 1px solid var(--line-soft); color: var(--txt); font-family: var(--mono); font-size: 12px; padding: 9px 10px; }
+      #cintel-panel input:focus, #cintel-panel textarea:focus, #cintel-panel select:focus { outline: none; border-color: var(--accent); }
+      #cintel-panel textarea { resize: vertical; min-height: 84px; line-height: 1.5; }
+      #cintel-panel .ci-alertrow { display: flex; gap: 8px; }
+      #cintel-panel .ci-alertrow select { width: 130px; flex-shrink: 0; }
+      #cintel-panel .ci-coordrow { display: flex; gap: 8px; margin-top: 8px; }
+      #cintel-panel .ci-coordrow input { width: 100%; }
+      #cintel-panel .ci-coordrow .ci-lat, #cintel-panel .ci-coordrow .ci-lng { width: 110px; flex-shrink: 0; }
+      #cintel-panel .ci-add { width: auto; flex-shrink: 0; padding: 0 16px; background: var(--accent); color: #0a0608; border: none; font-weight: 700; font-size: 10px; letter-spacing: 1.5px; cursor: pointer; }
+      #cintel-panel .ci-hint { font-size: 9px; color: var(--txt-dim); letter-spacing: .5px; margin-top: 6px; }
+      #cintel-panel .ci-alist { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+      #cintel-panel .ci-aitem { display: flex; align-items: flex-start; gap: 9px; padding: 8px 9px; background: var(--bg-2); border-left: 3px solid var(--deg); font-size: 11px; }
+      #cintel-panel .ci-aitem.sev-outage { border-left-color: #ff3b3b; }
+      #cintel-panel .ci-aitem.sev-unconf { border-left-color: #9b6dff; }
+      #cintel-panel .ci-aitem.sev-info   { border-left-color: #4ea3ff; }
+      #cintel-panel .ci-aitem .ci-abody { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+      #cintel-panel .ci-aitem .ci-atxt { color: var(--txt); }
+      #cintel-panel .ci-aitem .ci-ameta { font-size: 9px; color: var(--txt-dim); letter-spacing: .5px; display: flex; gap: 12px; flex-wrap: wrap; }
+      #cintel-panel .ci-aitem .ci-ameta a { color: var(--accent); text-decoration: none; }
+      #cintel-panel .ci-aitem .ci-asev { font-size: 8px; letter-spacing: 1px; font-weight: 700; flex-shrink: 0; padding-top: 1px; }
+      #cintel-panel .ci-aitem .ci-rm { cursor: pointer; color: var(--txt-mut); background: none; border: none; font-size: 13px; flex-shrink: 0; }
+      #cintel-panel .ci-aitem .ci-rm:hover { color: var(--out); }
+      #cintel-panel .ci-empty { font-size: 10px; color: var(--txt-dim); letter-spacing: 1px; padding: 4px 0; }
+      #cintel-panel .ci-ft { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-top: 1px solid var(--line); }
+      #cintel-panel .ci-btn { padding: 9px 18px; font-family: var(--mono); font-size: 10px; letter-spacing: 2px; cursor: pointer; border: 1px solid var(--line); background: var(--bg-2); color: var(--txt); }
+      #cintel-panel .ci-btn:hover { border-color: var(--txt-mut); }
+      #cintel-panel .ci-btn.danger { color: var(--out); border-color: transparent; background: none; }
+      #cintel-panel .ci-btn.danger:hover { color: #fff; background: var(--out); }
+      #cintel-panel .ci-btn.primary { background: var(--accent); color: #0a0608; border-color: var(--accent); font-weight: 700; }
+      #cintel-panel .ci-grp2 { display: flex; gap: 10px; }
+    `;
+    document.head.appendChild(s);
+  }
+
+  function openCountryEditor(c) {
+    injectCIntelStyle();
+    const existing = document.getElementById("cintel-ov");
+    if (existing) existing.remove();
+    const rec = COUNTRY_INTEL[c.iso3] || {};
+    let curStatus = rec.status || null;
+    let draftAlerts = (rec.alerts || []).map((a) => ({ text: a.text, sev: a.sev || "degraded", ts: a.ts || Date.now(), lat: a.lat, lng: a.lng, url: a.url || "" }));
+
+    const ov = document.createElement("div");
+    ov.id = "cintel-ov";
+    ov.innerHTML = `
+      <div id="cintel-panel" role="dialog" aria-modal="true">
+        <div class="ci-hd">
+          <div class="ci-ttl">INTEL EDITOR // <b>${escHtml(c.name.toUpperCase())}</b> &middot; ${c.iso3}</div>
+          <button class="ci-x" id="ci-close" aria-label="Close">&#x2715;</button>
+        </div>
+        <div class="ci-body">
+          <div>
+            <div class="ci-lbl">THREAT POSTURE</div>
+            <div class="ci-seg" id="ci-seg"></div>
+          </div>
+          <div>
+            <div class="ci-lbl">SUMMARY HEADLINE</div>
+            <input id="ci-summary" maxlength="120" placeholder="One-line assessment (e.g. Active state-sponsored cyber operations)" value="${escHtml(rec.summary || "")}" />
+          </div>
+          <div>
+            <div class="ci-lbl">ANALYST BRIEF / DESCRIPTION</div>
+            <textarea id="ci-desc" placeholder="Background, capabilities, known actors, recent activity\u2026">${escHtml(rec.description || "")}</textarea>
+          </div>
+          <div>
+            <div class="ci-lbl">ADD ALERT TO FEED</div>
+            <div class="ci-alertrow">
+              <select id="ci-asev">
+                <option value="outage">CRITICAL</option>
+                <option value="degraded" selected>WARNING</option>
+                <option value="unconf">UNCONFIRMED</option>
+                <option value="info">INFORMATIONAL</option>
+              </select>
+              <input id="ci-atext" placeholder="Alert entry text\u2026" />
+            </div>
+            <div class="ci-coordrow">
+              <input class="ci-lat" id="ci-alat" inputmode="decimal" placeholder="Lat (opt)" />
+              <input class="ci-lng" id="ci-alng" inputmode="decimal" placeholder="Lng (opt)" />
+              <input id="ci-aurl" placeholder="External link URL (optional)" />
+              <button class="ci-add" id="ci-addbtn">ADD</button>
+            </div>
+            <div class="ci-hint">Coordinates pin the alert on the map (else country centre). Links open in a new tab.</div>
+            <div class="ci-alist" id="ci-alist"></div>
+          </div>
+        </div>
+        <div class="ci-ft">
+          <button class="ci-btn danger" id="ci-delete">DELETE INTEL</button>
+          <div class="ci-grp2">
+            <button class="ci-btn" id="ci-cancel">CANCEL</button>
+            <button class="ci-btn primary" id="ci-save">SAVE &amp; DEPLOY</button>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(ov);
+
+    const $$ = (id) => ov.querySelector(id);
+    /* posture segmented control */
+    const seg = $$("#ci-seg");
+    POSTURE_ORDER.forEach((key) => {
+      const p = POSTURE[key];
+      const b = document.createElement("button");
+      b.textContent = p.label;
+      b.dataset.key = key;
+      seg.appendChild(b);
+    });
+    function paintSeg() {
+      seg.querySelectorAll("button").forEach((b) => {
+        const on = b.dataset.key === curStatus;
+        b.classList.toggle("on", on);
+        b.style.background = on ? POSTURE[b.dataset.key].color : "";
+      });
+    }
+    seg.addEventListener("click", (e) => {
+      const b = e.target.closest("button"); if (!b) return;
+      curStatus = (curStatus === b.dataset.key) ? null : b.dataset.key;
+      paintSeg();
+    });
+    paintSeg();
+
+    /* alerts sub-list */
+    function renderDraftAlerts() {
+      const list = $$("#ci-alist");
+      if (!draftAlerts.length) { list.innerHTML = `<div class="ci-empty">No alerts \u2014 added entries appear in the ALERTS feed.</div>`; return; }
+      list.innerHTML = draftAlerts.map((a, i) => {
+        const s = ALERT_SEV[a.sev] || ALERT_SEV.degraded;
+        const meta = [];
+        if (a.lat != null && a.lng != null) meta.push(`\u25C9 ${(+a.lat).toFixed(3)}, ${(+a.lng).toFixed(3)}`);
+        if (a.url) meta.push(`\u2197 <a href="${escHtml(a.url)}" target="_blank" rel="noopener">${escHtml(a.url.replace(/^https?:\/\//, "").slice(0, 40))}</a>`);
+        return `<div class="ci-aitem sev-${a.sev}">
+           <span class="ci-asev" style="color:${s.color}">${s.short}</span>
+           <span class="ci-abody">
+             <span class="ci-atxt">${escHtml(a.text)}</span>
+             ${meta.length ? `<span class="ci-ameta">${meta.join("")}</span>` : ""}
+           </span>
+           <button class="ci-rm" data-i="${i}" aria-label="Remove">&#x2715;</button>
+         </div>`;
+      }).join("");
+      list.querySelectorAll(".ci-rm").forEach((b) => b.addEventListener("click", () => {
+        draftAlerts.splice(+b.dataset.i, 1); renderDraftAlerts();
+      }));
+    }
+    renderDraftAlerts();
+    function addAlert() {
+      const t = $$("#ci-atext").value.trim(); if (!t) return;
+      const a = { text: t, sev: $$("#ci-asev").value, ts: Date.now() };
+      const latRaw = $$("#ci-alat").value.trim(), lngRaw = $$("#ci-alng").value.trim();
+      const lat = parseFloat(latRaw), lng = parseFloat(lngRaw);
+      if (latRaw !== "" && lngRaw !== "" && isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+        a.lat = lat; a.lng = lng;
+      } else if (latRaw !== "" || lngRaw !== "") {
+        cliPrint("\u2715 alert coords ignored \u2014 need a valid lat (\u00B190) AND lng (\u00B1180).", "warn");
+      }
+      let url = $$("#ci-aurl").value.trim();
+      if (url) { if (!/^https?:\/\//i.test(url)) url = "https://" + url; a.url = url; }
+      draftAlerts.unshift(a);
+      $$("#ci-atext").value = ""; $$("#ci-alat").value = ""; $$("#ci-alng").value = ""; $$("#ci-aurl").value = "";
+      renderDraftAlerts(); $$("#ci-atext").focus();
+    }
+    $$("#ci-addbtn").addEventListener("click", addAlert);
+    $$("#ci-atext").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addAlert(); } });
+    $$("#ci-aurl").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addAlert(); } });
+
+    function close() { ov.remove(); }
+    $$("#ci-close").addEventListener("click", close);
+    $$("#ci-cancel").addEventListener("click", close);
+    ov.addEventListener("mousedown", (e) => { if (e.target === ov) close(); });
+    document.addEventListener("keydown", function esc(e) { if (e.key === "Escape") { close(); document.removeEventListener("keydown", esc); } });
+
+    $$("#ci-delete").addEventListener("click", () => {
+      delete COUNTRY_INTEL[c.iso3];
+      saveCIntel(); renderAlerts();
+      if (countryLayer) { map.removeLayer(countryLayer); countryLayer = null; }
+      close();
+      cliPrint(`\u2713 intel for ${escHtml(c.name)} cleared.`, "warn");
+    });
+
+    $$("#ci-save").addEventListener("click", () => {
+      const draft = {
+        name: c.name, iso2: c.iso2,
+        status: curStatus,
+        summary: $$("#ci-summary").value.trim(),
+        description: $$("#ci-desc").value.trim(),
+        alerts: draftAlerts.slice(),
+        lat: rec.lat, lng: rec.lng
+      };
+      COUNTRY_INTEL[c.iso3] = draft;
+      saveCIntel().then((ok) => {
+        cliPrint(ok ? "  \u2713 written to data/soc_sitrep.json" : "  \u25CB offline \u2014 saved to browser storage (run node server.js to persist to data/).", ok ? "ok" : "warn");
+      });
+      renderAlerts();
+      centroidOf(c.iso3).then((ctr) => { if (ctr) { draft.lat = ctr.lat; draft.lng = ctr.lng; saveCIntel(); renderAlerts(); } });
+      close();
+      const p = curStatus ? POSTURE[curStatus] : null;
+      cliPrint(`\u2713 intel deployed for ${escHtml(c.name)} \u00B7 posture ${p ? p.label : "UNCLASSIFIED"} \u00B7 ${draft.alerts.length} alert(s).`, "ok");
+      showCountryStatus(c);
+    });
+  }
+
   const COMMANDS = {
     help() {
       cliPrint("AVAILABLE COMMANDS", "head");
       const rows = [
         ["help", "list available commands"],
         ["sitrep", "full situational report \u2014 all region statuses"],
-        ["status &lt;code&gt;", "region detail; 'status server' = node server check"],
+        ["status &lt;country&gt;", "country threat posture — zoom + outline border"],
+        ["status -m &lt;country&gt;", "open intel editor (posture · alerts · brief)"],
+        ["status server", "node server reachability check"],
         ["alerts", "list active incidents only"],
         ["intel", "public threat intel \u2014 CVEs \u00B7 C2 \u00B7 IOCs"],
         ["regions", "list all monitored region codes"],
@@ -1949,8 +2383,20 @@ function exportDossier(list) {
       });
     },
     status(arg) {
-      if (!arg) { cliPrint("usage: status &lt;region-code&gt; | status server", "warn"); return; }
-      if (arg.toLowerCase() === "server") {
+      /* parse: optional -m flag + (quoted) country/region query */
+      let edit = false;
+      let q = (arg || "").trim();
+      q = q.replace(/(^|\s)-m(\s|$)/i, () => { edit = true; return " "; }).trim();
+      q = q.replace(/^["'\u201C\u2018]|["'\u201D\u2019]$/g, "").trim();
+
+      if (!q) {
+        cliPrint('usage: status &lt;country&gt;  \u00B7  status -m &lt;country&gt;  (edit intel)', "warn");
+        cliPrint('  e.g. status US  \u00B7  status "United States"  \u00B7  status -m RU', "sys");
+        cliPrint('  also: status server (node check) \u00B7 status &lt;region-code&gt; (azure)', "sys");
+        return;
+      }
+      /* server health check (legacy) */
+      if (!edit && q.toLowerCase() === "server") {
         cliPrint("\u25C6 NODE SERVER REACHABILITY", "head");
         cliPrint("> probing http://localhost:3005/api/health \u2026", "sys");
         const t0 = performance.now();
@@ -1969,20 +2415,33 @@ function exportDossier(list) {
           });
         return;
       }
-      const r = AZURE_REGIONS.find((x) => x.code === arg.toLowerCase() || x.name.toLowerCase() === arg.toLowerCase());
-      if (!r) { cliPrint(`region '${arg}' not found. try 'regions'.`, "err"); return; }
-      const cls = r.status === "outage" ? "err" : r.status === "degraded" ? "warn" : "ok";
-      cliPrint(`\u25C6 ${r.name} [${r.code}]`, "head");
-      cliPrint(`  LOCATION  ${r.geo}`, "sys");
-      cliPrint(`  STATUS    ${r.status.toUpperCase()}`, cls);
-      const d = ALERT_DETAIL[r.code];
-      if (d) {
-        cliPrint(`  INCIDENT  ${d.id} \u00B7 ${d.service}`, "sys");
-        cliPrint(`  SINCE     ${ago(d.since)} ago`, "sys");
-        cliPrint(`  DETAIL    ${d.msg}`, cls);
-      } else {
-        cliPrint("  no active incidents.", "ok");
+      /* legacy: exact Azure region code/name (only when not editing) */
+      const r = AZURE_REGIONS.find((x) => x.code === q.toLowerCase() || x.name.toLowerCase() === q.toLowerCase());
+      if (r && !edit) {
+        const cls = r.status === "outage" ? "err" : r.status === "degraded" ? "warn" : "ok";
+        cliPrint(`\u25C6 ${r.name} [${r.code}]`, "head");
+        cliPrint(`  LOCATION  ${r.geo}`, "sys");
+        cliPrint(`  STATUS    ${r.status.toUpperCase()}`, cls);
+        const d = ALERT_DETAIL[r.code];
+        if (d) {
+          cliPrint(`  INCIDENT  ${d.id} \u00B7 ${d.service}`, "sys");
+          cliPrint(`  SINCE     ${ago(d.since)} ago`, "sys");
+          cliPrint(`  DETAIL    ${d.msg}`, cls);
+        } else {
+          cliPrint("  no active incidents.", "ok");
+        }
+        return;
       }
+
+      /* country threat posture */
+      const country = resolveCountry(q);
+      if (!country) {
+        cliPrint(`\u2715 '${escHtml(q)}' not recognized as a country or region.`, "err");
+        cliPrint('  try an ISO code or name \u2014 e.g. US, RU, CN, "United Kingdom".', "warn");
+        return;
+      }
+      if (edit) openCountryEditor(country);
+      else showCountryStatus(country);
     },
     alerts() {
       const active = AZURE_REGIONS.filter((r) => r.status !== "operational");
@@ -2155,6 +2614,7 @@ function exportDossier(list) {
       acquirePosition();
       updateHUD();
       renderAlerts();
+      loadCIntelRemote();
       renderLegend();
       requestAnimationFrame(sweepLoop);
       refreshAll();

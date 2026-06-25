@@ -23,13 +23,14 @@ When served this way the page detects the API and goes live:
 | Live SolarWinds component status | `GET /api/solarwinds-status` (Atlassian Statuspage v2 JSON API) |
 | Read roster | `GET /api/dossier` |
 | Create / edit / delete (writes the file) | `PUT /api/dossier` → `data/soc_dossier.json` |
+| Read / write country SITREP intel & alerts | `GET` / `PUT /api/sitrep` → `data/soc_sitrep.json` |
 | Address geocoding for map pins | `GET /api/geocode?q=...` (proxies Nominatim) |
 
 The **NEW / EDIT / DELETE** buttons in the Dossier persist straight to `data/soc_dossier.json` through the server. The nav badge reads **AZURE LIVE** when the proxy feed is active, **SIM FEED** when falling back.
 
 ## Views
 - **Status ticker** — scrolling bar beneath the nav showing live operational status of Azure regions and/or SolarWinds Observability components (colored dots + labels). Source, visibility, issues-only filter, and scroll speed are all controlled in Settings. Hover to pause.
-- **SITREP** — dark world map of Azure regions (green / amber / red), radar sweep from your live location that pings each region as the line crosses it. Right-edge **CMD** tab = command line (`help`, `sitrep`, `status <code>`, `alerts`, `scan`, `locate`, `clear`). Left-edge **ALERTS** tab = incident detail.
+- **SITREP** — dark world map of Azure regions (green / amber / red), radar sweep from your live location that pings each region as the line crosses it. Right-edge **CMD** tab = command line (`help`, `sitrep`, `status <country|code>`, `alerts`, `scan`, `locate`, `clear`). `status US` / `status "United States"` zooms + outlines a country's border by threat posture (red = hostile, yellow = watchlist, blue = allied) and prints its intel; `status -m <country>` opens an editor to set posture, write a brief, and log alerts (each with optional coordinates + an external link). Country alerts persist to `data/soc_sitrep.json` (server) or `localStorage` (offline) and appear in the **ALERTS** feed under the **COUNTRY** filter.
 - **DOSSIER** — case files with photo, DOB, sex, race/ethnicity, description, and **relationships** (linked to other subjects; click a name to jump to their file). A subject's **last known location** is clickable → plots a pin on the SITREP map. The roster panel's **WEB VIEW** shows all subjects as draggable cards with connector lines.
 - **SETTINGS** — theme (dark / light, also swaps the map basemap), accent color, ticker source/visibility/speed, radar sweep on-off + speed, auto-refresh interval, and reduce-motion. Saved to `localStorage`.
 - **LOG** — placeholder.

@@ -25,6 +25,7 @@ const PORT = 3005;
 const ROOT = __dirname;
 const DOSSIER_FILE = path.join(ROOT, "data", "soc_dossier.json");
 const FILES_FILE = path.join(ROOT, "data", "soc_files.json");
+const SITREP_FILE = path.join(ROOT, "data", "soc_sitrep.json");
 const IMG_DIR = path.join(ROOT, "assets", "images");
 
 /* Region catalogue — must mirror the codes used in index.html */
@@ -488,6 +489,27 @@ function writeFiles(list) {
   fs.writeFileSync(FILES_FILE, JSON.stringify(list, null, 2));
 }
 
+/* ---------- country SITREP / threat-posture file (soc_sitrep.json) ----------
+   Object keyed by ISO-3 country code; each record holds the posture, brief,
+   and the analyst alert entries (with optional coordinates + external link). */
+function ensureSitrepFile() {
+  try {
+    if (!fs.existsSync(SITREP_FILE)) {
+      fs.mkdirSync(path.dirname(SITREP_FILE), { recursive: true });
+      fs.writeFileSync(SITREP_FILE, "{}");
+    }
+  } catch (e) { console.error("sitrep init:", e.message); }
+}
+function readSitrep() {
+  try {
+    const v = JSON.parse(fs.readFileSync(SITREP_FILE, "utf8"));
+    return (v && typeof v === "object" && !Array.isArray(v)) ? v : {};
+  } catch (e) { return {}; }
+}
+function writeSitrep(obj) {
+  fs.writeFileSync(SITREP_FILE, JSON.stringify(obj, null, 2));
+}
+
 /* ---------- dossier photo storage (assets/images/) ----------
    Persists an uploaded image to disk and returns its relative path so
    the dossier stores a file location instead of a fat base64 blob. */
@@ -615,6 +637,27 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  /* ---------- country SITREP repository (data/soc_sitrep.json) ----------
+     Holds country threat posture + analyst alerts (with coords + links). */
+  if (p === "/api/sitrep" && req.method === "GET") {
+    ensureSitrepFile();
+    return sendJSON(res, 200, readSitrep());
+  }
+  if (p === "/api/sitrep" && req.method === "PUT") {
+    let body = "";
+    req.on("data", (c) => { body += c; if (body.length > 1e7) req.destroy(); });
+    req.on("end", () => {
+      try {
+        const obj = JSON.parse(body);
+        if (!obj || typeof obj !== "object" || Array.isArray(obj)) throw new Error("expected an object");
+        writeSitrep(obj);
+        const alerts = Object.values(obj).reduce((n, r) => n + ((r && r.alerts) ? r.alerts.length : 0), 0);
+        sendJSON(res, 200, { ok: true, countries: Object.keys(obj).length, alerts });
+      } catch (e) { sendJSON(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
   if (p === "/api/geocode" && req.method === "GET") {
     const q = u.searchParams.get("q");
     if (!q) return sendJSON(res, 400, { error: "missing q" });
@@ -654,6 +697,7 @@ const server = http.createServer(async (req, res) => {
 
 ensureDossierFile();
 ensureFilesFile();
+ensureSitrepFile();
 ensureImgDir();
 
 /* Refresh every public infosec feed in the background once per minute so
@@ -669,6 +713,7 @@ server.listen(PORT, "127.0.0.1", () => {
   console.log("  ThreatIntel: GET  /api/threat-intel   (CISA KEV · Feodo C2 · ThreatFox · URLhaus · Tor · OpenSky · auto-refresh 60s)");
   console.log("  Dossier    : GET/PUT /api/dossier  (writes data/soc_dossier.json)");
   console.log("  Log files  : GET/PUT /api/files    (writes data/soc_files.json)");
+  console.log("  Sitrep     : GET/PUT /api/sitrep   (writes data/soc_sitrep.json)");
   console.log("  Photo up   : POST /api/upload-image (writes assets/images/<file>)");
   console.log("  Geocode    : GET  /api/geocode?q=<address>");
   console.log("  Shell      : POST /api/exec   ⚠ runs host commands — loopback only, never expose\n");
