@@ -1828,6 +1828,11 @@ function exportDossier(list) {
     if (m < 60) return m + "m";
     return Math.floor(m / 60) + "h " + (m % 60) + "m";
   }
+  function fmtStamp(ts) {
+    if (!ts) return "\u2014";
+    const d = new Date(ts);
+    return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "2-digit" }) + " " + d.toTimeString().slice(0, 5);
+  }
 
   function updateHUD() {
     const c = statusCounts();
@@ -2276,6 +2281,8 @@ function exportDossier(list) {
       cliPrint(`  BRIEF`, "sys");
       wrapText(rec.description, 62).forEach((l) => cliPrint("    " + escHtml(l), "sys"));
     }
+    if (rec && rec.atWar && rec.atWar.length) cliPrint(`  AT WAR    ${escHtml(rec.atWar.join(", "))}`, "err");
+    if (rec && rec.allies && rec.allies.length) cliPrint(`  ALLIES    ${escHtml(rec.allies.join(", "))}`, "ok");
     const alerts = (rec && rec.alerts) || [];
     if (alerts.length) {
       cliPrint("\u2014".repeat(40), "sys");
@@ -2284,6 +2291,9 @@ function exportDossier(list) {
         const s = ALERT_SEV[a.sev] || ALERT_SEV.degraded;
         const cls = a.sev === "outage" ? "err" : a.sev === "info" ? "ok" : "warn";
         cliPrint(`  ${s.glyph} <span style="color:${s.color}">[${s.short}]</span> ${escHtml(a.text)} <span style="color:var(--txt-dim)">\u00B7 ${ago(a.ts)} ago</span>`, cls);
+        const dt = ["added " + fmtStamp(a.ts)];
+        if (a.modified) dt.push("modified " + fmtStamp(a.modified));
+        cliPrint(`      <span style="color:var(--txt-dim)">${escHtml(dt.join("  \u00B7  "))}</span>`, "sys");
         const bits = [];
         if (a.lat != null && a.lng != null) bits.push(`\u25C9 ${(+a.lat).toFixed(3)}, ${(+a.lng).toFixed(3)}`);
         if (a.url) bits.push(`\u2197 <a href="${escHtml(a.url)}" target="_blank" rel="noopener" style="color:var(--accent)">${escHtml(a.url.replace(/^https?:\/\//, "").slice(0, 42))}</a>`);
@@ -2349,6 +2359,27 @@ function exportDossier(list) {
       #cintel-panel .ci-btn.danger:hover { color: #fff; background: var(--out); }
       #cintel-panel .ci-btn.primary { background: var(--accent); color: #0a0608; border-color: var(--accent); font-weight: 700; }
       #cintel-panel .ci-grp2 { display: flex; gap: 10px; }
+      #cintel-panel .ci-grp2 > div { flex: 1; min-width: 0; }
+      #cintel-panel .ci-sublbl { font-size: 8px; letter-spacing: 1.5px; color: var(--txt-dim); margin-bottom: 5px; }
+      #cintel-panel .ci-tagbox { background: var(--bg-2); border: 1px solid var(--line-soft); padding: 7px 8px; min-height: 42px; display: flex; flex-direction: column; gap: 6px; }
+      #cintel-panel .ci-tagbox:focus-within { border-color: var(--accent); }
+      #cintel-panel .ci-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+      #cintel-panel .ci-chips:empty { display: none; }
+      #cintel-panel .ci-chip { display: inline-flex; align-items: center; gap: 5px; background: var(--bg-1); border: 1px solid var(--line-soft); color: var(--txt); font-size: 10px; letter-spacing: .5px; padding: 3px 4px 3px 8px; }
+      #cintel-panel .ci-chip button { background: none; border: none; color: var(--txt-mut); cursor: pointer; font-size: 12px; line-height: 1; padding: 0 1px; }
+      #cintel-panel .ci-chip button:hover { color: var(--out); }
+      #cintel-panel .ci-tagwrap { position: relative; }
+      #cintel-panel .ci-tagwrap input { width: 100%; background: none; border: none; padding: 3px 2px; font-size: 12px; }
+      #cintel-panel .ci-tagwrap input:focus { outline: none; border: none; }
+      #cintel-panel .ci-ac { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 10; background: var(--bg-1); border: 1px solid var(--line); max-height: 168px; overflow-y: auto; display: none; box-shadow: 0 12px 30px rgba(0,0,0,.6); }
+      #cintel-panel .ci-ac.open { display: block; }
+      #cintel-panel .ci-acrow { padding: 7px 10px; font-size: 11px; color: var(--txt); cursor: pointer; display: flex; justify-content: space-between; gap: 10px; }
+      #cintel-panel .ci-acrow .ci-acode { color: var(--txt-dim); font-size: 9px; letter-spacing: 1px; }
+      #cintel-panel .ci-acrow:hover, #cintel-panel .ci-acrow.sel { background: var(--accent); color: #0a0608; }
+      #cintel-panel .ci-acrow:hover .ci-acode, #cintel-panel .ci-acrow.sel .ci-acode { color: #0a0608; }
+      #cintel-panel .ci-aitem .ci-edit { cursor: pointer; color: var(--txt-mut); background: none; border: none; font-size: 12px; flex-shrink: 0; padding: 0; }
+      #cintel-panel .ci-aitem .ci-edit:hover { color: var(--accent); }
+      #cintel-panel .ci-aitem.editing { outline: 1px solid var(--accent); outline-offset: -1px; }
     `;
     document.head.appendChild(s);
   }
@@ -2359,7 +2390,10 @@ function exportDossier(list) {
     if (existing) existing.remove();
     const rec = COUNTRY_INTEL[c.iso3] || {};
     let curStatus = rec.status || null;
-    let draftAlerts = (rec.alerts || []).map((a) => ({ text: a.text, sev: a.sev || "degraded", ts: a.ts || Date.now(), lat: a.lat, lng: a.lng, url: a.url || "" }));
+    let draftAlerts = (rec.alerts || []).map((a) => ({ text: a.text, sev: a.sev || "degraded", ts: a.ts || Date.now(), modified: a.modified || null, lat: a.lat, lng: a.lng, url: a.url || "" }));
+    let draftWar = (rec.atWar || []).slice();
+    let draftAllies = (rec.allies || []).slice();
+    let editIdx = -1;
 
     const ov = document.createElement("div");
     ov.id = "cintel-ov";
@@ -2381,6 +2415,32 @@ function exportDossier(list) {
           <div>
             <div class="ci-lbl">ANALYST BRIEF / DESCRIPTION</div>
             <textarea id="ci-desc" placeholder="Background, capabilities, known actors, recent activity\u2026">${escHtml(rec.description || "")}</textarea>
+          </div>
+          <div>
+            <div class="ci-lbl">DIPLOMACY</div>
+            <div class="ci-grp2">
+              <div>
+                <div class="ci-sublbl">AT WAR</div>
+                <div class="ci-tagbox">
+                  <div class="ci-chips" id="ci-warchips"></div>
+                  <div class="ci-tagwrap">
+                    <input id="ci-warinput" autocomplete="off" placeholder="Type a country\u2026" />
+                    <div class="ci-ac" id="ci-warac"></div>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <div class="ci-sublbl">ALLIES</div>
+                <div class="ci-tagbox">
+                  <div class="ci-chips" id="ci-allychips"></div>
+                  <div class="ci-tagwrap">
+                    <input id="ci-allyinput" autocomplete="off" placeholder="Type a country\u2026" />
+                    <div class="ci-ac" id="ci-allyac"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="ci-hint">Type a country name and pick from the list (or press Enter).</div>
           </div>
           <div>
             <div class="ci-lbl">ADD ALERT TO FEED</div>
@@ -2444,41 +2504,128 @@ function exportDossier(list) {
       list.innerHTML = draftAlerts.map((a, i) => {
         const s = ALERT_SEV[a.sev] || ALERT_SEV.degraded;
         const meta = [];
-        if (a.lat != null && a.lng != null) meta.push(`\u25C9 ${(+a.lat).toFixed(3)}, ${(+a.lng).toFixed(3)}`);
-        if (a.url) meta.push(`\u2197 <a href="${escHtml(a.url)}" target="_blank" rel="noopener">${escHtml(a.url.replace(/^https?:\/\//, "").slice(0, 40))}</a>`);
-        return `<div class="ci-aitem sev-${a.sev}">
+        meta.push(`<span>ADDED ${escHtml(fmtStamp(a.ts))}</span>`);
+        if (a.modified) meta.push(`<span>MODIFIED ${escHtml(fmtStamp(a.modified))}</span>`);
+        if (a.lat != null && a.lng != null) meta.push(`<span>\u25C9 ${(+a.lat).toFixed(3)}, ${(+a.lng).toFixed(3)}</span>`);
+        if (a.url) meta.push(`<span>\u2197 <a href="${escHtml(a.url)}" target="_blank" rel="noopener">${escHtml(a.url.replace(/^https?:\/\//, "").slice(0, 40))}</a></span>`);
+        return `<div class="ci-aitem sev-${a.sev}${editIdx === i ? " editing" : ""}">
            <span class="ci-asev" style="color:${s.color}">${s.short}</span>
            <span class="ci-abody">
              <span class="ci-atxt">${escHtml(a.text)}</span>
-             ${meta.length ? `<span class="ci-ameta">${meta.join("")}</span>` : ""}
+             <span class="ci-ameta">${meta.join("")}</span>
            </span>
-           <button class="ci-rm" data-i="${i}" aria-label="Remove">&#x2715;</button>
+           <button class="ci-edit" data-i="${i}" aria-label="Edit" title="Edit alert">&#x270E;</button>
+           <button class="ci-rm" data-i="${i}" aria-label="Remove" title="Remove alert">&#x2715;</button>
          </div>`;
       }).join("");
+      list.querySelectorAll(".ci-edit").forEach((b) => b.addEventListener("click", () => startEdit(+b.dataset.i)));
       list.querySelectorAll(".ci-rm").forEach((b) => b.addEventListener("click", () => {
-        draftAlerts.splice(+b.dataset.i, 1); renderDraftAlerts();
+        const i = +b.dataset.i;
+        draftAlerts.splice(i, 1);
+        if (editIdx === i) cancelEdit();
+        else if (editIdx > i) editIdx -= 1;
+        renderDraftAlerts();
       }));
     }
     renderDraftAlerts();
-    function addAlert() {
-      const t = $$("#ci-atext").value.trim(); if (!t) return;
-      const a = { text: t, sev: $$("#ci-asev").value, ts: Date.now() };
+    function clearAlertForm() {
+      $$("#ci-atext").value = ""; $$("#ci-alat").value = ""; $$("#ci-alng").value = ""; $$("#ci-aurl").value = "";
+    }
+    function startEdit(i) {
+      const a = draftAlerts[i]; if (!a) return;
+      editIdx = i;
+      $$("#ci-asev").value = a.sev || "degraded";
+      $$("#ci-atext").value = a.text || "";
+      $$("#ci-alat").value = (a.lat != null ? a.lat : "");
+      $$("#ci-alng").value = (a.lng != null ? a.lng : "");
+      $$("#ci-aurl").value = a.url || "";
+      $$("#ci-addbtn").textContent = "SAVE";
+      renderDraftAlerts();
+      $$("#ci-atext").focus();
+    }
+    function cancelEdit() {
+      editIdx = -1;
+      $$("#ci-addbtn").textContent = "ADD";
+      clearAlertForm();
+    }
+    function readCoords() {
       const latRaw = $$("#ci-alat").value.trim(), lngRaw = $$("#ci-alng").value.trim();
       const lat = parseFloat(latRaw), lng = parseFloat(lngRaw);
       if (latRaw !== "" && lngRaw !== "" && isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
-        a.lat = lat; a.lng = lng;
-      } else if (latRaw !== "" || lngRaw !== "") {
+        return { lat, lng };
+      }
+      if (latRaw !== "" || lngRaw !== "") {
         cliPrint("\u2715 alert coords ignored \u2014 need a valid lat (\u00B190) AND lng (\u00B1180).", "warn");
       }
+      return null;
+    }
+    function addAlert() {
+      const t = $$("#ci-atext").value.trim(); if (!t) return;
+      const sev = $$("#ci-asev").value;
+      const coords = readCoords();
       let url = $$("#ci-aurl").value.trim();
-      if (url) { if (!/^https?:\/\//i.test(url)) url = "https://" + url; a.url = url; }
-      draftAlerts.unshift(a);
-      $$("#ci-atext").value = ""; $$("#ci-alat").value = ""; $$("#ci-alng").value = ""; $$("#ci-aurl").value = "";
+      if (url && !/^https?:\/\//i.test(url)) url = "https://" + url;
+      if (editIdx >= 0 && draftAlerts[editIdx]) {
+        const a = draftAlerts[editIdx];
+        a.text = t; a.sev = sev; a.url = url || "";
+        if (coords) { a.lat = coords.lat; a.lng = coords.lng; } else { delete a.lat; delete a.lng; }
+        a.modified = Date.now();
+        cancelEdit();
+      } else {
+        const a = { text: t, sev: sev, ts: Date.now(), modified: null };
+        if (coords) { a.lat = coords.lat; a.lng = coords.lng; }
+        if (url) a.url = url;
+        draftAlerts.unshift(a);
+        clearAlertForm();
+      }
       renderDraftAlerts(); $$("#ci-atext").focus();
     }
     $$("#ci-addbtn").addEventListener("click", addAlert);
     $$("#ci-atext").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addAlert(); } });
     $$("#ci-aurl").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addAlert(); } });
+
+    /* diplomacy: country-name tag inputs with autocomplete */
+    function setupTagInput(inputId, acId, chipsId, list) {
+      const input = $$("#" + inputId), ac = $$("#" + acId), chips = $$("#" + chipsId);
+      let matches = [], sel = -1;
+      function renderChips() {
+        chips.innerHTML = list.map((n, i) => `<span class="ci-chip">${escHtml(n)}<button type="button" data-i="${i}" aria-label="Remove">&#x2715;</button></span>`).join("");
+        chips.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { list.splice(+b.dataset.i, 1); renderChips(); }));
+      }
+      function closeAc() { ac.classList.remove("open"); ac.innerHTML = ""; matches = []; sel = -1; }
+      function paintSel() { ac.querySelectorAll(".ci-acrow").forEach((r, i) => r.classList.toggle("sel", i === sel)); }
+      function add(name) {
+        if (name && !list.some((n) => n.toLowerCase() === name.toLowerCase())) { list.push(name); renderChips(); }
+        input.value = ""; closeAc(); input.focus();
+      }
+      function renderAc() {
+        const q = input.value.trim().toLowerCase();
+        if (!q) { closeAc(); return; }
+        matches = COUNTRY_DB
+          .filter((r) => r[2].toLowerCase().includes(q) || r[0].toLowerCase() === q || r[1].toLowerCase() === q)
+          .filter((r) => !list.some((n) => n.toLowerCase() === r[2].toLowerCase()))
+          .slice(0, 8);
+        if (!matches.length) { closeAc(); return; }
+        sel = 0;
+        ac.innerHTML = matches.map((r, i) => `<div class="ci-acrow${i === 0 ? " sel" : ""}" data-i="${i}"><span>${escHtml(r[2])}</span><span class="ci-acode">${r[1]}</span></div>`).join("");
+        ac.classList.add("open");
+        ac.querySelectorAll(".ci-acrow").forEach((row) => row.addEventListener("mousedown", (e) => { e.preventDefault(); add(matches[+row.dataset.i][2]); }));
+      }
+      input.addEventListener("input", renderAc);
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowDown" && matches.length) { e.preventDefault(); sel = Math.min(sel + 1, matches.length - 1); paintSel(); }
+        else if (e.key === "ArrowUp" && matches.length) { e.preventDefault(); sel = Math.max(sel - 1, 0); paintSel(); }
+        else if (e.key === "Enter") {
+          e.preventDefault();
+          if (matches.length && sel >= 0) add(matches[sel][2]);
+          else { const r = resolveCountry(input.value.trim()); if (r) add(r.name); else input.value = ""; }
+        } else if (e.key === "Escape" && ac.classList.contains("open")) { e.stopPropagation(); closeAc(); }
+      });
+      input.addEventListener("blur", () => setTimeout(closeAc, 130));
+      renderChips();
+    }
+    setupTagInput("ci-warinput", "ci-warac", "ci-warchips", draftWar);
+    setupTagInput("ci-allyinput", "ci-allyac", "ci-allychips", draftAllies);
 
     /* long-press drop: auto-populate the coordinates and focus the entry */
     if (prefill && isFinite(prefill.lat) && isFinite(prefill.lng)) {
@@ -2507,6 +2654,8 @@ function exportDossier(list) {
         status: curStatus,
         summary: $$("#ci-summary").value.trim(),
         description: $$("#ci-desc").value.trim(),
+        atWar: draftWar.slice(),
+        allies: draftAllies.slice(),
         alerts: draftAlerts.slice(),
         lat: rec.lat, lng: rec.lng
       };
@@ -2523,29 +2672,65 @@ function exportDossier(list) {
     });
   }
 
+  function sitrep24h() {
+    const now = Date.now();
+    const DAY = 24 * 60 * 60 * 1000;
+    const rows = [];
+    Object.keys(COUNTRY_INTEL).forEach((iso3) => {
+      const rec = COUNTRY_INTEL[iso3];
+      (rec.alerts || []).forEach((a) => {
+        const created = a.ts || 0;
+        const mod = a.modified || 0;
+        const newRecent = created && (now - created) <= DAY;
+        const modRecent = mod && (now - mod) <= DAY;
+        if (newRecent || modRecent) rows.push({ rec, a, when: Math.max(created, mod), isMod: modRecent && !newRecent });
+      });
+    });
+    cliPrint("\u25C6 SITREP // COUNTRY ALERTS \u2014 LAST 24H", "head");
+    if (!rows.length) { cliPrint("  \u2713 no country alerts created or modified in the last 24 hours.", "ok"); return; }
+    cliPrint(`  ${rows.length} ALERT(S) \u00B7 SYNCED ${fmtTime()}`, "sys");
+    cliPrint("\u2014".repeat(40), "sys");
+    rows.sort((x, y) => y.when - x.when).forEach(({ rec, a, isMod }) => {
+      const s = ALERT_SEV[a.sev] || ALERT_SEV.degraded;
+      const cls = a.sev === "outage" ? "err" : a.sev === "info" ? "ok" : "warn";
+      const tag = isMod ? "MOD" : "NEW";
+      cliPrint(`  ${s.glyph} <span style="color:${s.color}">[${s.short}]</span> <span style="color:var(--txt-dim)">${tag}</span> ${escHtml(rec.name || "?")} \u2014 ${escHtml(a.text)}`, cls);
+      cliPrint(`      <span style="color:var(--txt-dim)">${escHtml(isMod ? "modified " + fmtStamp(a.modified) : "added " + fmtStamp(a.ts))}</span>`, "sys");
+    });
+  }
+
   const COMMANDS = {
     help() {
       cliPrint("AVAILABLE COMMANDS", "head");
       const rows = [
-        ["help", "list available commands"],
-        ["sitrep", "full situational report \u2014 all region statuses"],
-        ["status &lt;country&gt;", "country threat posture — zoom + outline border"],
-        ["status -m &lt;country&gt;", "open intel editor (posture · alerts · brief)"],
-        ["status server", "node server reachability check"],
         ["alerts", "list active incidents only"],
-        ["intel", "public threat intel \u2014 CVEs \u00B7 C2 \u00B7 IOCs"],
-        ["regions", "list all monitored region codes"],
-        ["scan", "force re-sync of the status feed"],
-        ["locate &lt;keyword&gt;", "find &amp; plot matching dossier subjects on the map"],
+        ["clear", "clear the console"],
         ["flight &lt;code&gt;", "locate a live aircraft by call sign on the map"],
+        ["help", "list available commands"],
+        ["intel", "public threat intel \u2014 CVEs \u00B7 C2 \u00B7 IOCs"],
         ["localhost", "open a live shell on the host running the server"],
-        ["clear", "clear the console"]
+        ["locate &lt;keyword&gt;", "find &amp; plot matching dossier subjects on the map"],
+        ["scan", "force re-sync of the status feed"],
+        ["server", "full situational report \u2014 azure + solarwinds status"],
+        ["server -h", "node server reachability check"],
+        ["sitrep", "country alerts created/modified in the last 24h"],
+        ["sitrep &lt;country&gt;", "country threat posture \u2014 zoom + outline border"],
+        ["sitrep -m &lt;country&gt;", "open intel editor (posture \u00B7 diplomacy \u00B7 alerts)"],
+        ["status &lt;country&gt;", "country threat posture (alias of sitrep)"],
+        ["status -m &lt;country&gt;", "open intel editor"]
       ];
-      rows.forEach(([c, d]) => cliPrint(`  <span style="color:var(--accent)">${c.padEnd(16)}</span> ${d}`, "sys"));
+      rows.sort((a, b) => a[0].replace(/&[a-z]+;/g, "<").localeCompare(b[0].replace(/&[a-z]+;/g, "<")));
+      rows.forEach(([c, d]) => {
+        const disp = c.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+        const pad = " ".repeat(Math.max(1, 22 - disp.length));
+        cliPrint(`  <span style="color:var(--accent)">${c}</span>${pad}${d}`, "sys");
+      });
     },
-    sitrep() {
+    server(arg) {
+      const q = (arg || "").trim().toLowerCase();
+      if (q === "-h" || q === "--help") { COMMANDS.status("server"); return; }
       const c = statusCounts();
-      cliPrint("\u25C6 SITREP // AZURE THREAT LANDSCAPE", "head");
+      cliPrint("\u25C6 SERVER // AZURE THREAT LANDSCAPE", "head");
       cliPrint(`  SYNCED ${fmtTime()} \u00B7 ${AZURE_REGIONS.length} REGIONS MONITORED`, "sys");
       cliPrint(`  OPERATIONAL ${c.operational}   DEGRADED ${c.degraded}   OUTAGE ${c.outage}`, "sys");
       cliPrint("\u2014".repeat(40), "sys");
@@ -2573,6 +2758,11 @@ function exportDossier(list) {
           cliPrint(`  ${dot} ${c.name.padEnd(28)} ${st.toUpperCase()}`, cls);
         });
       });
+    },
+    sitrep(arg) {
+      const q = (arg || "").trim();
+      if (!q) { sitrep24h(); return; }
+      COMMANDS.status(arg);
     },
     status(arg) {
       /* parse: optional -m flag + (quoted) country/region query */
@@ -2665,13 +2855,6 @@ function exportDossier(list) {
           cliPrint(`  ${it.sev === "outage" ? "\u2715" : "\u25B2"} ${(it.title || "").slice(0, 26).padEnd(27)} ${(it.sub || "").slice(0, 26)}${geo}`, cls);
         });
       });
-    },
-    regions() {
-      cliPrint("MONITORED REGIONS", "head");
-      const codes = AZURE_REGIONS.map((r) => r.code);
-      for (let i = 0; i < codes.length; i += 3) {
-        cliPrint("  " + codes.slice(i, i + 3).map((c) => c.padEnd(18)).join(""), "sys");
-      }
     },
     scan() {
       cliPrint("> initiating telemetry re-sync\u2026", "sys");
