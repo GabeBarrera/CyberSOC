@@ -52,6 +52,7 @@ Open it from the right-edge **CMD** tab on the SITREP view. Commands are single 
 | `sitrep` | List every country alert created or modified in the last 24h. |
 | `sitrep <country>` | Zoom + outline a country's border by threat posture and print its intel. Accepts ISO codes or names — e.g. `sitrep US`, `sitrep "United Kingdom"`. |
 | `sitrep -m <country>` | Open the intel editor (posture · diplomacy · brief · alerts). |
+| `sitrep -d <country>` | Diplomatic map — highlights the country's allies (blue) and adversaries (red) from its logged diplomacy, with a best-fit zoom across all of them. |
 | `sitrep -s` | Force a re-sync of the status feed. |
 | `sitrep -h` | Show the `sitrep` flag/parameter reference. |
 | `locate <keyword>` | Search the dossier (name, alias, city, affiliation…) and plot matching subjects' last-known locations on the map. With no keyword, prints the operator's current position. |

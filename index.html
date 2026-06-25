@@ -2246,10 +2246,18 @@ function exportDossier(list) {
   }
 
   let countryLayer = null;
+  let diplomacyLayers = [];
+  /* remove the active country outline + any diplomacy highlights */
+  function clearCountryHighlights() {
+    if (countryLayer && map) { try { map.removeLayer(countryLayer); } catch (e) {} }
+    countryLayer = null;
+    if (map) diplomacyLayers.forEach((l) => { try { map.removeLayer(l); } catch (e) {} });
+    diplomacyLayers = [];
+  }
   /* outline a country's border + best-fit zoom; resolves to its center latlng */
   function outlineCountry(iso3, postureKey) {
     return ensureGeo().then((feat) => {
-      if (countryLayer) { map.removeLayer(countryLayer); countryLayer = null; }
+      clearCountryHighlights();
       const f = feat[iso3];
       if (!f) return null;
       const p = POSTURE[postureKey] || { color: "#aab0bb" };
@@ -2269,6 +2277,51 @@ function exportDossier(list) {
     });
   }
 
+  /* highlight a country plus its allies (blue) and adversaries (red), best-fit zoom */
+  function highlightDiplomacy(c, allies, atWar) {
+    return ensureGeo().then((feat) => {
+      clearCountryHighlights();
+      if (!feat[c.iso3]) return null;
+      const postureKey = (COUNTRY_INTEL[c.iso3] || {}).status || null;
+      const selColor = postureKey && POSTURE[postureKey] ? POSTURE[postureKey].color : "#aab0bb";
+      const layers = [];
+      const addLayer = (iso3, color, weight, fill) => {
+        if (!feat[iso3]) return false;
+        const lyr = L.geoJSON(feat[iso3], { style: { color: color, weight: weight, opacity: 1, fillColor: color, fillOpacity: fill, className: "country-outline" } }).addTo(map);
+        diplomacyLayers.push(lyr); layers.push(lyr); return true;
+      };
+      addLayer(c.iso3, selColor, 3, 0.12);
+      const toIso = (name) => { const r = resolveCountry(name); return r ? r.iso3 : null; };
+      const unresolved = [];
+      let allyCount = 0, warCount = 0;
+      atWar.forEach((n) => { const iso = toIso(n); if (iso && iso !== c.iso3 && addLayer(iso, POSTURE.hostile.color, 2, 0.10)) warCount++; else unresolved.push(n); });
+      allies.forEach((n) => { const iso = toIso(n); if (iso && iso !== c.iso3 && addLayer(iso, POSTURE.friendly.color, 2, 0.10)) allyCount++; else unresolved.push(n); });
+      const b = L.featureGroup(layers).getBounds();
+      const hasOthers = (allies.length + atWar.length) > 0;
+      if (hasOthers) map.flyToBounds(b, { padding: [70, 70], duration: 1.2 });
+      else map.flyToBounds(b, { padding: [70, 70], maxZoom: 6, duration: 1.2 });
+      return { allyCount, warCount, unresolved };
+    });
+  }
+
+  /* sitrep -d : diplomatic map of a country's allies & adversaries */
+  function showCountryDiplomacy(c) {
+    const rec = COUNTRY_INTEL[c.iso3];
+    const allies = (rec && rec.allies) || [];
+    const atWar = (rec && rec.atWar) || [];
+    cliPrint(`\u25C6 ${escHtml(c.name.toUpperCase())} [${c.iso3} \u00B7 ${c.iso2}] \u2014 DIPLOMATIC MAP`, "head");
+    if (atWar.length) cliPrint(`  AT WAR    <span style="color:${POSTURE.hostile.color}">${escHtml(atWar.join(", "))}</span>`, "err");
+    if (allies.length) cliPrint(`  ALLIES    <span style="color:${POSTURE.friendly.color}">${escHtml(allies.join(", "))}</span>`, "sys");
+    if (!allies.length && !atWar.length) cliPrint("  no diplomacy on file \u2014 log allies / adversaries via 'sitrep -m " + escHtml(c.iso2) + "'.", "warn");
+    if (!map) return;
+    highlightDiplomacy(c, allies, atWar).then((res) => {
+      if (res === null) { cliPrint(`  (no map boundary available for ${c.iso3})`, "warn"); return; }
+      if (res.unresolved.length) cliPrint(`  \u26A0 unmapped: ${escHtml(res.unresolved.join(", "))}`, "warn");
+      if (allies.length || atWar.length)
+        cliPrint(`  highlighted <span style="color:${POSTURE.hostile.color}">${res.warCount} adversar${res.warCount === 1 ? "y" : "ies"}</span> \u00B7 <span style="color:${POSTURE.friendly.color}">${res.allyCount} all${res.allyCount === 1 ? "y" : "ies"}</span>`, "sys");
+    });
+  }
+
   function showCountryStatus(c) {
     const rec = COUNTRY_INTEL[c.iso3];
     const postureKey = rec && rec.status ? rec.status : null;
@@ -2282,7 +2335,7 @@ function exportDossier(list) {
       wrapText(rec.description, 62).forEach((l) => cliPrint("    " + escHtml(l), "sys"));
     }
     if (rec && rec.atWar && rec.atWar.length) cliPrint(`  AT WAR    ${escHtml(rec.atWar.join(", "))}`, "err");
-    if (rec && rec.allies && rec.allies.length) cliPrint(`  ALLIES    ${escHtml(rec.allies.join(", "))}`, "ok");
+    if (rec && rec.allies && rec.allies.length) cliPrint(`  ALLIES    <span style="color:${POSTURE.friendly.color}">${escHtml(rec.allies.join(", "))}</span>`, "sys");
     const alerts = (rec && rec.alerts) || [];
     if (alerts.length) {
       cliPrint("\u2014".repeat(40), "sys");
@@ -2643,7 +2696,7 @@ function exportDossier(list) {
     $$("#ci-delete").addEventListener("click", () => {
       delete COUNTRY_INTEL[c.iso3];
       saveCIntel(); renderAlerts();
-      if (countryLayer) { map.removeLayer(countryLayer); countryLayer = null; }
+      clearCountryHighlights();
       close();
       cliPrint(`\u2713 intel for ${escHtml(c.name)} cleared.`, "warn");
     });
@@ -2757,6 +2810,22 @@ function exportDossier(list) {
     else showCountryStatus(country);
   }
 
+  function sitrepDiplomacy(q) {
+    q = (q || "").replace(/^["'\u201C\u2018]|["'\u201D\u2019]$/g, "").trim();
+    if (!q) {
+      cliPrint('usage: sitrep -d &lt;country&gt;  \u2014 map allies (blue) &amp; adversaries (red)', "warn");
+      cliPrint('  e.g. sitrep -d US  \u00B7  sitrep -d "United Kingdom"', "sys");
+      return;
+    }
+    const country = resolveCountry(q);
+    if (!country) {
+      cliPrint(`\u2715 '${escHtml(q)}' not recognized as a country or region.`, "err");
+      cliPrint('  try an ISO code or name \u2014 e.g. US, RU, CN, "United Kingdom".', "warn");
+      return;
+    }
+    showCountryDiplomacy(country);
+  }
+
   function locateFlight(arg) {
     const air = (THREAT_FEED.items || []).filter((it) => it.cat === "AIR");
     const tele = (m) => escHtml((m || "").replace("Live aircraft \u00B7 ", ""));
@@ -2867,11 +2936,14 @@ function exportDossier(list) {
           ["sitrep", "country alerts created/modified in the last 24h"],
           ["sitrep &lt;country&gt;", "country threat posture \u2014 zoom + outline border"],
           ["sitrep -m &lt;country&gt;", "open intel editor (posture \u00B7 diplomacy \u00B7 alerts)"],
+          ["sitrep -d &lt;country&gt;", "diplomatic map \u2014 allies (blue) &amp; adversaries (red)"],
           ["sitrep -s", "force a re-sync of the status feed"]
         ]);
         return;
       }
       if (/^-s$/i.test(raw)) { resyncFeed(); return; }
+      const dm = raw.match(/^-d\b\s*(.*)$/i);
+      if (dm) { sitrepDiplomacy(dm[1].trim()); return; }
       if (!raw) { sitrep24h(); return; }
       sitrepCountry(arg);
     },
@@ -2956,7 +3028,11 @@ function exportDossier(list) {
       cliPrint("  every line you enter now executes on the host. type 'exit' to disconnect.", "warn");
       cliPrint("  (requires the local Node server \u2014 node server.js)", "sys");
     },
-    clear() { $("#cli-out").innerHTML = ""; }
+    clear() {
+      $("#cli-out").innerHTML = "";
+      clearCountryHighlights();
+      if (map) map.flyTo([30, 5], 2, { duration: 1.0 });
+    }
   };
 
   function runCommand(raw) {
