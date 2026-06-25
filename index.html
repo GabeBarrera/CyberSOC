@@ -358,14 +358,23 @@ body { position: relative; }
 .ca-pin.sev-unconf   { border-color: #9b6dff; background: rgba(155,109,255,.36); box-shadow: 0 0 9px rgba(155,109,255,.62); }
 .ca-pin.sev-info     { border-color: #4ea3ff; background: rgba(78,163,255,.36); box-shadow: 0 0 9px rgba(78,163,255,.62); }
 
-/* hover highlight square around any map pinpoint */
+/* hover highlight square + crosshair around any map pinpoint */
 .pin-wrap { position: relative; width: 14px; height: 14px; display: flex; align-items: center; justify-content: center; }
+.pin-wrap::before {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 8000px; height: 8000px;
+  transform: translate(-50%, -50%); pointer-events: none;
+  opacity: 0; transition: opacity .12s ease;
+  background:
+    linear-gradient(to right, var(--accent) calc(50% - 15px), transparent calc(50% - 15px), transparent calc(50% + 15px), var(--accent) calc(50% + 15px)) center center / 100% 1px no-repeat,
+    linear-gradient(to bottom, var(--accent) calc(50% - 15px), transparent calc(50% - 15px), transparent calc(50% + 15px), var(--accent) calc(50% + 15px)) center center / 1px 100% no-repeat;
+}
 .pin-wrap::after {
   content: ""; position: absolute; left: 50%; top: 50%; width: 28px; height: 28px;
   transform: translate(-50%, -50%); border: 1px solid var(--accent);
   box-shadow: 0 0 10px var(--accent-glow), inset 0 0 6px var(--accent-glow);
   opacity: 0; transition: opacity .12s ease; pointer-events: none;
 }
+.pin-wrap:hover::before,
 .pin-wrap:hover::after { opacity: 1; }
 
 /* themed arrow cursor (flips with light/dark theme) */
@@ -1982,6 +1991,7 @@ function exportDossier(list) {
       const color = palette[it.cat] || "var(--accent)";
       const loc = it.city ? (it.city + (it.geo ? ", " + it.geo : "")) : (it.geo || "");
       return L.marker([it.lat, it.lng], { icon, keyboard: false })
+        .on("click", () => { if (map) map.flyTo([it.lat, it.lng], Math.min(map.getZoom() + 2, map.getMaxZoom()), { duration: 1.0 }); })
         .bindPopup(`<div class="rp-name">${escA(it.title)}</div>
                     <div class="rp-meta">${escA((it.sub || "").slice(0, 54))}${loc ? " \u00B7 " + escA(loc) : ""}</div>
                     <div class="rp-status" style="color:${color}">${escA(it.cat)} \u00B7 ${escA(it.src || "")}</div>`,
@@ -2011,6 +2021,7 @@ function exportDossier(list) {
           iconSize: [14, 14], iconAnchor: [7, 7]
         });
         layers.push(L.marker([lat, lng], { icon, keyboard: false })
+          .on("click", () => { if (map) map.flyTo([lat, lng], Math.min(map.getZoom() + 2, map.getMaxZoom()), { duration: 1.0 }); })
           .bindPopup(`<div class="rp-name">${escA(rec.name || iso3)}</div>
                       <div class="rp-meta">${escA((a.text || "").slice(0, 80))}</div>
                       <div class="rp-status" style="color:${s.color}">${s.label} \u00B7 SOC ANALYST</div>`,
