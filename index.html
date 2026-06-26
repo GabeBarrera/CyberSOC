@@ -137,6 +137,9 @@ body { position: relative; }
 .ns-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--op); box-shadow: 0 0 8px var(--op); }
 .ns-live { animation: blink 2.4s infinite; }
 @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:.35;} }
+@keyframes offlinePulse { 0%,100%{opacity:1;} 50%{opacity:.3;} }
+#offline-badge.is-offline { display:flex !important; opacity:1 !important; transform:translateX(-50%) translateY(0) !important; }
+:root.reduce-motion #offline-badge span:first-child { animation: none !important; }
 #nav-clock { color: var(--txt); }
 
 /* ===================== VIEWS ===================== */
@@ -249,6 +252,9 @@ body { position: relative; }
   100% { opacity: 0;  transform: translate(-50%,-50%) rotate(45deg) scale(7); }
 }
 .region-popup .leaflet-popup-content-wrapper { background: #100b0f; color: var(--txt); border: 1px solid var(--line); border-radius: 2px; box-shadow: 0 8px 30px rgba(0,0,0,.7); }
+/* keep popups above every marker pin */
+.leaflet-popup-pane { z-index: 700 !important; }
+.leaflet-popup { z-index: 1000 !important; }
 .region-popup .leaflet-popup-tip { background: #100b0f; border-left: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .region-popup .leaflet-popup-content { margin: 12px 14px; font-family: var(--mono); }
 .rp-name { font-weight: 600; font-size: 13px; letter-spacing: .5px; }
@@ -782,6 +788,12 @@ html, body, .leaflet-grab, .leaflet-container, .leaflet-interactive {
 </style>
 </head>
 <body>
+
+<!-- Offline warning badge (shown only when the connection drops) -->
+<div id="offline-badge" role="status" aria-live="polite" style="position:fixed; left:50%; bottom:18px; transform:translateX(-50%) translateY(8px); z-index:6000; display:none; align-items:center; gap:8px; padding:7px 14px; background:rgba(34,6,12,0.92); border:1px solid #ff2d4a; border-radius:2px; box-shadow:0 0 14px rgba(255,45,74,0.45); color:#ff5d6f; font-family:var(--mono); font-size:11px; letter-spacing:1.5px; text-transform:uppercase; pointer-events:none; opacity:0; transition:opacity .25s ease, transform .25s ease;">
+  <span style="width:8px; height:8px; border-radius:50%; background:#ff2d4a; box-shadow:0 0 8px #ff2d4a; animation:offlinePulse 1.2s ease-in-out infinite;"></span>
+  <span>No internet connection</span>
+</div>
 
 <!-- ===================== TOP NAV ===================== -->
 <header class="topnav">
@@ -1559,6 +1571,18 @@ function exportDossier(list) {
 
   /* ---------- map + markers ---------- */
   function initMap() {
+    // One-time patch: any layer that binds a popup also opens it on hover
+    // (in addition to click), and closes it when the pointer leaves.
+    if (L && L.Layer && !L.Layer.prototype.__hoverPopupPatched) {
+      L.Layer.prototype.__hoverPopupPatched = true;
+      const _bindPopup = L.Layer.prototype.bindPopup;
+      L.Layer.prototype.bindPopup = function () {
+        const res = _bindPopup.apply(this, arguments);
+        this.on("mouseover", function () { this.openPopup(); });
+        this.on("mouseout", function () { this.closePopup(); });
+        return res;
+      };
+    }
     map = L.map("map", {
       zoomControl: true,
       worldCopyJump: false,
@@ -2945,6 +2969,46 @@ function exportDossier(list) {
     showCountryDiplomacy(country);
   }
 
+  function locateServer(arg) {
+    const norm = (s) => (s || "").toLowerCase().replace(/\s+/g, "");
+    if (!arg) {
+      cliPrint("\u25C6 AZURE REGIONS // SERVER NODES", "head");
+      cliPrint(`  ${AZURE_REGIONS.length} region(s) monitored`, "sys");
+      AZURE_REGIONS.slice(0, 12).forEach((r) => {
+        const cls = r.status === "outage" ? "err" : r.status === "degraded" ? "warn" : "ok";
+        cliPrint(`  \u25C9 ${escHtml(r.name.padEnd(22))} <span style="color:var(--txt-dim)">${escHtml(r.code.padEnd(16))}</span> ${escHtml(r.geo)}`, cls);
+      });
+      if (AZURE_REGIONS.length > 12) cliPrint(`  \u2026 +${AZURE_REGIONS.length - 12} more`, "sys");
+      cliPrint('  usage: locate -s &lt;name|code&gt;  \u2014 e.g. \'locate -s "Central US"\' or \'locate -s centralus\'', "sys");
+      return;
+    }
+    const q = norm(arg);
+    // exact code/name match first, then a contains match on name / geo / code
+    let r = AZURE_REGIONS.find((x) => norm(x.code) === q || norm(x.name) === q);
+    if (!r) r = AZURE_REGIONS.find((x) => norm(x.name).includes(q) || norm(x.geo).includes(q) || norm(x.code).includes(q));
+    if (!r) {
+      cliPrint(`\u2715 no server node matches '${escHtml(arg)}'.`, "err");
+      cliPrint("  run 'locate -s' with no value to list monitored regions.", "warn");
+      return;
+    }
+    const d = ALERT_DETAIL[r.code] || {};
+    const cls = r.status === "outage" ? "err" : r.status === "degraded" ? "warn" : "ok";
+    cliPrint(`\u25C6 SERVER // ${escHtml(r.name.toUpperCase())} [${escHtml(r.code)}]`, "head");
+    cliPrint(`  REGION    ${escHtml(r.geo)}`, "sys");
+    cliPrint(`  STATUS    <span style="text-transform:uppercase">${escHtml(r.status)}</span>${d.service ? " \u2014 " + escHtml(d.service) : ""}`, cls);
+    cliPrint(`  POSITION  LAT ${r.lat.toFixed(4)}  LNG ${r.lng.toFixed(4)}`, "sys");
+    if (map) {
+      map.flyTo([r.lat, r.lng], 6, { duration: 1.2 });
+      const ref = markers[r.code];
+      setTimeout(() => {
+        if (ref && ref.marker) ref.marker.openPopup();
+        else L.popup({ className: "region-popup", closeButton: false }).setLatLng([r.lat, r.lng])
+          .setContent(`<div class="rp-name">\u25C9 ${escHtml(r.name)}</div><div class="rp-meta">${escHtml(r.geo)} \u00B7 ${escHtml(r.status)}</div>`).openOn(map);
+        triggerPing(r.code);
+      }, 1250);
+    }
+  }
+
   function locateFlight(arg) {
     const air = (THREAT_FEED.items || []).filter((it) => it.cat === "AIR");
     const tele = (m) => escHtml((m || "").replace("Live aircraft \u00B7 ", ""));
@@ -2993,6 +3057,7 @@ function exportDossier(list) {
       const rows = [
         ["alerts", "active incidents only"],
         ["clear", "clear the console"],
+        ["dossier", "list every subject name on file"],
         ["help", "list available commands"],
         ["intel", "public threat intel \u2014 CVEs \u00B7 C2 \u00B7 IOCs"],
         ["localhost", "open a live shell on the host"],
@@ -3097,15 +3162,39 @@ function exportDossier(list) {
         });
       });
     },
+    dossier(arg) {
+      const raw = (arg || "").trim();
+      if (isHelpFlag(raw)) {
+        printFlagHelp("DOSSIER // FLAGS", [
+          ["dossier", "list every subject name on file"]
+        ]);
+        return;
+      }
+      const profs = window.Dossier ? window.Dossier.getProfiles() : [];
+      cliPrint("\u25C6 SUBJECT DOSSIER \u2014 ENTRIES ON FILE", "head");
+      if (!profs.length) { cliPrint("  roster empty \u2014 no subjects on file.", "warn"); return; }
+      cliPrint(`  ${profs.length} ENTR${profs.length === 1 ? "Y" : "IES"} \u00B7 SYNCED ${fmtTime()}`, "sys");
+      cliPrint("\u2014".repeat(40), "sys");
+      profs.forEach((p, i) => {
+        const num = String(i + 1).padStart(2, "0");
+        const alias = p.alias ? ` <span style="color:var(--accent)">\u201C${escHtml(p.alias)}\u201D</span>` : "";
+        cliPrint(`  ${num}  ${escHtml(p.name || "UNNAMED")}${alias}`, "sys");
+      });
+      cliPrint("\u2014".repeat(40), "sys");
+      cliPrint("  tip: 'locate <keyword>' plots matching subjects on the map.", "sys");
+    },
     locate(arg) {
       const raw = (arg || "").trim();
       if (isHelpFlag(raw)) {
         printFlagHelp("LOCATE // FLAGS &amp; PARAMETERS", [
           ["locate &lt;keyword&gt;", "find &amp; plot matching dossier subjects on the map"],
+          ["locate -s &lt;server&gt;", "center on an Azure region \u2014 e.g. locate -s centralus"],
           ["locate -f &lt;flight&gt;", "center the map on a live flight pin \u2014 e.g. locate -f UAL245"]
         ]);
         return;
       }
+      const sm = raw.match(/^-s\b\s*(.*)$/i);
+      if (sm) { locateServer(sm[1].trim().replace(/^["']|["']$/g, "")); return; }
       const fm = raw.match(/^-f\b\s*(.*)$/i);
       if (fm) { locateFlight(fm[1].trim()); return; }
       if (!arg) {
@@ -3852,9 +3941,19 @@ function exportDossier(list) {
     tick(); setInterval(tick, 1000);
   }
 
+  function wireConnBadge() {
+    const badge = document.getElementById("offline-badge");
+    if (!badge) return;
+    const sync = () => badge.classList.toggle("is-offline", !navigator.onLine);
+    window.addEventListener("online", sync);
+    window.addEventListener("offline", sync);
+    sync();
+  }
+
   function boot() {
     wireNav();
     startClock();
+    wireConnBadge();
     if (window.Settings) window.Settings.init();
     if (window.Sitrep) window.Sitrep.init();
     if (window.Dossier) window.Dossier.init();
