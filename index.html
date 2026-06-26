@@ -217,6 +217,13 @@ body { position: relative; }
 }
 #radar-home::before { width: 22px; height: 22px; }
 #radar-home::after { width: 34px; height: 34px; opacity: .25; }
+#radar-ping {
+  position: absolute; left: 50%; top: 50%; width: 0; height: 0;
+  transform: translate(-50%, -50%); border-radius: 50%;
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 14px var(--accent-glow), inset 0 0 14px var(--accent-glow);
+  opacity: 0; pointer-events: none; display: none;
+}
 
 /* region markers */
 .region-marker { position: relative; width: 14px; height: 14px; }
@@ -812,6 +819,7 @@ html, body, .leaflet-grab, .leaflet-container, .leaflet-interactive {
   <!-- Radar overlay (positioned over the map) -->
   <div id="radar" aria-hidden="true">
     <div id="radar-sweep"></div>
+    <div id="radar-ping"></div>
     <div id="radar-rings"></div>
     <div id="radar-home" title="Operator position"></div>
   </div>
@@ -1512,18 +1520,39 @@ function exportDossier(list) {
   const markers = {};        // code -> { marker, el, latlng, lastPing }
   let alertFilter = "ALL";   // ALL | AZURE | CVE | C2 | IOC | URL | RANSOM
   let threatLayer = null;    // Leaflet layer group for plotted threat intel
-  let threatLayers = { C2: true, IOC: true, URL: true, RANSOM: true, TOR: false, AIR: true, CISA: true };
+  let threatLayers = { C2: true, IOC: true, URL: true, RANSOM: true, TOR: false, AIR: false, CISA: true };
   let lastThreatSig = "";    // avoid rebuilding pins when nothing changed
   let sweepAngle = 0, prevSweepAngle = 0;
   let SWEEP_SPEED = 0.7;   // deg per frame (~8.5s / revolution)
-  let sweepEnabled = true;
+  let radarMode = "sweep"; // "off" | "sweep" | "ping"
+  let PING_SPEED = 160;    // sonar diameter growth per second (px)
+  let pingRadius = 0, prevPingRadius = 0, pingMaxRadius = 0;
+  let pingActive = false, lastPingStart = 0, lastFrameTime = 0;
+  let PING_INTERVAL = 30000; // ms between sonar pings — synced to the auto-refresh setting
+  let radarRAF = null;         // active rAF handle (null when loop is parked)
+  let sitrepVisible = false;   // true only while the SITREP view is on screen
   let refreshTimer = null;
   let baseLayer = null;
+  let detailLayer = null;    // high-detail tiles, present only during a locate fly-in
   let pinPending = false;    // true while arriving at SITREP via a dossier address link
   const PING_COOLDOWN = 1500;
   const BASEMAPS = {
-    dark: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-    light: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+    dark: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+    light: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"
+  };
+  const MAP_MAX_ZOOM = 7;     // interactive cap — keeps tile memory bounded
+  const LOCATE_ZOOM = 15;     // deep zoom allowed only for the `locate` command
+  // Tiles never load past native zoom 7 (no extra fetches/memory); the map can
+  // still zoom to 15 and upscale those tiles when `locate` flies in.
+  const TILE_OPTS = {
+    attribution: '&copy; OpenStreetMap &copy; CARTO \u00B7 CyberSOC',
+    subdomains: "abcd", maxNativeZoom: 7, maxZoom: LOCATE_ZOOM, keepBuffer: 0, updateWhenIdle: true
+  };
+  // High-detail overlay loaded ONLY during `locate` (real tiles to z15), then
+  // removed on zoom-out so its tiles are released back to the browser.
+  const DETAIL_TILE_OPTS = {
+    subdomains: "abcd", maxNativeZoom: LOCATE_ZOOM, maxZoom: LOCATE_ZOOM,
+    minZoom: 8, keepBuffer: 0, updateWhenIdle: true
   };
 
   const $ = (s) => document.querySelector(s);
@@ -1532,19 +1561,17 @@ function exportDossier(list) {
   function initMap() {
     map = L.map("map", {
       zoomControl: true,
-      worldCopyJump: true,
+      worldCopyJump: false,
+      maxBounds: [[-85, -180], [85, 180]],
+      maxBoundsViscosity: 1.0,
       minZoom: 2,
-      maxZoom: 18,
+      maxZoom: MAP_MAX_ZOOM,
       attributionControl: true
     }).setView([30, 5], 2);
 
     baseLayer = L.tileLayer(
       (window.Settings && window.Settings.get("theme") === "light") ? BASEMAPS.light : BASEMAPS.dark,
-      {
-        attribution: '&copy; OpenStreetMap &copy; CARTO \u00B7 CyberSOC',
-        subdomains: "abcd",
-        maxZoom: 19
-      }
+      TILE_OPTS
     ).addTo(map);
 
     AZURE_REGIONS.forEach(addRegionMarker);
@@ -1726,8 +1753,8 @@ function exportDossier(list) {
   function positionRadar() {
     if (!map || !radarCenterLatLng) return;
     const p = map.latLngToContainerPoint(radarCenterLatLng);
-    const sweep = $("#radar-sweep"), rings = $("#radar-rings"), home = $("#radar-home");
-    [sweep, rings, home].forEach((el) => {
+    const sweep = $("#radar-sweep"), rings = $("#radar-rings"), home = $("#radar-home"), ping = $("#radar-ping");
+    [sweep, rings, home, ping].forEach((el) => {
       if (!el) return;
       el.style.left = p.x + "px";
       el.style.top = p.y + "px";
@@ -1753,14 +1780,17 @@ function exportDossier(list) {
     return (a + 360) % 360;
   }
 
-  // cache marker angles; recomputed on pan/zoom and used by the sweep loop
+  // cache marker angles + distances; recomputed on pan/zoom and used by the radar loop
   const markerAngles = {};
+  const markerDist = {};
   function refreshMarkerAngles() {
     if (!map || !radarCenterLatLng) return;
     const c = map.latLngToContainerPoint(radarCenterLatLng);
     Object.keys(markers).forEach((code) => {
       const p = map.latLngToContainerPoint(markers[code].latlng);
-      markerAngles[code] = screenAngle(p.x - c.x, p.y - c.y);
+      const dx = p.x - c.x, dy = p.y - c.y;
+      markerAngles[code] = screenAngle(dx, dy);
+      markerDist[code] = Math.hypot(dx, dy);
     });
   }
 
@@ -1784,22 +1814,108 @@ function exportDossier(list) {
     node.classList.add("pinging");
   }
 
-  function sweepLoop() {
-    if (sweepEnabled) {
+  function startPing(now) {
+    pingActive = true;
+    pingRadius = 0; prevPingRadius = 0;
+    lastPingStart = now;
+    const r = document.getElementById("radar");
+    let maxR = 1200;
+    if (r && radarCenterLatLng && map) {
+      const c = map.latLngToContainerPoint(radarCenterLatLng);
+      const w = r.clientWidth, h = r.clientHeight;
+      maxR = Math.max(
+        Math.hypot(c.x, c.y), Math.hypot(w - c.x, c.y),
+        Math.hypot(c.x, h - c.y), Math.hypot(w - c.x, h - c.y)
+      );
+    }
+    pingMaxRadius = maxR;
+  }
+
+  function sweepLoop(now) {
+    // Park the loop entirely when it can't be seen or there's nothing to draw.
+    // A never-idle rAF is what lets renderer memory creep until WebKit kills the tab.
+    if (!sitrepVisible || document.hidden || radarMode === "off") {
+      radarRAF = null; lastFrameTime = 0;
+      return;
+    }
+    now = now || performance.now();
+    const dt = lastFrameTime ? Math.min(0.1, (now - lastFrameTime) / 1000) : 0;
+    lastFrameTime = now;
+    const sweep = $("#radar-sweep"), ping = $("#radar-ping");
+
+    if (radarMode === "sweep") {
+      if (ping) ping.style.display = "none";
+      if (sweep) sweep.style.display = "";
       prevSweepAngle = sweepAngle;
       sweepAngle = (sweepAngle + SWEEP_SPEED) % 360;
-      const sweep = $("#radar-sweep");
       if (sweep) sweep.style.transform = `translate(-50%, -50%) rotate(${sweepAngle}deg)`;
-
-    if (radarCenterLatLng) {
-      // ping a region ONLY when the rotating line passes over its center
-      Object.keys(markerAngles).forEach((code) => {
-        if (crossed(prevSweepAngle, sweepAngle, markerAngles[code])) triggerPing(code);
-      });
+      if (radarCenterLatLng) {
+        // ping a region ONLY when the rotating line passes over its center
+        Object.keys(markerAngles).forEach((code) => {
+          if (crossed(prevSweepAngle, sweepAngle, markerAngles[code])) triggerPing(code);
+        });
+      }
+    } else if (radarMode === "ping") {
+      if (sweep) sweep.style.display = "none";
+      if (ping) ping.style.display = "block";
+      if (!pingActive && now - lastPingStart >= PING_INTERVAL) startPing(now);
+      if (pingActive) {
+        prevPingRadius = pingRadius;
+        pingRadius += (PING_SPEED / 2) * dt; // diameter/s -> radius/s
+        if (ping) {
+          const d = pingRadius * 2;
+          ping.style.width = d + "px";
+          ping.style.height = d + "px";
+          ping.style.opacity = pingMaxRadius ? Math.max(0, 1 - pingRadius / pingMaxRadius) : 0;
+        }
+        if (radarCenterLatLng) {
+          // a server node pings when the expanding sonar ring crosses its distance
+          Object.keys(markerDist).forEach((code) => {
+            const dist = markerDist[code];
+            if (dist > prevPingRadius && dist <= pingRadius) triggerPing(code);
+          });
+        }
+        if (pingRadius >= pingMaxRadius) { pingActive = false; if (ping) ping.style.opacity = 0; }
+      }
+    } else {
+      if (sweep) sweep.style.display = "none";
+      if (ping) ping.style.display = "none";
     }
-    }
-    requestAnimationFrame(sweepLoop);
+    radarRAF = requestAnimationFrame(sweepLoop);
   }
+
+  // Start the radar loop if (and only if) it should be running and isn't already.
+  function startRadar() {
+    if (radarRAF == null && sitrepVisible && !document.hidden && radarMode !== "off") {
+      lastFrameTime = 0;
+      radarRAF = requestAnimationFrame(sweepLoop);
+    }
+  }
+  function stopRadar() {
+    if (radarRAF != null) { cancelAnimationFrame(radarRAF); radarRAF = null; }
+  }
+  /* Locate fly-in: load real high-detail tiles up to LOCATE_ZOOM, then release
+     them and re-clamp to MAP_MAX_ZOOM once the user zooms back out. */
+  function allowDeepZoom() {
+    if (!map) return;
+    map.setMaxZoom(LOCATE_ZOOM);
+    if (!detailLayer) {
+      const theme = (window.Settings && window.Settings.get("theme") === "light") ? "light" : "dark";
+      detailLayer = L.tileLayer(BASEMAPS[theme], DETAIL_TILE_OPTS).addTo(map);
+    }
+    const reclamp = () => {
+      if (map.getZoom() <= MAP_MAX_ZOOM) {
+        map.setMaxZoom(MAP_MAX_ZOOM);
+        if (detailLayer) { map.removeLayer(detailLayer); detailLayer = null; } // free the deep tiles
+        map.off("zoomend", reclamp);
+      }
+    };
+    map.off("zoomend", reclamp);
+    map.on("zoomend", reclamp);
+  }
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) stopRadar(); else startRadar();
+  });
 
   /* ---------- geolocation ---------- */
   function acquirePosition() {
@@ -1956,7 +2072,7 @@ function exportDossier(list) {
   ];
 
   /* Map legend with per-source layer toggles. */
-  const LEGEND_CATS = [["C2", "C2 / IP"], ["IOC", "IOC"], ["URL", "Malicious URL"], ["RANSOM", "Ransomware"], ["TOR", "Tor exit"], ["AIR", "Aircraft (OpenSky)"], ["CISA", "CISA offices (US)"]];
+  const LEGEND_CATS = [["CISA", "CISA offices (US)"], ["C2", "C2 / IP"], ["IOC", "IOC"], ["URL", "Malicious URL"], ["RANSOM", "Ransomware"], ["TOR", "Tor exit"], ["AIR", "Aircraft (OpenSky)"]];
   function renderLegend() {
     const el = $("#map-legend"); if (!el) return;
     const counts = {};
@@ -2763,11 +2879,14 @@ function exportDossier(list) {
   }
 
   function resyncFeed() {
-    cliPrint("> initiating telemetry re-sync\u2026", "sys");
-    syncAzureStatus().then((live) => {
+    cliPrint("> initiating full telemetry re-sync\u2026", "sys");
+    cliPrint("  feeds: azure \u00B7 solarwinds \u00B7 threat-intel", "sys");
+    Promise.all([syncAzureStatus(), syncSolarWindsStatus(), syncThreatIntel()]).then(() => {
       AZURE_REGIONS.forEach(updateMarkerStatus);
-      updateHUD(); renderAlerts(); updateFeedIndicator();
-      cliPrint(`\u2713 sync complete @ ${fmtTime()} \u00B7 source: ${live ? "AZURE LIVE FEED" : "LOCAL SIMULATION"}`, live ? "ok" : "warn");
+      updateHUD(); renderAlerts(); renderThreatPins(true); renderLegend(); updateFeedIndicator();
+      if (window.Ticker) window.Ticker.refresh();
+      cliPrint(`\u2713 sync complete @ ${fmtTime()}`, "ok");
+      cliPrint(`  azure ${LIVE_MODE ? "LIVE" : "SIM"} \u00B7 solarwinds ${LIVE_MODE_SW ? "LIVE" : "SIM"} \u00B7 threat-intel ${LIVE_MODE_INTEL ? "LIVE" : "SIM"}`, "sys");
     });
   }
 
@@ -3102,11 +3221,15 @@ function exportDossier(list) {
       renderAlerts();
       loadCIntelRemote();
       renderLegend();
-      requestAnimationFrame(sweepLoop);
+      sitrepVisible = true;
+      startRadar();
       refreshAll();
-      refreshTimer = setInterval(refreshAll, 7000);
+      const sec = (window.Settings && +window.Settings.get("refreshSec")) || 30;
+      this.setRefreshInterval(sec * 1000);
     },
     onShow() {
+      sitrepVisible = true;
+      startRadar();
       if (map) setTimeout(() => {
         map.invalidateSize();
         if (!pinPending) fitAllRegions();
@@ -3114,6 +3237,7 @@ function exportDossier(list) {
         refreshMarkerAngles();
       }, 60);
     },
+    onHide() { sitrepVisible = false; stopRadar(); },
     expectPin() { pinPending = true; },
     /* geocode & plot many dossier subjects, then fit the map to them (CLI 'locate') */
     async plotSubjects(list) {
@@ -3133,30 +3257,48 @@ function exportDossier(list) {
           .bindPopup(`<div class="rp-name">${(label || "SUBJECT")}</div><div class="rp-meta">${(display || "").slice(0, 60)}</div>`, { className: "region-popup", closeButton: false }));
       });
       window.__pinLayer = L.layerGroup(layers).addTo(map);
+      allowDeepZoom();
       const lls = found.map((f) => f.ll);
       if (lls.length === 1) {
-        map.flyTo(lls[0], 12, { duration: 1.3 });
+        map.flyTo(lls[0], LOCATE_ZOOM, { duration: 1.3 });
         setTimeout(() => { window.__pinLayer && window.__pinLayer.getLayers()[1].openPopup(); }, 1400);
       } else {
-        map.flyToBounds(L.latLngBounds(lls), { padding: [80, 80], maxZoom: 12, duration: 1.3 });
+        map.flyToBounds(L.latLngBounds(lls), { padding: [80, 80], maxZoom: LOCATE_ZOOM, duration: 1.3 });
       }
       return found.length;
     },
-    setSweepEnabled(on) {
-      sweepEnabled = !!on;
+    setRadarMode(mode) {
+      radarMode = (mode === "sweep" || mode === "ping") ? mode : "off";
       const r = document.getElementById("radar");
-      if (r) r.style.display = on ? "" : "none";
+      if (r) r.style.display = radarMode === "off" ? "none" : "";
+      const sweep = document.getElementById("radar-sweep");
+      const ping = document.getElementById("radar-ping");
+      if (radarMode === "ping") {
+        if (sweep) sweep.style.display = "none";
+        lastPingStart = performance.now() - PING_INTERVAL; // emit first ping right away
+        pingActive = false;
+      } else {
+        if (ping) { ping.style.display = "none"; ping.style.opacity = 0; }
+        pingActive = false;
+      }
+      if (radarMode === "off") stopRadar(); else startRadar();
     },
     setSweepSpeed(v) { SWEEP_SPEED = +v || 0.7; },
+    setPingSpeed(v) { PING_SPEED = +v || 160; },
     setRefreshInterval(ms) {
+      const v = Math.max(2000, +ms || 7000);
+      PING_INTERVAL = v;            // sonar ping cadence follows the auto-refresh interval
       if (refreshTimer) clearInterval(refreshTimer);
-      refreshTimer = setInterval(refreshAll, Math.max(2000, +ms || 7000));
+      refreshTimer = setInterval(refreshAll, v);
     },
     setBasemap(theme) {
       if (!map || !baseLayer) return;
       map.removeLayer(baseLayer);
-      baseLayer = L.tileLayer(theme === "light" ? BASEMAPS.light : BASEMAPS.dark,
-        { attribution: '&copy; OpenStreetMap &copy; CARTO \u00B7 CyberSOC', subdomains: "abcd", maxZoom: 19 }).addTo(map);
+      baseLayer = L.tileLayer(theme === "light" ? BASEMAPS.light : BASEMAPS.dark, TILE_OPTS).addTo(map);
+      if (detailLayer) {
+        map.removeLayer(detailLayer);
+        detailLayer = L.tileLayer(theme === "light" ? BASEMAPS.light : BASEMAPS.dark, DETAIL_TILE_OPTS).addTo(map);
+      }
     },
     /* drop a located pin on the map (used by Dossier last-known-location) */
     async dropPin(query, label) {
@@ -3692,6 +3834,7 @@ function exportDossier(list) {
     const view = $("#view-" + name);
     if (view) view.classList.add("is-active");
     if (name === "sitrep" && window.Sitrep) window.Sitrep.onShow();
+    else if (window.Sitrep && window.Sitrep.onHide) window.Sitrep.onHide();
     if (name === "log" && window.LogDocs) window.LogDocs.onShow();
     if (name === "settings" && window.Settings) window.Settings.render();
   }
@@ -3839,7 +3982,7 @@ function exportDossier(list) {
   const DEFAULTS = {
     theme: "dark", accent: "magenta",
     tickerVisible: true, tickerSource: "both", tickerIssuesOnly: false, tickerSpeed: 3,
-    radar: true, sweepSpeed: 0.7, refreshSec: 30, reduceMotion: false
+    radar: true, radarMode: null, sweepSpeed: 0.7, pingSpeed: 160, refreshSec: 30, reduceMotion: false
   };
   const ACCENTS = {
     magenta: ["#ff2d6f", "#7a1538", "rgba(255,45,111,0.45)"],
@@ -3856,10 +3999,25 @@ function exportDossier(list) {
   function applyTheme() { document.documentElement.dataset.theme = state.theme; if (window.Sitrep && window.Sitrep.setBasemap) window.Sitrep.setBasemap(state.theme); }
   function applyAccent() { const a = ACCENTS[state.accent] || ACCENTS.magenta; const s = document.documentElement.style; s.setProperty("--accent", a[0]); s.setProperty("--accent-dim", a[1]); s.setProperty("--accent-glow", a[2]); }
   function applyTicker() { document.documentElement.classList.toggle("no-ticker", !state.tickerVisible); document.documentElement.style.setProperty("--ticker-dur", tickerDuration()); if (window.Ticker) window.Ticker.refresh(); if (window.Sitrep) window.Sitrep.onShow(); }
-  function applyRadar() { if (window.Sitrep) { window.Sitrep.setSweepEnabled(state.radar && !state.reduceMotion); window.Sitrep.setSweepSpeed(state.sweepSpeed); } }
+  function applyRadar() {
+    if (!window.Sitrep) return;
+    const mode = state.reduceMotion ? "off" : (state.radarMode || "off");
+    window.Sitrep.setRadarMode(mode);
+    window.Sitrep.setSweepSpeed(state.sweepSpeed);
+    if (window.Sitrep.setPingSpeed) window.Sitrep.setPingSpeed(state.pingSpeed);
+  }
+  /* Pick the default radar mode the first time, based on whether the bundled
+     Node server is serving the page: server -> sweep, static host -> ping/30s. */
+  function resolveRadarDefault() {
+    if (state.radarMode) { applyRadar(); return; }
+    fetch("/api/health", { cache: "no-store" })
+      .then((r) => { state.radarMode = r.ok ? "sweep" : "ping"; })
+      .catch(() => { state.radarMode = "ping"; })
+      .then(() => { save(); applyRadar(); render(); });
+  }
   function applyRefresh() { if (window.Sitrep) window.Sitrep.setRefreshInterval(state.refreshSec * 1000); }
   function applyMotion() { document.documentElement.classList.toggle("reduce-motion", state.reduceMotion); applyRadar(); }
-  function applyAll() { applyTheme(); applyAccent(); applyTicker(); applyMotion(); applyRadar(); applyRefresh(); }
+  function applyAll() { applyTheme(); applyAccent(); applyTicker(); applyMotion(); applyRadar(); applyRefresh(); resolveRadarDefault(); }
 
   function set(k, v) {
     state[k] = v; save();
@@ -3869,7 +4027,8 @@ function exportDossier(list) {
     else if (k === "tickerSource" || k === "tickerIssuesOnly") { if (window.Ticker) window.Ticker.refresh(); }
     else if (k === "tickerSpeed") document.documentElement.style.setProperty("--ticker-dur", tickerDuration());
     else if (k === "reduceMotion") applyMotion();
-    else if (k === "radar" || k === "sweepSpeed") applyRadar();
+    else if (k === "radarMode") { applyRadar(); render(); }
+    else if (k === "radar" || k === "sweepSpeed" || k === "pingSpeed") applyRadar();
     else if (k === "refreshSec") applyRefresh();
   }
 
@@ -3900,8 +4059,12 @@ function exportDossier(list) {
          ${row("Scroll speed", "Marquee velocity", slider("tickerSpeed", 1, 5, 1, v => ["","SLOW","RELAXED","NORMAL","BRISK","FAST"][v]))}
        </div>
        <div class="set-section"><h3>OPERATIONS</h3>
-         ${row("Radar sweep", "Rotating sweep + region pings on the SITREP map", toggle("radar"))}
-         ${row("Sweep speed", "Rotation rate of the radar line", slider("sweepSpeed", 0.2, 2, 0.1, v => (+v).toFixed(1) + "\u00B0/f"))}
+         ${row("Radar options", "SITREP map radar \u2014 rotating sweep, sonar ping, or off", segmented("radarMode", [{v:"off",l:"OFF"},{v:"sweep",l:"SWEEP"},{v:"ping",l:"PING"}]))}
+         ${state.radarMode === "ping"
+            ? row("Sweep speed", "Sonar expansion \u2014 diameter growth per second", slider("pingSpeed", 40, 400, 10, v => Math.round(v) + " px/s"))
+            : state.radarMode === "sweep"
+              ? row("Sweep speed", "Rotation rate of the radar line", slider("sweepSpeed", 0.2, 2, 0.1, v => (+v).toFixed(1) + "\u00B0/f"))
+              : ""}
          ${row("Auto-refresh", "How often all live feeds re-sync (Azure · SolarWinds · threat intel)", slider("refreshSec", 5, 300, 5, fmtDuration))}
          ${row("Reduce motion", "Pause sweep, ticker and ambient animation", toggle("reduceMotion"))}
        </div>
@@ -3919,12 +4082,13 @@ function exportDossier(list) {
       set(k, v);
     })));
     wrap.querySelectorAll("[data-slider]").forEach(sl => sl.addEventListener("input", () => {
-      const k = sl.dataset.slider; const v = k === "sweepSpeed" ? parseFloat(sl.value) : parseInt(sl.value, 10);
+      const k = sl.dataset.slider; const v = (k === "sweepSpeed") ? parseFloat(sl.value) : parseInt(sl.value, 10);
       set(k, v);
       const sv = wrap.querySelector(`[data-sv="${k}"]`);
       if (sv) {
         if (k === "tickerSpeed") sv.textContent = ["","SLOW","RELAXED","NORMAL","BRISK","FAST"][v];
         else if (k === "sweepSpeed") sv.textContent = v.toFixed(1) + "\u00B0/f";
+        else if (k === "pingSpeed") sv.textContent = Math.round(v) + " px/s";
         else if (k === "refreshSec") sv.textContent = fmtDuration(v);
         else sv.textContent = v + "s";
       }
