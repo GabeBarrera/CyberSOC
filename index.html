@@ -363,6 +363,7 @@ body { position: relative; }
 :root.reduce-motion .tm-RANSOM { animation: none !important; }
 .tm-AIR { width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 13px solid #38d6ff; background: none; filter: drop-shadow(0 0 5px rgba(56,214,255,.75)); transform-origin: 50% 65%; }
 .tm-CISA { border: 1.5px solid #5b8def; background: rgba(91,141,239,.30); box-shadow: 0 0 8px rgba(91,141,239,.6); border-radius: 2px; }
+.tm-AZURE { border-radius: 50%; border: 1.5px solid var(--op); background: rgba(57,255,20,.26); box-shadow: 0 0 8px rgba(57,255,20,.5); }
 
 /* country-alert pins (analyst) — coloured by alert severity */
 .ca-pin { width: 12px; height: 12px; box-sizing: border-box; border-radius: 50%; border: 2px solid; }
@@ -1532,7 +1533,10 @@ function exportDossier(list) {
   const markers = {};        // code -> { marker, el, latlng, lastPing }
   let alertFilter = "ALL";   // ALL | AZURE | CVE | C2 | IOC | URL | RANSOM
   let threatLayer = null;    // Leaflet layer group for plotted threat intel
-  let threatLayers = { C2: true, IOC: true, URL: true, RANSOM: true, TOR: false, AIR: false, CISA: true };
+  let threatLayers = { AZURE: true, C2: true, IOC: true, URL: true, RANSOM: true, TOR: true, AIR: true, CISA: true };
+  // master data-feed switches (mirrored from Settings) — a feed that is off is
+  // never queried and its legend row is hidden entirely.
+  let feeds = { AZURE: true, CISA: true, C2: false, IOC: false, URL: false, RANSOM: false, TOR: false, AIR: false };
   let lastThreatSig = "";    // avoid rebuilding pins when nothing changed
   let sweepAngle = 0, prevSweepAngle = 0;
   let SWEEP_SPEED = 0.7;   // deg per frame (~8.5s / revolution)
@@ -2096,12 +2100,14 @@ function exportDossier(list) {
   ];
 
   /* Map legend with per-source layer toggles. */
-  const LEGEND_CATS = [["CISA", "CISA offices (US)"], ["C2", "C2 / IP"], ["IOC", "IOC"], ["URL", "Malicious URL"], ["RANSOM", "Ransomware"], ["TOR", "Tor exit"], ["AIR", "Aircraft (OpenSky)"]];
+  const LEGEND_CATS = [["AZURE", "Azure regions"], ["CISA", "CISA offices (US)"], ["C2", "C2 / IP"], ["IOC", "IOC"], ["URL", "Malicious URL"], ["RANSOM", "Ransomware"], ["TOR", "Tor exit"], ["AIR", "Aircraft (OpenSky)"]];
   function renderLegend() {
     const el = $("#map-legend"); if (!el) return;
-    const counts = {};
+    const counts = { AZURE: AZURE_REGIONS.length };
     THREAT_FEED.items.concat(CISA_OFFICES).forEach((it) => { if (it.lat != null) counts[it.cat] = (counts[it.cat] || 0) + 1; });
-    el.innerHTML = `<div class="map-legend-h">MAP LAYERS</div>` + LEGEND_CATS.map(([c, label]) => {
+    // only feeds that are enabled in Settings appear in the legend
+    const rows = LEGEND_CATS.filter(([c]) => feeds[c] !== false);
+    el.innerHTML = `<div class="map-legend-h">MAP LAYERS</div>` + rows.map(([c, label]) => {
       const on = threatLayers[c] !== false;
       return `<div class="legend-row ${on ? "" : "off"}" data-layer="${c}">
         <span class="legend-swatch"><span class="tm tm-${c} sev-outage"></span></span>
@@ -2111,16 +2117,28 @@ function exportDossier(list) {
     el.querySelectorAll(".legend-row").forEach((row) => row.addEventListener("click", () => {
       const c = row.dataset.layer;
       threatLayers[c] = threatLayers[c] === false;
-      renderThreatPins(true);
+      if (c === "AZURE") updateRegionVisibility(); else renderThreatPins(true);
       renderLegend();
     }));
+  }
+
+  /* Show / hide the Azure region markers per feed + legend state. */
+  function updateRegionVisibility() {
+    if (!map) return;
+    const show = feeds.AZURE !== false && threatLayers.AZURE !== false;
+    Object.values(markers).forEach((ref) => {
+      if (!ref || !ref.marker) return;
+      const on = map.hasLayer(ref.marker);
+      if (show && !on) ref.marker.addTo(map);
+      else if (!show && on) map.removeLayer(ref.marker);
+    });
   }
 
   /* Plot geo-tagged threat intel on the map (filtered by enabled layers). */
   function renderThreatPins(force) {
     if (!map) return;
-    const geoItems = THREAT_FEED.items.concat(CISA_OFFICES).filter((it) => it.lat != null && it.lng != null && threatLayers[it.cat] !== false);
-    const sig = geoItems.map((it) => it.id + it.sev).join("|") + "||" + JSON.stringify(threatLayers);
+    const geoItems = THREAT_FEED.items.concat(CISA_OFFICES).filter((it) => it.lat != null && it.lng != null && feeds[it.cat] !== false && threatLayers[it.cat] !== false);
+    const sig = geoItems.map((it) => it.id + it.sev).join("|") + "||" + JSON.stringify(threatLayers) + "||" + JSON.stringify(feeds);
     if (!force && sig === lastThreatSig && threatLayer) return; // nothing changed
     lastThreatSig = sig;
     if (threatLayer) { map.removeLayer(threatLayer); threatLayer = null; }
@@ -2177,8 +2195,16 @@ function exportDossier(list) {
   }
 
   async function refreshAll() {
-    await Promise.all([syncAzureStatus(), syncThreatIntel(), syncSolarWindsStatus()]);
+    // only query feeds that are enabled — a disabled feed is never hit
+    const jobs = [];
+    if (feeds.AZURE !== false) jobs.push(syncAzureStatus());
+    jobs.push(syncSolarWindsStatus()); // SolarWinds is always polled
+    const intelOn = ["C2", "IOC", "URL", "RANSOM", "TOR", "AIR"].some((c) => feeds[c] !== false);
+    if (intelOn) jobs.push(syncThreatIntel());
+    else { THREAT_FEED.items = []; THREAT_FEED.feeds = {}; }
+    await Promise.all(jobs);
     AZURE_REGIONS.forEach(updateMarkerStatus);
+    updateRegionVisibility();
     updateHUD();
     renderAlerts();
     renderThreatPins();
@@ -3374,6 +3400,17 @@ function exportDossier(list) {
     },
     setSweepSpeed(v) { SWEEP_SPEED = +v || 0.7; },
     setPingSpeed(v) { PING_SPEED = +v || 160; },
+    /* Master data-feed switches from Settings. Re-queries (enabled feeds only)
+       and re-renders the map + legend. */
+    setFeeds(f) {
+      if (!f) return;
+      const prev = feeds;
+      feeds = Object.assign({}, feeds, f);
+      // if a feed just turned on and we have no data yet, refreshAll will fetch it
+      const changed = Object.keys(feeds).some((k) => feeds[k] !== prev[k]);
+      if (!changed) return;
+      refreshAll();
+    },
     setRefreshInterval(ms) {
       const v = Math.max(2000, +ms || 7000);
       PING_INTERVAL = v;            // sonar ping cadence follows the auto-refresh interval
@@ -4081,7 +4118,8 @@ function exportDossier(list) {
   const DEFAULTS = {
     theme: "dark", accent: "magenta",
     tickerVisible: true, tickerSource: "both", tickerIssuesOnly: false, tickerSpeed: 3,
-    radar: true, radarMode: null, sweepSpeed: 0.7, pingSpeed: 160, refreshSec: 30, reduceMotion: false
+    radar: true, radarMode: null, sweepSpeed: 0.7, pingSpeed: 160, refreshSec: 30, reduceMotion: false,
+    feeds: { AZURE: true, CISA: true, C2: false, IOC: false, URL: false, RANSOM: false, TOR: false, AIR: false }
   };
   const ACCENTS = {
     magenta: ["#ff2d6f", "#7a1538", "rgba(255,45,111,0.45)"],
@@ -4090,7 +4128,13 @@ function exportDossier(list) {
     amber:   ["#ffae00", "#7a5300", "rgba(255,174,0,0.45)"]
   };
   let state = load();
-  function load() { try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) { return Object.assign({}, DEFAULTS); } }
+  function load() {
+    try {
+      const s = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(KEY)) || {});
+      s.feeds = Object.assign({}, DEFAULTS.feeds, s.feeds || {}); // deep-merge feed flags
+      return s;
+    } catch (e) { return Object.assign({}, DEFAULTS, { feeds: Object.assign({}, DEFAULTS.feeds) }); }
+  }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
   function get(k) { return state[k]; }
   function tickerDuration() { return (74 - state.tickerSpeed * 11) + "s"; }
@@ -4115,8 +4159,15 @@ function exportDossier(list) {
       .then(() => { save(); applyRadar(); render(); });
   }
   function applyRefresh() { if (window.Sitrep) window.Sitrep.setRefreshInterval(state.refreshSec * 1000); }
+  function applyFeeds() { if (window.Sitrep && window.Sitrep.setFeeds) window.Sitrep.setFeeds(state.feeds); }
   function applyMotion() { document.documentElement.classList.toggle("reduce-motion", state.reduceMotion); applyRadar(); }
-  function applyAll() { applyTheme(); applyAccent(); applyTicker(); applyMotion(); applyRadar(); applyRefresh(); resolveRadarDefault(); }
+  function applyAll() { applyTheme(); applyAccent(); applyTicker(); applyMotion(); applyRadar(); applyRefresh(); applyFeeds(); resolveRadarDefault(); }
+
+  function setFeed(key, on) {
+    state.feeds = Object.assign({}, state.feeds, { [key]: on });
+    save();
+    applyFeeds();
+  }
 
   function set(k, v) {
     state[k] = v; save();
@@ -4136,6 +4187,7 @@ function exportDossier(list) {
     return `<div class="set-row"><div class="set-info"><div class="set-label">${label}</div><div class="set-desc">${desc}</div></div><div class="set-control">${controlHtml}</div></div>`;
   }
   function toggle(key) { return `<div class="toggle ${state[key] ? "on" : ""}" data-toggle="${key}"></div>`; }
+  function feedToggle(key) { return `<div class="toggle ${state.feeds[key] ? "on" : ""}" data-feed="${key}"></div>`; }
   function segmented(key, opts) { return `<div class="segmented" data-seg="${key}">${opts.map(o => `<button data-val="${o.v}" class="${state[key] === o.v ? "on" : ""}">${o.l}</button>`).join("")}</div>`; }
   function slider(key, min, max, step, fmt) { return `<div class="set-slider"><input type="range" min="${min}" max="${max}" step="${step}" value="${state[key]}" data-slider="${key}"><span class="sv" data-sv="${key}">${fmt(state[key])}</span></div>`; }
   function swatches() { return `<div class="swatches" data-swatch>${Object.keys(ACCENTS).map(n => `<span class="swatch ${state.accent === n ? "on" : ""}" data-accent="${n}" style="background:${ACCENTS[n][0]};color:${ACCENTS[n][0]}"></span>`).join("")}</div>`; }
@@ -4167,6 +4219,17 @@ function exportDossier(list) {
          ${row("Auto-refresh", "How often all live feeds re-sync (Azure · SolarWinds · threat intel)", slider("refreshSec", 5, 300, 5, fmtDuration))}
          ${row("Reduce motion", "Pause sweep, ticker and ambient animation", toggle("reduceMotion"))}
        </div>
+       <div class="set-section"><h3>DATA FEEDS</h3>
+         <div class="set-desc" style="margin:-4px 0 14px">Sources polled for the SITREP map. A feed that is off is never queried and its legend layer is hidden.</div>
+         ${row("Azure regions", "Azure datacenter health \u2014 region status markers", feedToggle("AZURE"))}
+         ${row("CISA offices", "Static reference markers \u2014 CISA HQ &amp; regional offices", feedToggle("CISA"))}
+         ${row("Feodo Tracker (C2)", "Botnet command-and-control IPs", feedToggle("C2"))}
+         ${row("ThreatFox (IOC)", "Indicators of compromise", feedToggle("IOC"))}
+         ${row("URLhaus", "Malicious URLs", feedToggle("URL"))}
+         ${row("Ransomwhere", "Ransomware payment trackers", feedToggle("RANSOM"))}
+         ${row("Tor exit nodes", "Live Tor exit-node list", feedToggle("TOR"))}
+         ${row("OpenSky aircraft", "Live aircraft positions", feedToggle("AIR"))}
+       </div>
        <div class="set-section"><h3>DATA</h3>
          ${row("Reset to defaults", "Restore all settings on this device", `<button class="btn-ghost set-reset" id="set-reset">RESET</button>`)}
        </div>
@@ -4174,6 +4237,9 @@ function exportDossier(list) {
 
     wrap.querySelectorAll("[data-toggle]").forEach(el => el.addEventListener("click", () => {
       const k = el.dataset.toggle; set(k, !state[k]); el.classList.toggle("on", state[k]);
+    }));
+    wrap.querySelectorAll("[data-feed]").forEach(el => el.addEventListener("click", () => {
+      const k = el.dataset.feed; const on = !state.feeds[k]; setFeed(k, on); el.classList.toggle("on", on);
     }));
     wrap.querySelectorAll("[data-seg]").forEach(seg => seg.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
       const k = seg.dataset.seg; let v = b.dataset.val;
@@ -4200,7 +4266,7 @@ function exportDossier(list) {
     const rb = wrap.querySelector("#set-reset");
     if (rb) rb.addEventListener("click", () => {
       if (!confirm("Reset all console settings to defaults?")) return;
-      state = Object.assign({}, DEFAULTS); save(); applyAll(); render();
+      state = Object.assign({}, DEFAULTS, { feeds: Object.assign({}, DEFAULTS.feeds) }); save(); applyAll(); render();
     });
   }
 
