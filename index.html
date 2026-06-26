@@ -2930,13 +2930,25 @@ function exportDossier(list) {
 
   function resyncFeed() {
     cliPrint("> initiating full telemetry re-sync\u2026", "sys");
-    cliPrint("  feeds: azure \u00B7 solarwinds \u00B7 threat-intel", "sys");
-    Promise.all([syncAzureStatus(), syncSolarWindsStatus(), syncThreatIntel()]).then(() => {
+    const intelOn = ["C2", "IOC", "URL", "RANSOM", "TOR", "AIR"].some((c) => feeds[c] !== false);
+    const list = ["solarwinds"];
+    if (feeds.AZURE !== false) list.unshift("azure");
+    if (intelOn) list.push("threat-intel");
+    cliPrint(`  feeds: ${list.join(" \u00B7 ")}`, "sys");
+    // only query enabled feeds — mirrors refreshAll(), so disabled feeds are
+    // never hit and we don't re-introduce the memory spike behind the crash
+    const jobs = [];
+    if (feeds.AZURE !== false) jobs.push(syncAzureStatus());
+    jobs.push(syncSolarWindsStatus()); // always polled
+    if (intelOn) jobs.push(syncThreatIntel());
+    else { THREAT_FEED.items = []; THREAT_FEED.feeds = {}; }
+    Promise.all(jobs).then(() => {
       AZURE_REGIONS.forEach(updateMarkerStatus);
+      updateRegionVisibility();
       updateHUD(); renderAlerts(); renderThreatPins(true); renderLegend(); updateFeedIndicator();
       if (window.Ticker) window.Ticker.refresh();
       cliPrint(`\u2713 sync complete @ ${fmtTime()}`, "ok");
-      cliPrint(`  azure ${LIVE_MODE ? "LIVE" : "SIM"} \u00B7 solarwinds ${LIVE_MODE_SW ? "LIVE" : "SIM"} \u00B7 threat-intel ${LIVE_MODE_INTEL ? "LIVE" : "SIM"}`, "sys");
+      cliPrint(`  azure ${feeds.AZURE === false ? "OFF" : (LIVE_MODE ? "LIVE" : "SIM")} \u00B7 solarwinds ${LIVE_MODE_SW ? "LIVE" : "SIM"} \u00B7 threat-intel ${intelOn ? (LIVE_MODE_INTEL ? "LIVE" : "SIM") : "OFF"}`, "sys");
     });
   }
 
