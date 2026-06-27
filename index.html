@@ -1719,17 +1719,29 @@ function exportDossier(list) {
     }
     const el = map.getContainer();
     const HOLD = 550, MOVE_TOL = 12;
-    let timer = null, startPt = null, startLatLng = null, ind = null;
+    let timer = null, startPt = null, startLatLng = null, ind = null, activeId = null;
 
+    // remove the indicator AND sweep any orphans left by multi-touch / lost
+    // pointer events, so a circle can never get stuck on screen.
+    function removeIndicator() {
+      if (ind) { ind.remove(); ind = null; }
+      document.querySelectorAll(".lp-ind").forEach((n) => n.remove());
+    }
     function clearPress() {
       if (timer) { clearTimeout(timer); timer = null; }
-      if (ind) { ind.remove(); ind = null; }
+      removeIndicator();
       startPt = null;
+      activeId = null;
     }
     function down(e) {
       if (e.pointerType === "mouse" && e.button !== 0) return;
+      // only track the primary pointer — ignore extra fingers (multi-touch)
+      if (activeId !== null) return;
       // ignore presses on controls, popups, links, buttons, inputs
       if (e.target.closest && e.target.closest(".leaflet-control, .leaflet-popup, a, button, input, select, textarea")) return;
+      // clear any stale press/indicator before starting a fresh one
+      clearPress();
+      activeId = e.pointerId;
       const rect = el.getBoundingClientRect();
       const x = e.clientX - rect.left, y = e.clientY - rect.top;
       startPt = { x, y };
@@ -1741,24 +1753,34 @@ function exportDossier(list) {
       document.body.appendChild(ind);
       timer = setTimeout(() => {
         timer = null;
-        if (ind) { ind.remove(); ind = null; }
+        removeIndicator();
         const ll = startLatLng;
         startPt = null;
+        activeId = null;
         triggerLongPress(ll);
       }, HOLD);
     }
     function move(e) {
-      if (!startPt) return;
+      if (!startPt || (activeId !== null && e.pointerId !== activeId)) return;
       const rect = el.getBoundingClientRect();
       const dx = (e.clientX - rect.left) - startPt.x;
       const dy = (e.clientY - rect.top) - startPt.y;
       if (Math.hypot(dx, dy) > MOVE_TOL) clearPress();
     }
+    function up(e) {
+      if (activeId !== null && e.pointerId !== activeId) return;
+      clearPress();
+    }
     el.addEventListener("pointerdown", down);
     el.addEventListener("pointermove", move);
-    el.addEventListener("pointerup", clearPress);
-    el.addEventListener("pointercancel", clearPress);
-    el.addEventListener("pointerleave", clearPress);
+    el.addEventListener("pointerup", up);
+    el.addEventListener("pointercancel", up);
+    el.addEventListener("pointerleave", up);
+    // global safety nets — if the pointer is released outside the map or the
+    // gesture is interrupted (scroll, blur), make sure no circle survives.
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    window.addEventListener("blur", clearPress);
     el.addEventListener("contextmenu", (e) => e.preventDefault());
   }
 
