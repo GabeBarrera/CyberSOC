@@ -1583,6 +1583,7 @@ function exportDossier(list) {
   let radarRAF = null;         // active rAF handle (null when loop is parked)
   let sitrepVisible = false;   // true only while the SITREP view is on screen
   let refreshTimer = null;
+  let refreshMs = 0;
   let baseLayer = null;
   let detailLayer = null;    // high-detail tiles, present only during a locate fly-in
   let pinPending = false;    // true while arriving at SITREP via a dossier address link
@@ -2339,16 +2340,47 @@ function exportDossier(list) {
   }
 
   /* ---------- command line ---------- */
+  const CLI_MAX_LINES = 300;   // hard cap so a long session can't balloon the DOM
   function cliPrint(text, cls) {
     const out = $("#cli-out");
     const line = document.createElement("div");
     line.className = "cli-line " + (cls || "sys");
     line.innerHTML = text;
     out.appendChild(line);
+    // trim oldest lines once over the cap (keeps memory + DOM bounded)
+    while (out.childElementCount > CLI_MAX_LINES) out.removeChild(out.firstElementChild);
     out.scrollTop = out.scrollHeight;
   }
   function cliEcho(cmd) {
     cliPrint(`<span class="ci-prompt">soc@cybersoc:~$</span> ${cmd}`, "cmd");
+  }
+
+  /* ---------- memory watchdog (#11) ----------
+     Samples the JS heap on a timer. As pressure climbs it auto-trims the CLI
+     buffer and warns once in the console; clears the warning when it recovers. */
+  let memWatchTimer = null, memWarned = false;
+  function startMemoryWatchdog() {
+    if (memWatchTimer) return;
+    const sample = () => {
+      const m = performance && performance.memory;
+      if (!m || !m.jsHeapSizeLimit) return;
+      const frac = m.usedJSHeapSize / m.jsHeapSizeLimit;
+      if (frac > 0.85) {
+        // aggressively reclaim: trim CLI output hard
+        const out = $("#cli-out");
+        if (out) while (out.childElementCount > 120) out.removeChild(out.firstElementChild);
+        if (!memWarned) {
+          memWarned = true;
+          cliPrint(`\u26A0 MEMORY PRESSURE \u2014 heap at ${(frac * 100).toFixed(0)}% of ceiling. trimmed console buffer.`, "err");
+        }
+      } else if (frac < 0.6) {
+        memWarned = false;   // recovered \u2014 re-arm the warning
+      }
+    };
+    memWatchTimer = setInterval(sample, 15000);
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) sample();
+    });
   }
   function escHtml(s) {
     return (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -3552,10 +3584,17 @@ function exportDossier(list) {
       refreshAll();
       const sec = (window.Settings && +window.Settings.get("refreshSec")) || 30;
       this.setRefreshInterval(sec * 1000);
+      // pause radar + polling when the tab is backgrounded; resume on return
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) { stopRadar(); this.pausePolling(); }
+        else if (sitrepVisible) { startRadar(); this.resumePolling(); }
+      });
+      startMemoryWatchdog();
     },
     onShow() {
       sitrepVisible = true;
       startRadar();
+      this.resumePolling();
       if (map) setTimeout(() => {
         map.invalidateSize();
         if (!pinPending) fitAllRegions();
@@ -3563,7 +3602,7 @@ function exportDossier(list) {
         refreshMarkerAngles();
       }, 60);
     },
-    onHide() { sitrepVisible = false; stopRadar(); },
+    onHide() { sitrepVisible = false; stopRadar(); this.pausePolling(); },
     expectPin() { pinPending = true; },
     /* geocode & plot many dossier subjects, then fit the map to them (CLI 'locate') */
     async plotSubjects(list) {
@@ -3625,8 +3664,17 @@ function exportDossier(list) {
     setRefreshInterval(ms) {
       const v = Math.max(2000, +ms || 7000);
       PING_INTERVAL = v;            // sonar ping cadence follows the auto-refresh interval
+      refreshMs = v;
       if (refreshTimer) clearInterval(refreshTimer);
-      refreshTimer = setInterval(refreshAll, v);
+      // don't poll while the view is hidden/backgrounded — resumes on show
+      if (sitrepVisible && !document.hidden) refreshTimer = setInterval(refreshAll, v);
+    },
+    pausePolling() { if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; } },
+    resumePolling() {
+      if (!refreshTimer && refreshMs && sitrepVisible && !document.hidden) {
+        refreshAll();
+        refreshTimer = setInterval(refreshAll, refreshMs);
+      }
     },
     setBasemap(theme) {
       if (!map || !baseLayer) return;
