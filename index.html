@@ -83,6 +83,20 @@
 :root.reduce-motion .ns-live,
 :root.reduce-motion .region-marker.pinging .rm-ping { animation: none !important; }
 
+/* PERFORMANCE MODE (#9) — strips the GPU-heavy effects: live backdrop blur on
+   overlays that sit over the panning map, and the ambient looping animations.
+   Reuses the reduce-motion rules above (the class is applied alongside). */
+:root.perf-mode .hud-readout,
+:root.perf-mode .map-legend,
+:root.perf-mode .modal-scrim,
+:root.perf-mode #cintel-ov { backdrop-filter: none !important; }
+:root.perf-mode .hud-readout { background: rgba(10,6,8,0.92) !important; }
+:root.perf-mode .map-legend { background: rgba(10,6,8,0.92) !important; }
+:root.perf-mode .tm-RANSOM { animation: none !important; }
+:root.perf-mode .ticker-track,
+:root.perf-mode .ns-live,
+:root.perf-mode .tl-pulse { animation: none !important; }
+
 * { box-sizing: border-box; }
 html, body {
   margin: 0; height: 100%; width: 100%;
@@ -1579,6 +1593,8 @@ function exportDossier(list) {
   let PING_SPEED = 160;    // sonar diameter growth per second (px)
   let pingRadius = 0, prevPingRadius = 0, pingMaxRadius = 0;
   let pingActive = false, lastPingStart = 0, lastFrameTime = 0;
+  let lastRenderTime = 0;                 // last frame the radar actually re-rendered
+  const RADAR_FRAME_MS = 1000 / 30;       // cap radar render to ~30fps
   let PING_INTERVAL = 30000; // ms between sonar pings — synced to the auto-refresh setting
   let radarRAF = null;         // active rAF handle (null when loop is parked)
   let sitrepVisible = false;   // true only while the SITREP view is on screen
@@ -1921,10 +1937,18 @@ function exportDossier(list) {
     // Park the loop entirely when it can't be seen or there's nothing to draw.
     // A never-idle rAF is what lets renderer memory creep until WebKit kills the tab.
     if (!sitrepVisible || document.hidden || radarMode === "off") {
-      radarRAF = null; lastFrameTime = 0;
+      radarRAF = null; lastFrameTime = 0; lastRenderTime = 0;
       return;
     }
     now = now || performance.now();
+    // Throttle the actual sweep render to ~30fps. rAF still fires at the display
+    // rate, but rotating the big conic-gradient only every ~33ms roughly halves
+    // the GPU cost on high-refresh / high-DPI Macs with no visible difference.
+    if (lastRenderTime && (now - lastRenderTime) < RADAR_FRAME_MS) {
+      radarRAF = requestAnimationFrame(sweepLoop);
+      return;
+    }
+    lastRenderTime = now;
     const dt = lastFrameTime ? Math.min(0.1, (now - lastFrameTime) / 1000) : 0;
     lastFrameTime = now;
     const sweep = $("#radar-sweep"), ping = $("#radar-ping");
@@ -1973,7 +1997,7 @@ function exportDossier(list) {
   // Start the radar loop if (and only if) it should be running and isn't already.
   function startRadar() {
     if (radarRAF == null && sitrepVisible && !document.hidden && radarMode !== "off") {
-      lastFrameTime = 0;
+      lastFrameTime = 0; lastRenderTime = 0;
       radarRAF = requestAnimationFrame(sweepLoop);
     }
   }
@@ -3253,6 +3277,7 @@ function exportDossier(list) {
         ["localhost", "open a live shell on the host"],
         ["locate", "find &amp; plot dossier subjects, or center a flight"],
         ["run", "run diagnostic \u2014 memory footprint check"],
+        ["safemode", "toggle performance mode \u2014 cut graphical load"],
         ["server", "full report \u2014 azure + solarwinds status"],
         ["sitrep", "country posture, 24h alerts &amp; intel editor"]
       ];
@@ -3262,6 +3287,29 @@ function exportDossier(list) {
       });
       cliPrint("\u2014".repeat(40), "sys");
       cliPrint("  add -h after a command to list its flags &amp; parameters \u2014 e.g. 'locate -h'", "sys");
+    },
+    safemode(arg) {
+      const q = (arg || "").trim().toLowerCase();
+      if (isHelpFlag(q)) {
+        printFlagHelp("SAFEMODE // FLAGS", [
+          ["safemode", "toggle performance mode on/off"],
+          ["safemode on", "force performance mode on"],
+          ["safemode off", "force performance mode off"],
+          ["safemode -h", "show this flag reference"]
+        ]);
+        return;
+      }
+      if (!window.Settings) { cliPrint("\u2715 settings unavailable.", "err"); return; }
+      const cur = !!window.Settings.get("perfMode");
+      const next = q === "on" ? true : q === "off" ? false : !cur;
+      window.Settings.set("perfMode", next);
+      if (next) {
+        cliPrint("\u25C6 SAFEMODE ENGAGED \u2014 performance mode ON", "head");
+        cliPrint("  radar paused \u00B7 blur effects off \u00B7 ambient animation halted.", "ok");
+      } else {
+        cliPrint("\u25CB SAFEMODE DISENGAGED \u2014 performance mode OFF", "warn");
+        cliPrint("  full graphical fidelity restored.", "sys");
+      }
     },
     run(arg) {
       const a = (arg || "").trim().toLowerCase();
@@ -4399,7 +4447,7 @@ function exportDossier(list) {
   const DEFAULTS = {
     theme: "dark", accent: "magenta",
     tickerVisible: true, tickerSource: "both", tickerIssuesOnly: false, tickerSpeed: 3,
-    radar: true, radarMode: null, sweepSpeed: 0.7, pingSpeed: 160, refreshSec: 30, reduceMotion: false,
+    radar: true, radarMode: null, sweepSpeed: 0.7, pingSpeed: 160, refreshSec: 30, reduceMotion: false, perfMode: false,
     feeds: { AZURE: true, CISA: true, C2: false, IOC: false, URL: false, RANSOM: false, TOR: false, AIR: false }
   };
   const ACCENTS = {
@@ -4425,7 +4473,7 @@ function exportDossier(list) {
   function applyTicker() { document.documentElement.classList.toggle("no-ticker", !state.tickerVisible); document.documentElement.style.setProperty("--ticker-dur", tickerDuration()); if (window.Ticker) window.Ticker.refresh(); if (window.Sitrep) window.Sitrep.onShow(); }
   function applyRadar() {
     if (!window.Sitrep) return;
-    const mode = state.reduceMotion ? "off" : (state.radarMode || "off");
+    const mode = (state.reduceMotion || state.perfMode) ? "off" : (state.radarMode || "off");
     window.Sitrep.setRadarMode(mode);
     window.Sitrep.setSweepSpeed(state.sweepSpeed);
     if (window.Sitrep.setPingSpeed) window.Sitrep.setPingSpeed(state.pingSpeed);
@@ -4441,7 +4489,13 @@ function exportDossier(list) {
   }
   function applyRefresh() { if (window.Sitrep) window.Sitrep.setRefreshInterval(state.refreshSec * 1000); }
   function applyFeeds() { if (window.Sitrep && window.Sitrep.setFeeds) window.Sitrep.setFeeds(state.feeds); }
-  function applyMotion() { document.documentElement.classList.toggle("reduce-motion", state.reduceMotion); applyRadar(); }
+  function applyMotion() {
+    // perf mode implies reduced motion; radar is forced off while either is on
+    const rm = state.reduceMotion || state.perfMode;
+    document.documentElement.classList.toggle("reduce-motion", rm);
+    document.documentElement.classList.toggle("perf-mode", state.perfMode);
+    applyRadar();
+  }
   function applyAll() { applyTheme(); applyAccent(); applyTicker(); applyMotion(); applyRadar(); applyRefresh(); applyFeeds(); resolveRadarDefault(); }
 
   function setFeed(key, on) {
@@ -4457,7 +4511,7 @@ function exportDossier(list) {
     else if (k === "tickerVisible") applyTicker();
     else if (k === "tickerSource" || k === "tickerIssuesOnly") { if (window.Ticker) window.Ticker.refresh(); }
     else if (k === "tickerSpeed") document.documentElement.style.setProperty("--ticker-dur", tickerDuration());
-    else if (k === "reduceMotion") applyMotion();
+    else if (k === "reduceMotion" || k === "perfMode") { applyMotion(); render(); }
     else if (k === "radarMode") { applyRadar(); render(); }
     else if (k === "radar" || k === "sweepSpeed" || k === "pingSpeed") applyRadar();
     else if (k === "refreshSec") applyRefresh();
@@ -4499,6 +4553,7 @@ function exportDossier(list) {
               : ""}
          ${row("Auto-refresh", "How often all live feeds re-sync (Azure · SolarWinds · threat intel)", slider("refreshSec", 5, 300, 5, fmtDuration))}
          ${row("Reduce motion", "Pause sweep, ticker and ambient animation", toggle("reduceMotion"))}
+         ${row("Performance mode", "Cut GPU load on slower machines \u2014 disables radar, blur effects and all ambient animation", toggle("perfMode"))}
        </div>
        <div class="set-section"><h3>DATA FEEDS</h3>
          <div class="set-desc" style="margin:-4px 0 14px">Sources polled for the SITREP map. A feed that is off is never queried and its legend layer is hidden.</div>
