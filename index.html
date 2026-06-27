@@ -331,6 +331,15 @@ body { position: relative; }
 .alert-empty { text-align: center; color: var(--op); font-family: var(--mono); font-size: 11px; letter-spacing: 2px; margin-top: 40px; }
 
 /* alert filters + threat-intel cards */
+.alert-timefilter { display: flex; align-items: center; gap: 6px; padding: 10px 12px 0; flex-shrink: 0; }
+.atf-label { font-family: var(--mono); font-size: 8px; letter-spacing: 2px; color: var(--txt-dim); margin-right: 2px; }
+.atf-chip {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 1px; cursor: pointer;
+  padding: 4px 0; flex: 1; text-align: center; background: var(--bg-1); color: var(--txt-mut);
+  border: 1px solid var(--line-soft); border-radius: 2px; transition: all .15s;
+}
+.atf-chip:hover { color: var(--txt); border-color: var(--line); }
+.atf-chip.active { background: var(--accent); color: #0a0608; border-color: var(--accent); }
 .alert-filters { display: flex; gap: 6px; padding: 10px 12px 0; flex-wrap: wrap; flex-shrink: 0; }
 .af-chip {
   font-family: var(--mono); font-size: 9px; letter-spacing: 1.5px; cursor: pointer;
@@ -391,13 +400,19 @@ body { position: relative; }
 .pin-wrap:hover::before,
 .pin-wrap:hover::after { opacity: 1; }
 
-/* themed arrow cursor (flips with light/dark theme) */
-html, body, .leaflet-grab, .leaflet-container, .leaflet-interactive {
-  cursor: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='26'%20height='26'%20viewBox='0%200%2026%2026'%3E%3Cpath%20d='M4%203V21L9.2%2016L12.7%2023L15.8%2021.6L12.3%2015H19Z'%20fill='%23f3e8ee'%20stroke='%230a0608'%20stroke-width='1.4'%20stroke-linejoin='round'/%3E%3C/svg%3E") 4 3, default;
+/* themed cursors — magenta-outlined pointer + lock-on reticle for clickables */
+html, body, .leaflet-grab, .leaflet-container {
+  cursor: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='26'%20height='26'%20viewBox='0%200%2026%2026'%3E%3Cpath%20d='M4%203V21L9.2%2016L12.7%2023L15.8%2021.6L12.3%2015H19Z'%20fill='%23120a0f'%20stroke='%23ff2d6f'%20stroke-width='1.6'%20stroke-linejoin='round'/%3E%3C/svg%3E") 4 3, default;
 }
 :root[data-theme="light"] html, :root[data-theme="light"] body,
-:root[data-theme="light"] .leaflet-grab, :root[data-theme="light"] .leaflet-container, :root[data-theme="light"] .leaflet-interactive {
-  cursor: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='26'%20height='26'%20viewBox='0%200%2026%2026'%3E%3Cpath%20d='M4%203V21L9.2%2016L12.7%2023L15.8%2021.6L12.3%2015H19Z'%20fill='%231a1822'%20stroke='%23eceef3'%20stroke-width='1.4'%20stroke-linejoin='round'/%3E%3C/svg%3E") 4 3, default;
+:root[data-theme="light"] .leaflet-grab, :root[data-theme="light"] .leaflet-container {
+  cursor: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='26'%20height='26'%20viewBox='0%200%2026%2026'%3E%3Cpath%20d='M4%203V21L9.2%2016L12.7%2023L15.8%2021.6L12.3%2015H19Z'%20fill='%23ffffff'%20stroke='%23ff2d6f'%20stroke-width='1.8'%20stroke-linejoin='round'/%3E%3C/svg%3E") 4 3, default;
+}
+/* lock-on reticle for interactive elements */
+a, button, summary, label, select, [role="button"], [onclick],
+.af-chip, .atf-chip, .legend-row, .pull-tab, .alert-card.geo,
+.leaflet-interactive, .leaflet-marker-icon {
+  cursor: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='30'%20height='30'%20viewBox='0%200%2030%2030'%3E%3Cg%20fill='none'%20stroke='%23120a0f'%20stroke-width='4'%20stroke-linecap='round'%3E%3Cpath%20d='M5%2010V5H10'/%3E%3Cpath%20d='M20%205H25V10'/%3E%3Cpath%20d='M25%2020V25H20'/%3E%3Cpath%20d='M10%2025H5V20'/%3E%3C/g%3E%3Cg%20fill='none'%20stroke='%23ff2d6f'%20stroke-width='2'%20stroke-linecap='round'%3E%3Cpath%20d='M5%2010V5H10'/%3E%3Cpath%20d='M20%205H25V10'/%3E%3Cpath%20d='M25%2020V25H20'/%3E%3Cpath%20d='M10%2025H5V20'/%3E%3C/g%3E%3Ccircle%20cx='15'%20cy='15'%20r='1.6'%20fill='%23ff2d6f'/%3E%3C/svg%3E") 15 15, pointer;
 }
 
 /* SITREP map legend / layer toggles */
@@ -408,6 +423,17 @@ html, body, .leaflet-grab, .leaflet-container, .leaflet-interactive {
 .legend-row:hover { color: var(--accent); }
 .legend-swatch { width: 16px; height: 14px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
 .legend-count { margin-left: auto; font-size: 9px; color: var(--txt-dim); }
+/* multi-icon swatch: only the status/severity colours currently on the map */
+.legend-swatch.legend-swatch-multi { width: auto; min-width: 16px; gap: 4px; justify-content: flex-start; }
+.legend-diamond { width: 9px; height: 9px; box-sizing: border-box; transform: rotate(45deg); border: 1.5px solid; }
+.legend-diamond.status-operational { border-color: var(--op);  background: rgba(57,255,20,.28);  box-shadow: 0 0 6px rgba(57,255,20,.5); }
+.legend-diamond.status-degraded    { border-color: var(--deg); background: rgba(245,166,35,.26); box-shadow: 0 0 6px rgba(245,166,35,.5); }
+.legend-diamond.status-outage      { border-color: var(--out); background: rgba(255,59,59,.28);  box-shadow: 0 0 6px rgba(255,59,59,.55); }
+.legend-circle { width: 10px; height: 10px; box-sizing: border-box; border-radius: 50%; border: 2px solid; }
+.legend-circle.sev-outage   { border-color: #ff3b3b; background: rgba(255,59,59,.40);  box-shadow: 0 0 6px rgba(255,59,59,.6); }
+.legend-circle.sev-degraded { border-color: #ffd23d; background: rgba(255,210,61,.36); box-shadow: 0 0 6px rgba(255,210,61,.55); }
+.legend-circle.sev-unconf   { border-color: #9b6dff; background: rgba(155,109,255,.36); box-shadow: 0 0 6px rgba(155,109,255,.55); }
+.legend-circle.sev-info     { border-color: #4ea3ff; background: rgba(78,163,255,.36); box-shadow: 0 0 6px rgba(78,163,255,.55); }
 :root[data-theme="light"] .map-legend { background: rgba(245,246,249,.78); }
 @media (max-width: 720px) { .map-legend { bottom: 12px; left: 10px; min-width: 138px; padding: 7px 9px; } }
 
@@ -861,6 +887,14 @@ html, body, .leaflet-grab, .leaflet-container, .leaflet-interactive {
       <div class="panel-head">
         <h2>ALERT FEED</h2>
         <span class="panel-sub">CLOUD INCIDENTS &amp; THREAT INTEL</span>
+      </div>
+      <div class="alert-timefilter" id="alert-timefilter">
+        <span class="atf-label">WINDOW</span>
+        <button class="atf-chip active" data-win="ALL">ALL</button>
+        <button class="atf-chip" data-win="24h">24H</button>
+        <button class="atf-chip" data-win="w">W</button>
+        <button class="atf-chip" data-win="m">M</button>
+        <button class="atf-chip" data-win="y">Y</button>
       </div>
       <div class="alert-filters" id="alert-filters">
         <button class="af-chip active" data-cat="ALL">ALL</button>
@@ -1532,8 +1566,9 @@ function exportDossier(list) {
   let map, radarCenterLatLng = null;
   const markers = {};        // code -> { marker, el, latlng, lastPing }
   let alertFilter = "ALL";   // ALL | AZURE | CVE | C2 | IOC | URL | RANSOM
+  let alertWindow = "ALL";   // ALL | 24h | w | m | y
   let threatLayer = null;    // Leaflet layer group for plotted threat intel
-  let threatLayers = { AZURE: true, C2: true, IOC: true, URL: true, RANSOM: true, TOR: true, AIR: true, CISA: true };
+  let threatLayers = { AZURE: true, C2: true, IOC: true, URL: true, RANSOM: true, TOR: true, AIR: true, CISA: true, SITREP: true };
   // master data-feed switches (mirrored from Settings) — a feed that is off is
   // never queried and its legend row is hidden entirely.
   let feeds = { AZURE: true, CISA: true, C2: false, IOC: false, URL: false, RANSOM: false, TOR: false, AIR: false };
@@ -1994,7 +2029,7 @@ function exportDossier(list) {
     AZURE_REGIONS.filter((r) => r.status !== "operational").forEach((r) => {
       const d = ALERT_DETAIL[r.code] || {};
       out.push({
-        cat: "AZURE", sev: r.status,
+        cat: "AZURE", sev: r.status, ts: d.since || null,
         time: (d.id || "") + (d.since ? " \u00B7 " + ago(d.since) + " ago" : ""),
         title: r.name, sub: (d.service || "Multiple services") + " \u00B7 " + r.geo,
         msg: d.msg || "", src: "Azure Status"
@@ -2003,7 +2038,7 @@ function exportDossier(list) {
     THREAT_FEED.items.forEach((it) => {
       if (it.cat === "TOR" || it.cat === "AIR" || it.cat === "CISA") return; // map-only layers
       out.push({
-        cat: it.cat, sev: it.sev,
+        cat: it.cat, sev: it.sev, ts: it.ts || null,
         time: it.ts ? ago(it.ts) + " ago" : "",
         title: it.title, sub: it.sub || "", msg: it.msg || "", src: it.src || "",
         lat: it.lat, lng: it.lng, geo: it.geo, ransomware: it.ransomware
@@ -2018,7 +2053,7 @@ function exportDossier(list) {
         const s = ALERT_SEV[sev];
         out.push({
           cat: "COUNTRY", catLabel: s.label, catColor: s.color,
-          sev: sev,
+          sev: sev, ts: a.ts || null,
           time: a.ts ? ago(a.ts) + " ago" : "",
           title: (p ? p.label + " \u00B7 " : "") + (rec.name || iso3),
           sub: rec.summary || "", msg: a.text || "", url: a.url || "",
@@ -2039,7 +2074,11 @@ function exportDossier(list) {
     badge.textContent = model.length;
     badge.classList.toggle("zero", model.length === 0);
 
-    const filtered = (alertFilter === "ALL" ? model : model.filter((a) => a.cat === alertFilter))
+    const WIN_MS = { "24h": 864e5, w: 6048e5, m: 2592e6, y: 31536e6 };
+    const cutoff = WIN_MS[alertWindow] ? Date.now() - WIN_MS[alertWindow] : null;
+    const filtered = model
+      .filter((a) => alertFilter === "ALL" || a.cat === alertFilter)
+      .filter((a) => cutoff == null || (a.ts != null && a.ts >= cutoff))
       .sort((a, b) => (a.sev === "outage" ? -1 : 1) - (b.sev === "outage" ? -1 : 1));
 
     if (!filtered.length) {
@@ -2069,6 +2108,7 @@ function exportDossier(list) {
     }
     renderIntelFoot();
     renderCountryAlertPins();
+    renderLegend();
   }
 
   function renderIntelFoot() {
@@ -2105,19 +2145,69 @@ function exportDossier(list) {
     const el = $("#map-legend"); if (!el) return;
     const counts = { AZURE: AZURE_REGIONS.length };
     THREAT_FEED.items.concat(CISA_OFFICES).forEach((it) => { if (it.lat != null) counts[it.cat] = (counts[it.cat] || 0) + 1; });
+
+    // Azure swatch: one diamond per status colour actually present on the map
+    // (green operational, yellow degraded, red outage) — colours with zero
+    // regions are omitted.
+    const azureSwatch = () => {
+      const sc = statusCounts();
+      const shown = ["operational", "degraded", "outage"].filter((s) => sc[s] > 0);
+      const list = shown.length ? shown : ["operational"];
+      return `<span class="legend-swatch legend-swatch-multi">${list.map((s) => `<span class="legend-diamond status-${s}"></span>`).join("")}</span>`;
+    };
+
+    // Analyst (country-intel) alert severities currently plotted on the map.
+    const sitrepSev = () => {
+      const present = {};
+      Object.keys(COUNTRY_INTEL).forEach((iso3) => {
+        const rec = COUNTRY_INTEL[iso3];
+        (rec.alerts || []).forEach((a) => {
+          const lat = a.lat != null ? a.lat : rec.lat;
+          const lng = a.lng != null ? a.lng : rec.lng;
+          if (lat == null || lng == null) return;
+          const sev = ALERT_SEV[a.sev] ? a.sev : "degraded";
+          present[sev] = (present[sev] || 0) + 1;
+        });
+      });
+      return present;
+    };
+
     // only feeds that are enabled in Settings appear in the legend
     const rows = LEGEND_CATS.filter(([c]) => feeds[c] !== false);
-    el.innerHTML = `<div class="map-legend-h">MAP LAYERS</div>` + rows.map(([c, label]) => {
+    const layerRows = rows.map(([c, label]) => {
       const on = threatLayers[c] !== false;
+      const swatch = c === "AZURE"
+        ? azureSwatch()
+        : `<span class="legend-swatch"><span class="tm tm-${c} sev-outage"></span></span>`;
       return `<div class="legend-row ${on ? "" : "off"}" data-layer="${c}">
-        <span class="legend-swatch"><span class="tm tm-${c} sev-outage"></span></span>
+        ${swatch}
         <span>${label}</span><span class="legend-count">${counts[c] || 0}</span>
       </div>`;
     }).join("");
+
+    // SITREP alerts row — only the circle colours relevant to the map, hidden
+    // entirely when no analyst alerts are plotted. Pinned to the top of the
+    // legend, above the standard map layers.
+    let sitrepHtml = "";
+    const present = sitrepSev();
+    const sevs = ALERT_SEV_ORDER.filter((s) => present[s] > 0);
+    if (sevs.length) {
+      const total = sevs.reduce((n, s) => n + present[s], 0);
+      const on = threatLayers.SITREP !== false;
+      const circles = sevs.map((s) => `<span class="legend-circle sev-${s}"></span>`).join("");
+      sitrepHtml = `<div class="legend-row ${on ? "" : "off"}" data-layer="SITREP">
+        <span class="legend-swatch legend-swatch-multi">${circles}</span>
+        <span>Sitrep alerts</span><span class="legend-count">${total}</span>
+      </div>`;
+    }
+    el.innerHTML = `<div class="map-legend-h">MAP LAYERS</div>` + sitrepHtml + layerRows;
+
     el.querySelectorAll(".legend-row").forEach((row) => row.addEventListener("click", () => {
       const c = row.dataset.layer;
       threatLayers[c] = threatLayers[c] === false;
-      if (c === "AZURE") updateRegionVisibility(); else renderThreatPins(true);
+      if (c === "AZURE") updateRegionVisibility();
+      else if (c === "SITREP") renderCountryAlertPins();
+      else renderThreatPins(true);
       renderLegend();
     }));
   }
@@ -2169,6 +2259,7 @@ function exportDossier(list) {
   function renderCountryAlertPins() {
     if (!map) return;
     if (countryAlertLayer) { map.removeLayer(countryAlertLayer); countryAlertLayer = null; }
+    if (threatLayers.SITREP === false) return;
     const layers = [];
     Object.keys(COUNTRY_INTEL).forEach((iso3) => {
       const rec = COUNTRY_INTEL[iso3];
@@ -2236,6 +2327,13 @@ function exportDossier(list) {
       if (!b) return;
       alertFilter = b.dataset.cat;
       $("#alert-filters").querySelectorAll(".af-chip").forEach((c) => c.classList.toggle("active", c === b));
+      renderAlerts();
+    });
+    $("#alert-timefilter").addEventListener("click", (e) => {
+      const b = e.target.closest(".atf-chip");
+      if (!b) return;
+      alertWindow = b.dataset.win;
+      $("#alert-timefilter").querySelectorAll(".atf-chip").forEach((c) => c.classList.toggle("active", c === b));
       renderAlerts();
     });
   }
@@ -3094,7 +3192,7 @@ function exportDossier(list) {
       cliPrint("AVAILABLE COMMANDS", "head");
       const rows = [
         ["alerts", "active incidents only"],
-        ["clear", "clear the console"],
+        ["clear", "clear console \u00B7 -a <country> wipes its alerts"],
         ["dossier", "list every subject name on file"],
         ["help", "list available commands"],
         ["intel", "public threat intel \u2014 CVEs \u00B7 C2 \u00B7 IOCs"],
@@ -3274,14 +3372,47 @@ function exportDossier(list) {
       cliPrint("  every line you enter now executes on the host. type 'exit' to disconnect.", "warn");
       cliPrint("  (requires the local Node server \u2014 node server.js)", "sys");
     },
-    clear() {
+    clear(arg) {
+      const a = (arg || "").trim();
+      // clear -a <country> : wipe every alert on file for that country
+      if (/^-a(\s|$)/i.test(a)) {
+        const q = a.replace(/^-a\s*/i, "").trim().replace(/^["']|["']$/g, "");
+        if (!q) { cliPrint("usage: clear -a <country>", "warn"); return; }
+        const c = resolveCountry(q);
+        if (!c) { cliPrint(`\u2715 country not recognised: ${escHtml(q)}`, "err"); return; }
+        const rec = COUNTRY_INTEL[c.iso3];
+        const n = rec && rec.alerts ? rec.alerts.length : 0;
+        if (!n) { cliPrint(`\u2713 no alerts on file for ${escHtml(c.name)} \u2014 nothing to clear.`, "ok"); return; }
+        cliConfirm(`\u26A0 delete all ${n} alert(s) for ${c.name.toUpperCase()}? [y/N]`, () => {
+          rec.alerts = [];
+          saveCIntel(); renderAlerts();
+          cliPrint(`\u2713 cleared ${n} alert(s) for ${escHtml(c.name)}.`, "warn");
+        });
+        return;
+      }
       $("#cli-out").innerHTML = "";
       clearCountryHighlights();
       if (map) map.flyTo([30, 5], 2, { duration: 1.0 });
     }
   };
 
+  /* pending y/N confirmation: the next CLI line answers it instead of running
+     as a command. */
+  let pendingConfirm = null;
+  function cliConfirm(promptText, onYes) {
+    cliPrint(promptText, "warn");
+    pendingConfirm = onYes;
+  }
+
   function runCommand(raw) {
+    if (pendingConfirm) {
+      cliEcho(raw);
+      const ans = raw.trim().toLowerCase();
+      const fn = pendingConfirm; pendingConfirm = null;
+      if (ans === "y" || ans === "yes") fn();
+      else cliPrint("\u25CB cancelled.", "sys");
+      return;
+    }
     if (shellMode) {
       const t = raw.trim();
       cliPrint(`<span class="ci-prompt" style="color:var(--out)">host:~#</span> ${escHtml(raw)}`, "cmd");
