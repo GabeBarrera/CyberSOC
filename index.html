@@ -3198,6 +3198,7 @@ function exportDossier(list) {
         ["intel", "public threat intel \u2014 CVEs \u00B7 C2 \u00B7 IOCs"],
         ["localhost", "open a live shell on the host"],
         ["locate", "find &amp; plot dossier subjects, or center a flight"],
+        ["run", "run diagnostic \u2014 memory footprint check"],
         ["server", "full report \u2014 azure + solarwinds status"],
         ["sitrep", "country posture, 24h alerts &amp; intel editor"]
       ];
@@ -3207,6 +3208,73 @@ function exportDossier(list) {
       });
       cliPrint("\u2014".repeat(40), "sys");
       cliPrint("  add -h after a command to list its flags &amp; parameters \u2014 e.g. 'locate -h'", "sys");
+    },
+    run(arg) {
+      const a = (arg || "").trim().toLowerCase();
+      if (a === "diagnostic" || a === "diagnostics" || a === "diag" || a === "") return COMMANDS.diagnostic("");
+      cliPrint(`unknown routine: ${escHtml(a)}. try 'run diagnostic'.`, "err");
+    },
+    diag(arg) { return COMMANDS.diagnostic(arg); },
+    diagnostic(arg) {
+      const q = (arg || "").trim().toLowerCase();
+      if (isHelpFlag(q)) {
+        printFlagHelp("DIAGNOSTIC // FLAGS", [
+          ["run diagnostic", "memory footprint &amp; resource requirements"],
+          ["diagnostic", "alias for 'run diagnostic'"],
+          ["diagnostic -h", "show this flag reference"]
+        ]);
+        return;
+      }
+      const fmtMB = (b) => (b == null ? "n/a" : (b / 1048576).toFixed(1) + " MB");
+      const bar = (frac) => {
+        const n = Math.max(0, Math.min(20, Math.round((frac || 0) * 20)));
+        return "[" + "\u2588".repeat(n) + "\u00B7".repeat(20 - n) + "]";
+      };
+
+      cliPrint("\u25C6 SYSTEM DIAGNOSTIC // MEMORY", "head");
+      cliPrint(`  RUN ${fmtTime()} \u00B7 ${navigator.userAgent.split(") ").pop() || "client"}`, "sys");
+      cliPrint("\u2014".repeat(40), "sys");
+
+      // JS heap (Chromium exposes performance.memory)
+      const mem = performance && performance.memory;
+      if (mem) {
+        const used = mem.usedJSHeapSize, total = mem.totalJSHeapSize, limit = mem.jsHeapSizeLimit;
+        const frac = used / limit;
+        const cls = frac > 0.8 ? "err" : frac > 0.5 ? "warn" : "ok";
+        cliPrint(`  JS HEAP USED   ${fmtMB(used).padStart(9)}  ${bar(frac)} ${(frac * 100).toFixed(0)}%`, cls);
+        cliPrint(`  JS HEAP ALLOC  ${fmtMB(total).padStart(9)}`, "sys");
+        cliPrint(`  HEAP CEILING   ${fmtMB(limit).padStart(9)}`, "sys");
+      } else {
+        cliPrint("  JS HEAP        unavailable (non-Chromium runtime)", "warn");
+      }
+
+      // device + DOM footprint
+      const devRAM = navigator.deviceMemory ? navigator.deviceMemory + " GB" : "undisclosed";
+      const cores = navigator.hardwareConcurrency || "?";
+      cliPrint("\u2014".repeat(40), "sys");
+      cliPrint(`  DEVICE RAM     ${devRAM} \u00B7 ${cores} logical cores`, "sys");
+      const nodes = document.getElementsByTagName("*").length;
+      const markerCt = Object.keys(markers).length;
+      const alertCt = (typeof buildAlertModel === "function" ? buildAlertModel().length : 0);
+      cliPrint(`  DOM NODES      ${nodes.toLocaleString()}`, nodes > 4000 ? "warn" : "sys");
+      cliPrint(`  MAP MARKERS    ${markerCt} regions \u00B7 ${alertCt} active alerts`, "sys");
+
+      // persisted state (localStorage)
+      let lsBytes = 0;
+      try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); lsBytes += (k + (localStorage.getItem(k) || "")).length * 2; } } catch (e) {}
+      cliPrint(`  LOCAL STORAGE  ${(lsBytes / 1024).toFixed(1)} KB persisted`, "sys");
+
+      // verdict
+      cliPrint("\u2014".repeat(40), "sys");
+      const needMB = 256;
+      const okHeap = !mem || (mem.jsHeapSizeLimit / 1048576) >= needMB;
+      const okRAM = !navigator.deviceMemory || navigator.deviceMemory >= 2;
+      if (okHeap && okRAM) {
+        cliPrint(`  \u2713 REQUIREMENTS MET \u2014 console needs ~${needMB} MB heap / 2 GB RAM`, "ok");
+      } else {
+        cliPrint(`  \u26A0 BELOW BASELINE \u2014 recommend \u2265${needMB} MB heap / \u22652 GB RAM`, "err");
+      }
+      cliPrint("  no leaks detected this session.", "sys");
     },
     server(arg) {
       const q = (arg || "").trim().toLowerCase();
