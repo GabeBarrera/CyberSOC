@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -83,7 +83,7 @@
 :root.reduce-motion .ns-live,
 :root.reduce-motion .region-marker.pinging .rm-ping { animation: none !important; }
 
-/* PERFORMANCE MODE (#9) — strips the GPU-heavy effects: live backdrop blur on
+/* PERFORMANCE MODE (#9) â€” strips the GPU-heavy effects: live backdrop blur on
    overlays that sit over the panning map, and the ambient looping animations.
    Reuses the reduce-motion rules above (the class is applied alongside). */
 :root.perf-mode .hud-readout,
@@ -252,6 +252,7 @@ body { position: relative; }
 .region-marker.status-operational .rm-dot { background: var(--op); color: var(--op); }
 .region-marker.status-degraded   .rm-dot { background: var(--deg); color: var(--deg); }
 .region-marker.status-outage      .rm-dot { background: var(--out); color: var(--out); }
+.region-marker.status-unknown     .rm-dot { background: var(--out); color: var(--out); }
 .rm-ping {
   position: absolute; left: 50%; top: 50%; width: 8px; height: 8px;
   transform: translate(-50%,-50%) rotate(45deg);
@@ -260,6 +261,7 @@ body { position: relative; }
 .region-marker.status-operational .rm-ping { color: var(--op); }
 .region-marker.status-degraded   .rm-ping { color: var(--deg); }
 .region-marker.status-outage      .rm-ping { color: var(--out); }
+.region-marker.status-unknown     .rm-ping { color: var(--out); }
 .region-marker.pinging .rm-ping { animation: ping 1.4s cubic-bezier(.2,.6,.3,1) forwards; }
 @keyframes ping {
   0%   { opacity: .9; transform: translate(-50%,-50%) rotate(45deg) scale(1); }
@@ -331,6 +333,7 @@ body { position: relative; }
 .alert-card.sev-outage   { border-left-color: var(--out); }
 .alert-card.sev-info     { border-left-color: #4ea3ff; }
 .alert-card.sev-unconf   { border-left-color: #9b6dff; }
+.alert-card.sev-unknown  { border-left-color: var(--out); }
 .alert-link { margin-top: 6px; font-family: var(--mono); font-size: 9px; letter-spacing: .5px; }
 .alert-link a { color: var(--accent); text-decoration: none; word-break: break-all; }
 .alert-link a:hover { text-decoration: underline; }
@@ -354,10 +357,33 @@ body { position: relative; }
 }
 .atf-chip:hover { color: var(--txt); border-color: var(--line); }
 .atf-chip.active { background: var(--accent); color: #0a0608; border-color: var(--accent); }
-.alert-filters { display: flex; gap: 6px; padding: 10px 12px 0; flex-wrap: wrap; flex-shrink: 0; }
+.atf-funnel-wrap { position: relative; flex-shrink: 0; margin-left: 2px; }
+.atf-funnel {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; padding: 4px 0; cursor: pointer;
+  background: var(--bg-1); color: var(--txt-mut);
+  border: 1px solid var(--line-soft); border-radius: 2px; transition: all .15s;
+}
+.atf-funnel:hover { color: var(--txt); border-color: var(--line); }
+.atf-funnel svg { width: 12px; height: 12px; display: block; }
+.atf-funnel.filtered { border-color: var(--accent); color: var(--accent); }
+.atf-funnel.open { background: var(--accent); color: #0a0608; border-color: var(--accent); }
+.atf-funnel .funnel-dot { display: none; }
+.alert-filters {
+  display: none; position: absolute; top: calc(100% + 7px); right: 0; z-index: 700;
+  flex-direction: column; gap: 4px; padding: 8px; min-width: 132px;
+  background: var(--bg-1); border: 1px solid var(--line);
+  box-shadow: 0 14px 36px rgba(0,0,0,.65);
+}
+.alert-filters.open { display: flex; }
+.alert-filters::before {
+  content: ""; position: absolute; top: -5px; right: 9px; width: 8px; height: 8px;
+  background: var(--bg-1); border-left: 1px solid var(--line); border-top: 1px solid var(--line);
+  transform: rotate(45deg);
+}
 .af-chip {
   font-family: var(--mono); font-size: 9px; letter-spacing: 1.5px; cursor: pointer;
-  padding: 4px 9px; background: var(--bg-1); color: var(--txt-mut);
+  padding: 5px 9px; text-align: left; background: var(--bg-1); color: var(--txt-mut);
   border: 1px solid var(--line-soft); border-radius: 2px; transition: all .15s;
 }
 .af-chip:hover { color: var(--txt); border-color: var(--line); }
@@ -372,9 +398,9 @@ body { position: relative; }
 .alert-pin { font-family: var(--mono); font-size: 8px; letter-spacing: 1px; color: var(--op); margin-top: 5px; }
 .alert-src { font-family: var(--mono); font-size: 8px; letter-spacing: 1px; color: var(--txt-dim); margin-top: 5px; }
 .intel-foot { flex-shrink: 0; padding: 8px 12px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: 8px; letter-spacing: 1px; color: var(--txt-dim); line-height: 1.5; }
-.intel-foot .if-ok { color: var(--op); } .intel-foot .if-bad { color: var(--deg); }
+.intel-foot .if-ok { color: var(--op); } .intel-foot .if-bad { color: var(--out); }
 
-/* threat-intel map markers — distinct shape + colour per source */
+/* threat-intel map markers â€” distinct shape + colour per source */
 .tm { width: 12px; height: 12px; box-sizing: border-box; }
 .tm-C2 { transform: rotate(45deg); border: 1.5px solid var(--out); background: rgba(255,59,59,.28); box-shadow: 0 0 8px rgba(255,59,59,.55); }
 .tm-C2.sev-degraded { border-color: var(--deg); background: rgba(245,166,35,.26); box-shadow: 0 0 8px rgba(245,166,35,.5); }
@@ -388,7 +414,7 @@ body { position: relative; }
 .tm-CISA { border: 1.5px solid #5b8def; background: rgba(91,141,239,.30); box-shadow: 0 0 8px rgba(91,141,239,.6); border-radius: 2px; }
 .tm-AZURE { border-radius: 50%; border: 1.5px solid var(--op); background: rgba(57,255,20,.26); box-shadow: 0 0 8px rgba(57,255,20,.5); }
 
-/* country-alert pins (analyst) — coloured by alert severity */
+/* country-alert pins (analyst) â€” coloured by alert severity */
 .ca-pin { width: 12px; height: 12px; box-sizing: border-box; border-radius: 50%; border: 2px solid; }
 .ca-pin.sev-outage   { border-color: #ff3b3b; background: rgba(255,59,59,.40);  box-shadow: 0 0 9px rgba(255,59,59,.7); }
 .ca-pin.sev-degraded { border-color: #ffd23d; background: rgba(255,210,61,.36); box-shadow: 0 0 9px rgba(255,210,61,.62); }
@@ -413,8 +439,9 @@ body { position: relative; }
 }
 .pin-wrap:hover::before,
 .pin-wrap:hover::after { opacity: 1; }
+.dossier-pin { width: 12px; height: 12px; border-radius: 50%; background: #ff2d6f; border: 2px solid #ff2d6f; box-shadow: 0 0 8px rgba(255,45,111,.75); }
 
-/* themed cursors — magenta-outlined pointer + lock-on reticle for clickables */
+/* themed cursors â€” magenta-outlined pointer + lock-on reticle for clickables */
 html, body, .leaflet-grab, .leaflet-container {
   cursor: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='26'%20height='26'%20viewBox='0%200%2026%2026'%3E%3Cpath%20d='M4%203V21L9.2%2016L12.7%2023L15.8%2021.6L12.3%2015H19Z'%20fill='%23120a0f'%20stroke='%23ff2d6f'%20stroke-width='1.6'%20stroke-linejoin='round'/%3E%3C/svg%3E") 4 3, default;
 }
@@ -909,9 +936,12 @@ a, button, summary, label, select, [role="button"], [onclick],
         <button class="atf-chip" data-win="w">W</button>
         <button class="atf-chip" data-win="m">M</button>
         <button class="atf-chip" data-win="y">Y</button>
-      </div>
-      <div class="alert-filters" id="alert-filters">
-        <button class="af-chip active" data-cat="ALL">ALL</button>
+        <div class="atf-funnel-wrap">
+          <button class="atf-funnel" id="alert-funnel" aria-label="Filter by category" title="Filter by category" aria-expanded="false">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 2.5h13l-5 6v5l-3-1.6V8.5z"></path></svg>
+          </button>
+          <div class="alert-filters" id="alert-filters">
+            <button class="af-chip active" data-cat="ALL">ALL</button>
         <button class="af-chip" data-cat="AZURE">AZURE</button>
         <button class="af-chip" data-cat="CVE">CVE</button>
         <button class="af-chip" data-cat="C2">C2/IP</button>
@@ -919,6 +949,8 @@ a, button, summary, label, select, [role="button"], [onclick],
         <button class="af-chip" data-cat="URL">URL</button>
         <button class="af-chip" data-cat="RANSOM">RANSOM</button>
         <button class="af-chip" data-cat="COUNTRY">COUNTRY</button>
+          </div>
+        </div>
       </div>
       <div class="alert-list" id="alert-list"></div>
       <div class="intel-foot" id="intel-foot">FEEDS: &#x2014;</div>
@@ -1183,9 +1215,9 @@ a, button, summary, label, select, [role="button"], [onclick],
    - DOSSIER seed loader (data/soc_dossier.json -> localStorage)
    =================================================================== */
 
-/* Real Azure regions with approximate geo coordinates.
-   `status` is mock telemetry; in a hosted env you could replace
-   refreshAzureStatus() with a real fetch of an Azure status JSON feed. */
+/* Real Azure regions with approximate geo coordinates. Region `status` is
+   authoritative ONLY from the live Azure feed (/api/azure-status); offline,
+   every region is forced to "unknown" by setAzureOffline(). */
 const AZURE_REGIONS = [
   { code: "eastus",        name: "East US",            geo: "Virginia, USA",      lat: 37.37,  lng: -79.82, status: "operational" },
   { code: "eastus2",       name: "East US 2",          geo: "Virginia, USA",      lat: 36.66,  lng: -78.39, status: "operational" },
@@ -1217,44 +1249,22 @@ const AZURE_REGIONS = [
   { code: "australiaeast", name: "Australia East",     geo: "Sydney, AU",         lat: -33.87, lng: 151.21, status: "operational" }
 ];
 
-/* Services that can be flagged in an alert */
-const AZURE_SERVICES = [
-  "Virtual Machines", "App Service", "Azure SQL Database", "Storage",
-  "Azure Kubernetes Service", "Azure Active Directory", "Cosmos DB",
-  "Azure Functions", "Networking", "Key Vault", "Service Bus", "Azure Monitor"
-];
-
-const DEGRADED_MSGS = [
-  "Elevated latency observed on regional gateways. Mitigation in progress.",
-  "Intermittent connection failures affecting a subset of customers.",
-  "Increased error rates on management plane operations.",
-  "Partial capacity constraint; new deployments may be delayed."
-];
-const OUTAGE_MSGS = [
-  "Loss of availability impacting multiple services. Engineers engaged.",
-  "Underlying network infrastructure failure under active investigation.",
-  "Datacenter cooling event triggered protective shutdown of racks.",
-  "Storage subsystem fault \u2014 failover initiated to secondary scale unit."
-];
-
-/* per-region active alert detail (generated for non-operational regions) */
+/* per-region active alert detail â€” populated ONLY from the live Azure feed
+   (see syncAzureStatus). Nothing here is ever fabricated locally. */
 const ALERT_DETAIL = {};
-function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 function regionTrackingId() { return "AZ-" + Math.floor(1000 + Math.random() * 8999); }
 
-function ensureAlertDetail(r) {
-  if (r.status === "operational") { delete ALERT_DETAIL[r.code]; return; }
-  if (!ALERT_DETAIL[r.code] || ALERT_DETAIL[r.code].sev !== r.status) {
-    ALERT_DETAIL[r.code] = {
-      sev: r.status,
-      service: pick(AZURE_SERVICES),
-      msg: r.status === "outage" ? pick(OUTAGE_MSGS) : pick(DEGRADED_MSGS),
-      id: regionTrackingId(),
-      since: Date.now() - Math.floor(Math.random() * 5400 * 1000)
-    };
-  }
+/* OFFLINE MODE.
+   When the page is not served by the local Node server (hosted online, or the
+   server isn't running) every /api/* call fails. We do NOT simulate â€” instead
+   each Azure region's health is reported as UNKNOWN (rendered red, status text
+   gray) and per-region detail is cleared. A live sync overwrites this. */
+const OFFLINE_STATUS = "unknown";
+function setAzureOffline() {
+  AZURE_REGIONS.forEach((r) => { r.status = OFFLINE_STATUS; });
+  for (const k in ALERT_DETAIL) delete ALERT_DETAIL[k];
 }
-AZURE_REGIONS.forEach(ensureAlertDetail);
+setAzureOffline(); // start offline until the first live sync succeeds
 
 /* When the page is served by the bundled Node server (port 3005),
    /api/* is same-origin and LIVE. Otherwise these fetches fail and the
@@ -1279,15 +1289,11 @@ const SOLARWINDS_COMPONENTS = [
   { name: "AIOps Service", status: "operational" }
 ];
 
-const SW_DRIFT = ["degraded", "outage", "maintenance"];
-function simSolarWinds() {
-  // mostly operational; occasionally nudge one component
-  if (Math.random() < 0.25) {
-    const c = SOLARWINDS_COMPONENTS[Math.floor(Math.random() * SOLARWINDS_COMPONENTS.length)];
-    c.status = c.status === "operational" ? SW_DRIFT[Math.floor(Math.random() * SW_DRIFT.length)] : "operational";
-  }
-  return SOLARWINDS_COMPONENTS;
+/* Offline: every SolarWinds component reports UNKNOWN â€” never simulated. */
+function setSolarWindsOffline() {
+  SOLARWINDS_COMPONENTS.forEach((c) => { c.status = OFFLINE_STATUS; });
 }
+setSolarWindsOffline(); // start offline until a live sync succeeds
 
 async function syncSolarWindsStatus() {
   try {
@@ -1307,7 +1313,7 @@ async function syncSolarWindsStatus() {
     }
   } catch (e) { /* server not running */ }
   LIVE_MODE_SW = false;
-  simSolarWinds();
+  setSolarWindsOffline();
   return false;
 }
 
@@ -1340,93 +1346,27 @@ async function syncAzureStatus() {
     }
   } catch (e) { /* server not running */ }
   LIVE_MODE = false;
-  refreshAzureStatus(); // local simulation fallback
+  setAzureOffline(); // no live feed â€” regions report UNKNOWN, never simulated
   return false;
 }
 
-/* Simulated status drift (fallback when no live feed is available). */
-function refreshAzureStatus() {
-  // 35% chance to mutate one random region's status on each tick
-  if (Math.random() < 0.35) {
-    const r = pick(AZURE_REGIONS);
-    const roll = Math.random();
-    if (r.status === "operational") {
-      r.status = roll < 0.78 ? "degraded" : "outage";
-    } else if (r.status === "degraded") {
-      r.status = roll < 0.55 ? "operational" : "outage";
-    } else { // outage
-      r.status = roll < 0.6 ? "degraded" : "operational";
-    }
-    ensureAlertDetail(r);
-  }
-  return AZURE_REGIONS;
-}
-
 function statusCounts() {
-  const c = { operational: 0, degraded: 0, outage: 0 };
-  AZURE_REGIONS.forEach(r => c[r.status]++);
+  const c = { operational: 0, degraded: 0, outage: 0, unknown: 0 };
+  AZURE_REGIONS.forEach(r => { if (c[r.status] != null) c[r.status]++; });
   return c;
 }
 
 /* ===================================================================
    THREAT INTELLIGENCE (client)
    Live: /api/threat-intel  (server refreshes public feeds every 60s).
-   Fallback: a small simulated set so the page still demos statically.
+   Offline: no data â€” these categories simply show nothing (never simulated).
    Item shape: { id, cat, sev, title, sub, msg, ts, src, lat?, lng?, geo? }
    =================================================================== */
 const THREAT_FEED = { items: [], feeds: {}, fetchedAt: null };
 let LIVE_MODE_INTEL = false;
 
-const INTEL_SIM = [
-  { id: "kev-CVE-2024-3400", cat: "CVE", sev: "outage", title: "CVE-2024-3400", sub: "Palo Alto Networks PAN-OS",
-    msg: "Command Injection in GlobalProtect \u2014 actively exploited in the wild.", src: "CISA KEV (sim)", ransomware: true },
-  { id: "kev-CVE-2023-34362", cat: "CVE", sev: "outage", title: "CVE-2023-34362", sub: "Progress MOVEit Transfer",
-    msg: "SQL injection enabling unauthenticated RCE \u2014 Cl0p ransomware campaign.", src: "CISA KEV (sim)", ransomware: true },
-  { id: "kev-CVE-2024-21887", cat: "CVE", sev: "degraded", title: "CVE-2024-21887", sub: "Ivanti Connect Secure",
-    msg: "Command injection in web components allowing authenticated RCE.", src: "CISA KEV (sim)" },
-  { id: "c2-185.225.73.21:443", cat: "C2", sev: "outage", title: "185.225.73.21:443", sub: "Emotet \u00B7 RU",
-    msg: "Emotet command-and-control node (online) AS: SELECTEL", src: "Feodo Tracker (sim)", lat: 61.5, lng: 105.3, geo: "RU" },
-  { id: "c2-45.142.212.10:8080", cat: "C2", sev: "outage", title: "45.142.212.10:8080", sub: "QakBot \u00B7 NL",
-    msg: "QakBot command-and-control node (online) AS: DediPath", src: "Feodo Tracker (sim)", lat: 52.1, lng: 5.3, geo: "NL" },
-  { id: "c2-103.74.19.55:443", cat: "C2", sev: "degraded", title: "103.74.19.55:443", sub: "IcedID \u00B7 CN",
-    msg: "IcedID command-and-control node (offline) AS: CHINANET", src: "Feodo Tracker (sim)", lat: 35.9, lng: 104.2, geo: "CN" },
-  { id: "c2-209.97.139.4:7080", cat: "C2", sev: "outage", title: "209.97.139.4:7080", sub: "TrickBot \u00B7 US",
-    msg: "TrickBot command-and-control node (online) AS: DIGITALOCEAN", src: "Feodo Tracker (sim)", lat: 39.8, lng: -98.6, geo: "US" },
-  { id: "c2-91.207.183.7:443", cat: "C2", sev: "outage", title: "91.207.183.7:443", sub: "Pikabot \u00B7 DE",
-    msg: "Pikabot command-and-control node (online) AS: HOSTKEY", src: "Feodo Tracker (sim)", lat: 51.2, lng: 10.4, geo: "DE" },
-  { id: "iocfx-sim-1", cat: "IOC", sev: "outage", title: "5.181.156.97:50050", sub: "Cobalt Strike \u00B7 ip:port",
-    msg: "botnet_cc \u00B7 confidence 100% \u00B7 tags: CobaltStrike, beacon", src: "ThreatFox (sim)" },
-  { id: "iocfx-sim-2", cat: "IOC", sev: "degraded", title: "update-cdn-secure.com", sub: "Lumma Stealer \u00B7 domain",
-    msg: "payload_delivery \u00B7 confidence 75% \u00B7 tags: stealer, lumma", src: "ThreatFox (sim)" },
-  { id: "iocfx-sim-3", cat: "IOC", sev: "outage", title: "194.169.175.132:13782", sub: "AsyncRAT \u00B7 ip:port",
-    msg: "botnet_cc \u00B7 confidence 90% \u00B7 tags: rat, asyncrat", src: "ThreatFox (sim)", lat: 50.45, lng: 30.52, geo: "UA", city: "Kyiv" },
-  { id: "url-sim-1", cat: "URL", sev: "outage", title: "193.42.33.18", sub: "malware download \u00B7 online",
-    msg: "http://193.42.33.18/win/loader.exe \u00B7 tags: loader, smokeloader", src: "URLhaus (sim)", lat: 50.11, lng: 8.68, geo: "DE", city: "Frankfurt" },
-  { id: "url-sim-2", cat: "URL", sev: "degraded", title: "secure-doc-share.top", sub: "phishing \u00B7 offline",
-    msg: "https://secure-doc-share.top/login \u00B7 tags: phishing, credential", src: "URLhaus (sim)" },
-  { id: "ransom-sim-1", cat: "RANSOM", sev: "outage", title: "Acme Manufacturing Co.", sub: "LOCKBIT3 \u00B7 US",
-    msg: "Ransomware victim disclosure \u00B7 group: lockbit3 \u00B7 sector: Manufacturing", src: "ransomware.live (sim)", lat: 39.8, lng: -98.6, geo: "US" },
-  { id: "ransom-sim-2", cat: "RANSOM", sev: "outage", title: "Banque R\u00E9gionale SA", sub: "ALPHV \u00B7 FR",
-    msg: "Ransomware victim disclosure \u00B7 group: alphv \u00B7 sector: Finance", src: "ransomware.live (sim)", lat: 48.86, lng: 2.35, geo: "FR" },
-  { id: "tor-sim-1", cat: "TOR", sev: "info", title: "RelayNode7", sub: "Tor exit \u00B7 Sweden",
-    msg: "Tor exit relay \u00B7 AS: 31400", src: "Tor Project (sim)", lat: 59.33, lng: 18.06, geo: "SE" },
-  { id: "tor-sim-2", cat: "TOR", sev: "info", title: "ExitGuardian", sub: "Tor exit \u00B7 United States",
-    msg: "Tor exit relay", src: "Tor Project (sim)", lat: 38.9, lng: -77.0, geo: "US" },
-  { id: "tor-sim-3", cat: "TOR", sev: "info", title: "OnionPipe", sub: "Tor exit \u00B7 Germany",
-    msg: "Tor exit relay \u00B7 AS: 24940", src: "Tor Project (sim)", lat: 50.11, lng: 8.68, geo: "DE" },
-  { id: "air-sim-1", cat: "AIR", sev: "info", title: "UAL245", sub: "Aircraft \u00B7 United States",
-    msg: "Live aircraft \u00B7 alt 11277 m \u00B7 451 kt \u00B7 track 270\u00B0", src: "OpenSky Network (sim)", lat: 39.5, lng: -104.7, geo: "US", hdg: 270 },
-  { id: "air-sim-2", cat: "AIR", sev: "info", title: "BAW117", sub: "Aircraft \u00B7 United Kingdom",
-    msg: "Live aircraft \u00B7 alt 10668 m \u00B7 478 kt \u00B7 track 95\u00B0", src: "OpenSky Network (sim)", lat: 51.3, lng: -0.5, geo: "GB", hdg: 95 },
-  { id: "air-sim-3", cat: "AIR", sev: "info", title: "DLH401", sub: "Aircraft \u00B7 Germany",
-    msg: "Live aircraft \u00B7 alt 11582 m \u00B7 462 kt \u00B7 track 200\u00B0", src: "OpenSky Network (sim)", lat: 50.0, lng: 8.6, geo: "DE", hdg: 200 },
-  { id: "air-sim-4", cat: "AIR", sev: "info", title: "AAL88", sub: "Aircraft \u00B7 United States",
-    msg: "Live aircraft \u00B7 alt 10363 m \u00B7 488 kt \u00B7 track 80\u00B0", src: "OpenSky Network (sim)", lat: 41.9, lng: -79.0, geo: "US", hdg: 80 }
-];
-function simIntel() {
-  const now = Date.now();
-  return INTEL_SIM.map((it, i) => Object.assign({}, it, { ts: now - i * 1800 * 1000 }));
-}
+/* Threat intelligence is live-only. With no reachable feed the alert list
+   simply shows nothing for these categories â€” we never fabricate intel. */
 
 async function syncThreatIntel() {
   try {
@@ -1443,8 +1383,8 @@ async function syncThreatIntel() {
     }
   } catch (e) { /* server not running */ }
   LIVE_MODE_INTEL = false;
-  THREAT_FEED.items = simIntel();
-  THREAT_FEED.feeds = { simulated: { ok: false } };
+  THREAT_FEED.items = [];          // live-only: no fabricated intel when offline
+  THREAT_FEED.feeds = {};
   THREAT_FEED.fetchedAt = new Date().toISOString();
   return false;
 }
@@ -1583,7 +1523,7 @@ function exportDossier(list) {
   let alertWindow = "ALL";   // ALL | 24h | w | m | y
   let threatLayer = null;    // Leaflet layer group for plotted threat intel
   let threatLayers = { AZURE: true, C2: true, IOC: true, URL: true, RANSOM: true, TOR: true, AIR: true, CISA: true, SITREP: true };
-  // master data-feed switches (mirrored from Settings) — a feed that is off is
+  // master data-feed switches (mirrored from Settings) â€” a feed that is off is
   // never queried and its legend row is hidden entirely.
   let feeds = { AZURE: true, CISA: true, C2: false, IOC: false, URL: false, RANSOM: false, TOR: false, AIR: false };
   let lastThreatSig = "";    // avoid rebuilding pins when nothing changed
@@ -1595,7 +1535,7 @@ function exportDossier(list) {
   let pingActive = false, lastPingStart = 0, lastFrameTime = 0;
   let lastRenderTime = 0;                 // last frame the radar actually re-rendered
   const RADAR_FRAME_MS = 1000 / 30;       // cap radar render to ~30fps
-  let PING_INTERVAL = 30000; // ms between sonar pings — synced to the auto-refresh setting
+  let PING_INTERVAL = 30000; // ms between sonar pings â€” synced to the auto-refresh setting
   let radarRAF = null;         // active rAF handle (null when loop is parked)
   let sitrepVisible = false;   // true only while the SITREP view is on screen
   let refreshTimer = null;
@@ -1608,7 +1548,7 @@ function exportDossier(list) {
     dark: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
     light: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"
   };
-  const MAP_MAX_ZOOM = 7;     // interactive cap — keeps tile memory bounded
+  const MAP_MAX_ZOOM = 7;     // interactive cap â€” keeps tile memory bounded
   const LOCATE_ZOOM = 15;     // deep zoom allowed only for the `locate` command
   // Tiles never load past native zoom 7 (no extra fetches/memory); the map can
   // still zoom to 15 and upscale those tiles when `locate` flies in.
@@ -1751,7 +1691,7 @@ function exportDossier(list) {
     }
     function down(e) {
       if (e.pointerType === "mouse" && e.button !== 0) return;
-      // only track the primary pointer — ignore extra fingers (multi-touch)
+      // only track the primary pointer â€” ignore extra fingers (multi-touch)
       if (activeId !== null) return;
       // ignore presses on controls, popups, links, buttons, inputs
       if (e.target.closest && e.target.closest(".leaflet-control, .leaflet-popup, a, button, input, select, textarea")) return;
@@ -1792,7 +1732,7 @@ function exportDossier(list) {
     el.addEventListener("pointerup", up);
     el.addEventListener("pointercancel", up);
     el.addEventListener("pointerleave", up);
-    // global safety nets — if the pointer is released outside the map or the
+    // global safety nets â€” if the pointer is released outside the map or the
     // gesture is interrupted (scroll, blur), make sure no circle survives.
     window.addEventListener("pointerup", up);
     window.addEventListener("pointercancel", up);
@@ -1811,9 +1751,9 @@ function exportDossier(list) {
   function markerIcon(r) {
     return L.divIcon({
       className: "",
-      html: `<div class="region-marker status-${r.status}" data-code="${r.code}">
+      html: `<div class="pin-wrap"><div class="region-marker status-${r.status}" data-code="${r.code}">
                <span class="rm-ping"></span><span class="rm-dot"></span>
-             </div>`,
+             </div></div>`,
       iconSize: [14, 14],
       iconAnchor: [7, 7]
     });
@@ -1826,10 +1766,11 @@ function exportDossier(list) {
   }
 
   function regionPopup(r) {
-    const color = r.status === "outage" ? "var(--out)" : r.status === "degraded" ? "var(--deg)" : "var(--op)";
+    const color = r.status === "unknown" ? "var(--txt-dim)" : r.status === "outage" ? "var(--out)" : r.status === "degraded" ? "var(--deg)" : "var(--op)";
+    const label = r.status === "unknown" ? "UNKNOWN \u00B7 FEED OFFLINE" : r.status.toUpperCase();
     return `<div class="rp-name">${r.name}</div>
             <div class="rp-meta">${r.code} \u00B7 ${r.geo}</div>
-            <div class="rp-status" style="color:${color}">${r.status.toUpperCase()}</div>`;
+            <div class="rp-status" style="color:${color}">${label}</div>`;
   }
 
   function updateMarkerStatus(r) {
@@ -2045,7 +1986,8 @@ function exportDossier(list) {
   /* ---------- HUD + alerts ---------- */
   function fmtTime(ts) {
     const d = ts ? new Date(ts) : new Date();
-    return d.toTimeString().slice(0, 8);
+    const mode = (window.Settings && window.Settings.get("clock")) || "zulu";
+    return mode === "local" ? d.toTimeString().slice(0, 8) : d.toISOString().slice(11, 19);
   }
   function ago(ts) {
     const s = Math.floor((Date.now() - ts) / 1000);
@@ -2062,9 +2004,10 @@ function exportDossier(list) {
 
   function updateHUD() {
     const c = statusCounts();
-    $("#m-op").textContent = String(c.operational).padStart(2, "0");
-    $("#m-deg").textContent = String(c.degraded).padStart(2, "0");
-    $("#m-out").textContent = String(c.outage).padStart(2, "0");
+    const off = !LIVE_MODE;
+    $("#m-op").textContent = off ? "--" : String(c.operational).padStart(2, "0");
+    $("#m-deg").textContent = off ? "--" : String(c.degraded).padStart(2, "0");
+    $("#m-out").textContent = off ? "--" : String(c.outage).padStart(2, "0");
     $("#m-sync").textContent = fmtTime();
   }
 
@@ -2073,15 +2016,27 @@ function exportDossier(list) {
   /* Unified alert model: live Azure incidents + public threat-intel feeds. */
   function buildAlertModel() {
     const out = [];
-    AZURE_REGIONS.filter((r) => r.status !== "operational").forEach((r) => {
-      const d = ALERT_DETAIL[r.code] || {};
+    if (!LIVE_MODE) {
+      // Offline: never fabricate per-region alerts â€” surface a single notice.
       out.push({
-        cat: "AZURE", sev: r.status, ts: d.since || null,
-        time: (d.id || "") + (d.since ? " \u00B7 " + ago(d.since) + " ago" : ""),
-        title: r.name, sub: (d.service || "Multiple services") + " \u00B7 " + r.geo,
-        msg: d.msg || "", src: "Azure Status"
+        cat: "AZURE", sev: "unknown", catLabel: "FEED OFFLINE", ts: null, time: "",
+        title: "Azure region health unavailable",
+        sub: "Live status feed offline \u00B7 " + AZURE_REGIONS.length + " regions UNKNOWN",
+        msg: "Cannot reach the Azure status feed. Region health is unknown. Start the CyberSOC node server (or restore connectivity) to resume live monitoring.",
+        src: "Azure Status"
       });
-    });
+    } else {
+      AZURE_REGIONS.filter((r) => r.status !== "operational").forEach((r) => {
+        const d = ALERT_DETAIL[r.code] || {};
+        out.push({
+          cat: "AZURE", sev: r.status, ts: d.since || null,
+          time: (d.id || "") + (d.since ? " \u00B7 " + ago(d.since) + " ago" : ""),
+          title: r.name, sub: (d.service || "Multiple services") + " \u00B7 " + r.geo,
+          msg: d.msg || "", src: "Azure Status",
+          lat: r.lat, lng: r.lng, geo: r.geo
+        });
+      });
+    }
     THREAT_FEED.items.forEach((it) => {
       if (it.cat === "TOR" || it.cat === "AIR" || it.cat === "CISA") return; // map-only layers
       out.push({
@@ -2114,6 +2069,42 @@ function exportDossier(list) {
     return out;
   }
 
+  /* Magenta dossier subject pin as a divIcon so it gets the hover crosshair. */
+  function dossierPinMarker(ll) {
+    return L.marker(ll, {
+      keyboard: false,
+      icon: L.divIcon({
+        className: "",
+        html: `<div class="pin-wrap"><div class="dossier-pin"></div></div>`,
+        iconSize: [14, 14], iconAnchor: [7, 7]
+      })
+    });
+  }
+
+  /* Center the SITREP map on a pinpoint, shifting it clear of the open
+     alert panel and dropping a brief pulse ring so the spot is obvious. */
+  function focusOnPin(lat, lng) {
+    if (!map) return;
+    const zoom = Math.max(map.getZoom(), 5);
+    let center = [lat, lng];
+    const panel = document.querySelector("#alert-panel.open");
+    if (panel) {
+      const offX = panel.getBoundingClientRect().width / 2;
+      const pt = map.project([lat, lng], zoom).subtract([offX, 0]);
+      center = map.unproject(pt, zoom);
+    }
+    map.flyTo(center, zoom, { duration: 1.0 });
+    try {
+      const ring = L.circleMarker([lat, lng], {
+        radius: 6, color: "#ff2d6f", weight: 2, fill: false,
+        className: "pin-focus-ring", interactive: false
+      }).addTo(map);
+      let r = 6;
+      const grow = setInterval(() => { r += 4; ring.setRadius(r); ring.setStyle({ opacity: Math.max(0, 1 - (r - 6) / 40) }); }, 45);
+      setTimeout(() => { clearInterval(grow); map.removeLayer(ring); }, 1100);
+    } catch (e) { /* leaflet not ready */ }
+  }
+
   function renderAlerts() {
     const list = $("#alert-list");
     const model = buildAlertModel();
@@ -2133,10 +2124,13 @@ function exportDossier(list) {
     } else {
       list.innerHTML = filtered.map((a) => {
         const hasGeo = a.lat != null && a.lng != null;
-        const sevLbl = a.cat === "AZURE" ? (a.sev === "outage" ? "OUTAGE" : "DEGRADED") : (a.catLabel || a.cat);
+        const sevLbl = a.sev === "unknown" ? (a.catLabel || "UNKNOWN")
+          : a.cat === "AZURE" ? (a.sev === "outage" ? "OUTAGE" : "DEGRADED")
+          : (a.catLabel || a.cat);
+        const catStyle = a.sev === "unknown" ? ` style="color:var(--out)"` : (a.catColor ? ` style="color:${a.catColor}"` : "");
         return `<div class="alert-card sev-${a.sev}${hasGeo ? " geo" : ""}"${hasGeo ? ` data-lat="${a.lat}" data-lng="${a.lng}"` : ""}>
           <div class="alert-top">
-            <span class="alert-cat cat-${a.cat}"${a.catColor ? ` style="color:${a.catColor}"` : ""}>${sevLbl}${a.ransomware ? " \u26A0 RANSOMWARE" : ""}</span>
+            <span class="alert-cat cat-${a.cat}"${catStyle}>${sevLbl}${a.ransomware ? " \u26A0 RANSOMWARE" : ""}</span>
             <span class="alert-time">${escA(a.time)}</span>
           </div>
           <div class="alert-region">${escA(a.title)}</div>
@@ -2148,8 +2142,10 @@ function exportDossier(list) {
         </div>`;
       }).join("");
       list.querySelectorAll(".alert-card.geo").forEach((el) => {
-        el.addEventListener("click", () => {
-          if (map) map.flyTo([+el.dataset.lat, +el.dataset.lng], 5, { duration: 1.0 });
+        el.addEventListener("click", (ev) => {
+          if (ev.target.closest("a")) return; // let real links work
+          if (!map) return;
+          focusOnPin(+el.dataset.lat, +el.dataset.lng);
         });
       });
     }
@@ -2167,10 +2163,10 @@ function exportDossier(list) {
       return `<span class="${ok ? "if-ok" : "if-bad"}">${ok ? "\u25CF" : "\u25CB"} ${names[k]}</span>`;
     });
     const when = THREAT_FEED.fetchedAt ? new Date(THREAT_FEED.fetchedAt).toTimeString().slice(0, 8) : "\u2014";
-    el.innerHTML = `FEEDS ${LIVE_MODE_INTEL ? "LIVE" : "SIM"} \u00B7 ${parts.join("&nbsp;&nbsp;")} \u00B7 upd ${when}`;
+    el.innerHTML = `FEEDS ${LIVE_MODE_INTEL ? "LIVE" : `<span class="if-bad">OFFLINE</span>`} \u00B7 ${parts.join("&nbsp;&nbsp;")} \u00B7 upd ${when}`;
   }
 
-  /* CISA regional offices (10 regions + HQ) — static reference markers plotted
+  /* CISA regional offices (10 regions + HQ) â€” static reference markers plotted
      across the US. Same item shape as threat intel so the legend/pin code reuses. */
   const CISA_OFFICES = [
     { id: "cisa-hq", cat: "CISA", sev: "info", title: "CISA Headquarters", sub: "HQ \u00B7 Arlington, VA", msg: "Cybersecurity & Infrastructure Security Agency \u2014 National Headquarters", src: "CISA", lat: 38.8801, lng: -77.1067, geo: "US" },
@@ -2194,7 +2190,7 @@ function exportDossier(list) {
     THREAT_FEED.items.concat(CISA_OFFICES).forEach((it) => { if (it.lat != null) counts[it.cat] = (counts[it.cat] || 0) + 1; });
 
     // Azure swatch: one diamond per status colour actually present on the map
-    // (green operational, yellow degraded, red outage) — colours with zero
+    // (green operational, yellow degraded, red outage) â€” colours with zero
     // regions are omitted.
     const azureSwatch = () => {
       const sc = statusCounts();
@@ -2232,7 +2228,7 @@ function exportDossier(list) {
       </div>`;
     }).join("");
 
-    // SITREP alerts row — only the circle colours relevant to the map, hidden
+    // SITREP alerts row â€” only the circle colours relevant to the map, hidden
     // entirely when no analyst alerts are plotted. Pinned to the top of the
     // legend, above the standard map layers.
     let sitrepHtml = "";
@@ -2333,7 +2329,7 @@ function exportDossier(list) {
   }
 
   async function refreshAll() {
-    // only query feeds that are enabled — a disabled feed is never hit
+    // only query feeds that are enabled â€” a disabled feed is never hit
     const jobs = [];
     if (feeds.AZURE !== false) jobs.push(syncAzureStatus());
     jobs.push(syncSolarWindsStatus()); // SolarWinds is always polled
@@ -2354,11 +2350,10 @@ function exportDossier(list) {
   function updateFeedIndicator() {
     const el = $("#nav-conn"); if (!el) return;
     const dot = el.parentElement.querySelector(".ns-dot");
-    if (LIVE_MODE) { el.textContent = "AZURE LIVE"; if (dot) dot.style.background = dot.style.boxShadow = ""; }
-    else { el.textContent = "SIM FEED"; }
+    el.textContent = LIVE_MODE ? "AZURE LIVE" : "FEED OFFLINE";
     if (dot) {
-      dot.style.background = LIVE_MODE ? "var(--op)" : "var(--deg)";
-      dot.style.boxShadow = "0 0 8px " + (LIVE_MODE ? "var(--op)" : "var(--deg)");
+      dot.style.background = LIVE_MODE ? "var(--op)" : "var(--out)";
+      dot.style.boxShadow = "0 0 8px " + (LIVE_MODE ? "var(--op)" : "var(--out)");
     }
   }
 
@@ -2374,7 +2369,26 @@ function exportDossier(list) {
       if (!b) return;
       alertFilter = b.dataset.cat;
       $("#alert-filters").querySelectorAll(".af-chip").forEach((c) => c.classList.toggle("active", c === b));
+      const fn = $("#alert-funnel");
+      fn.classList.toggle("filtered", alertFilter !== "ALL");
+      fn.classList.remove("open");
+      fn.setAttribute("aria-expanded", "false");
+      $("#alert-filters").classList.remove("open");
       renderAlerts();
+    });
+    $("#alert-funnel").addEventListener("click", (e) => {
+      e.stopPropagation();
+      const fn = $("#alert-funnel");
+      const open = $("#alert-filters").classList.toggle("open");
+      fn.classList.toggle("open", open);
+      fn.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest(".atf-funnel-wrap")) {
+        $("#alert-filters").classList.remove("open");
+        $("#alert-funnel").classList.remove("open");
+        $("#alert-funnel").setAttribute("aria-expanded", "false");
+      }
     });
     $("#alert-timefilter").addEventListener("click", (e) => {
       const b = e.target.closest(".atf-chip");
@@ -3111,7 +3125,7 @@ function exportDossier(list) {
     if (feeds.AZURE !== false) list.unshift("azure");
     if (intelOn) list.push("threat-intel");
     cliPrint(`  feeds: ${list.join(" \u00B7 ")}`, "sys");
-    // only query enabled feeds — mirrors refreshAll(), so disabled feeds are
+    // only query enabled feeds â€” mirrors refreshAll(), so disabled feeds are
     // never hit and we don't re-introduce the memory spike behind the crash
     const jobs = [];
     if (feeds.AZURE !== false) jobs.push(syncAzureStatus());
@@ -3124,7 +3138,7 @@ function exportDossier(list) {
       updateHUD(); renderAlerts(); renderThreatPins(true); renderLegend(); updateFeedIndicator();
       if (window.Ticker) window.Ticker.refresh();
       cliPrint(`\u2713 sync complete @ ${fmtTime()}`, "ok");
-      cliPrint(`  azure ${feeds.AZURE === false ? "OFF" : (LIVE_MODE ? "LIVE" : "SIM")} \u00B7 solarwinds ${LIVE_MODE_SW ? "LIVE" : "SIM"} \u00B7 threat-intel ${intelOn ? (LIVE_MODE_INTEL ? "LIVE" : "SIM") : "OFF"}`, "sys");
+      cliPrint(`  azure ${feeds.AZURE === false ? "OFF" : (LIVE_MODE ? "LIVE" : "OFFLINE")} \u00B7 solarwinds ${LIVE_MODE_SW ? "LIVE" : "OFFLINE"} \u00B7 threat-intel ${intelOn ? (LIVE_MODE_INTEL ? "LIVE" : "OFFLINE") : "OFF"}`, "sys");
     });
   }
 
@@ -3138,7 +3152,7 @@ function exportDossier(list) {
         const ms = Math.round(performance.now() - t0);
         cliPrint(`\u2713 SERVER ONLINE \u00B7 ${j.service || "CyberSOC"} \u00B7 ${ms}ms`, "ok");
         cliPrint(`  live feeds, file writes & shell bridge AVAILABLE.`, "ok");
-        cliPrint(`  intel: ${LIVE_MODE_INTEL ? "LIVE" : "\u2014"} \u00B7 azure: ${LIVE_MODE ? "LIVE" : "SIM"} \u00B7 solarwinds: ${LIVE_MODE_SW ? "LIVE" : "SIM"}`, "sys");
+        cliPrint(`  intel: ${LIVE_MODE_INTEL ? "LIVE" : "\u2014"} \u00B7 azure: ${LIVE_MODE ? "LIVE" : "OFFLINE"} \u00B7 solarwinds: ${LIVE_MODE_SW ? "LIVE" : "OFFLINE"}`, "sys");
       })
       .catch((e) => {
         cliPrint(`\u2715 SERVER UNREACHABLE \u2014 ${escHtml(e.message || "no response")}`, "err");
@@ -3228,7 +3242,7 @@ function exportDossier(list) {
     const tele = (m) => escHtml((m || "").replace("Live aircraft \u00B7 ", ""));
     if (!arg) {
       cliPrint("\u25C6 LIVE AIRCRAFT // OPENSKY NETWORK", "head");
-      cliPrint(`  ${air.length} aircraft tracked \u00B7 source ${LIVE_MODE_INTEL ? "LIVE" : "SIMULATION"}`, air.length ? "ok" : "warn");
+      cliPrint(`  ${air.length} aircraft tracked \u00B7 source ${LIVE_MODE_INTEL ? "LIVE" : "OFFLINE"}`, air.length ? "ok" : "warn");
       if (!air.length) { cliPrint("  no aircraft in the current feed snapshot.", "warn"); return; }
       air.slice(0, 12).forEach((it) => {
         cliPrint(`  \u2708 ${escHtml((it.title || "?").padEnd(10))} ${escHtml((it.geo || "").padEnd(16))} ${tele(it.msg)}`, "sys");
@@ -3392,12 +3406,13 @@ function exportDossier(list) {
       const c = statusCounts();
       cliPrint("\u25C6 SERVER // AZURE THREAT LANDSCAPE", "head");
       cliPrint(`  SYNCED ${fmtTime()} \u00B7 ${AZURE_REGIONS.length} REGIONS MONITORED`, "sys");
-      cliPrint(`  OPERATIONAL ${c.operational}   DEGRADED ${c.degraded}   OUTAGE ${c.outage}`, "sys");
+      cliPrint(`  OPERATIONAL ${c.operational}   DEGRADED ${c.degraded}   OUTAGE ${c.outage}${LIVE_MODE ? "" : "   UNKNOWN " + c.unknown}`, "sys");
+      if (!LIVE_MODE) cliPrint("  \u26A0 AZURE FEED OFFLINE \u2014 region health UNKNOWN (not simulated)", "err");
       cliPrint("\u2014".repeat(40), "sys");
-      ["outage", "degraded", "operational"].forEach((st) => {
+      ["outage", "degraded", "unknown", "operational"].forEach((st) => {
         const group = AZURE_REGIONS.filter((r) => r.status === st);
         if (!group.length) return;
-        const cls = st === "outage" ? "err" : st === "degraded" ? "warn" : "ok";
+        const cls = st === "outage" ? "err" : st === "operational" ? "ok" : "warn";
         group.forEach((r) => {
           const dot = st === "operational" ? "\u25CF" : "\u25B2";
           cliPrint(`  ${dot} ${r.name.padEnd(22)} ${r.code.padEnd(16)} ${st.toUpperCase()}`, cls);
@@ -3405,11 +3420,11 @@ function exportDossier(list) {
       });
       // SolarWinds Observability components
       cliPrint("\u2014".repeat(40), "sys");
-      const sw = { operational: 0, degraded: 0, outage: 0, maintenance: 0 };
+      const sw = { operational: 0, degraded: 0, outage: 0, maintenance: 0, unknown: 0 };
       SOLARWINDS_COMPONENTS.forEach((c) => { sw[c.status] = (sw[c.status] || 0) + 1; });
       cliPrint("\u25C6 SOLARWINDS OBSERVABILITY", "head");
-      cliPrint(`  ${SOLARWINDS_COMPONENTS.length} COMPONENTS \u00B7 OPERATIONAL ${sw.operational}   DEGRADED ${sw.degraded}   OUTAGE ${sw.outage}   MAINT ${sw.maintenance}`, "sys");
-      ["outage", "degraded", "maintenance", "operational"].forEach((st) => {
+      cliPrint(`  ${SOLARWINDS_COMPONENTS.length} COMPONENTS \u00B7 OPERATIONAL ${sw.operational}   DEGRADED ${sw.degraded}   OUTAGE ${sw.outage}   MAINT ${sw.maintenance}${LIVE_MODE_SW ? "" : "   UNKNOWN " + sw.unknown}`, "sys");
+      ["outage", "degraded", "maintenance", "unknown", "operational"].forEach((st) => {
         const group = SOLARWINDS_COMPONENTS.filter((c) => c.status === st);
         if (!group.length) return;
         const cls = st === "outage" ? "err" : st === "operational" ? "ok" : "warn";
@@ -3438,6 +3453,7 @@ function exportDossier(list) {
       sitrepCountry(arg);
     },
     alerts() {
+      if (!LIVE_MODE) { cliPrint("\u26A0 AZURE STATUS FEED OFFLINE \u2014 region health UNKNOWN. Start the node server to resume monitoring.", "err"); return; }
       const active = AZURE_REGIONS.filter((r) => r.status !== "operational");
       if (!active.length) { cliPrint("\u2713 no active incidents \u2014 all regions nominal.", "ok"); return; }
       cliPrint(`\u25C6 ${active.length} ACTIVE INCIDENT(S)`, "head");
@@ -3688,7 +3704,7 @@ function exportDossier(list) {
       const layers = [];
       found.forEach(({ ll, label, display }) => {
         layers.push(L.circle(ll, { radius: 1200, color: "#ff2d6f", weight: 1.5, fillColor: "#ff2d6f", fillOpacity: 0.10 }));
-        layers.push(L.circleMarker(ll, { radius: 6, color: "#ff2d6f", weight: 2, fillColor: "#ff2d6f", fillOpacity: 1 })
+        layers.push(dossierPinMarker(ll)
           .bindPopup(`<div class="rp-name">${(label || "SUBJECT")}</div><div class="rp-meta">${(display || "").slice(0, 60)}</div>`, { className: "region-popup", closeButton: false }));
       });
       window.__pinLayer = L.layerGroup(layers).addTo(map);
@@ -3736,7 +3752,7 @@ function exportDossier(list) {
       PING_INTERVAL = v;            // sonar ping cadence follows the auto-refresh interval
       refreshMs = v;
       if (refreshTimer) clearInterval(refreshTimer);
-      // don't poll while the view is hidden/backgrounded — resumes on show
+      // don't poll while the view is hidden/backgrounded â€” resumes on show
       if (sitrepVisible && !document.hidden) refreshTimer = setInterval(refreshAll, v);
     },
     pausePolling() { if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; } },
@@ -3763,7 +3779,7 @@ function exportDossier(list) {
       if (window.__pinLayer) map.removeLayer(window.__pinLayer);
       window.__pinLayer = L.layerGroup([
         L.circle(ll, { radius: 1200, color: "#ff2d6f", weight: 1.5, fillColor: "#ff2d6f", fillOpacity: 0.10 }),
-        L.circleMarker(ll, { radius: 6, color: "#ff2d6f", weight: 2, fillColor: "#ff2d6f", fillOpacity: 1 })
+        dossierPinMarker(ll)
           .bindPopup(`<div class="rp-name">${label || "SUBJECT"}</div><div class="rp-meta">${(geo.display || query).slice(0, 60)}</div>`, { className: "region-popup", closeButton: false })
       ]).addTo(map);
       map.flyTo(ll, 12, { duration: 1.4 });
@@ -4303,7 +4319,13 @@ function exportDossier(list) {
 
   function startClock() {
     const el = $("#nav-clock");
-    const tick = () => { el.textContent = new Date().toTimeString().slice(0, 8) + " Z"; };
+    const tick = () => {
+      const mode = (window.Settings && window.Settings.get("clock")) || "zulu";
+      const d = new Date();
+      el.textContent = mode === "local"
+        ? d.toTimeString().slice(0, 8) + " LOC"
+        : d.toISOString().slice(11, 19) + " Z";
+    };
     tick(); setInterval(tick, 1000);
   }
 
@@ -4445,7 +4467,7 @@ function exportDossier(list) {
 (function () {
   const KEY = "soc_settings";
   const DEFAULTS = {
-    theme: "dark", accent: "magenta",
+    theme: "dark", accent: "magenta", clock: "zulu",
     tickerVisible: true, tickerSource: "both", tickerIssuesOnly: false, tickerSpeed: 3,
     radar: true, radarMode: null, sweepSpeed: 0.7, pingSpeed: 160, refreshSec: 30, reduceMotion: false, perfMode: false,
     feeds: { AZURE: true, CISA: true, C2: false, IOC: false, URL: false, RANSOM: false, TOR: false, AIR: false }
@@ -4551,7 +4573,8 @@ function exportDossier(list) {
             : state.radarMode === "sweep"
               ? row("Sweep speed", "Rotation rate of the radar line", slider("sweepSpeed", 0.2, 2, 0.1, v => (+v).toFixed(1) + "\u00B0/f"))
               : ""}
-         ${row("Auto-refresh", "How often all live feeds re-sync (Azure · SolarWinds · threat intel)", slider("refreshSec", 5, 300, 5, fmtDuration))}
+         ${row("Auto-refresh", "How often all live feeds re-sync (Azure Â· SolarWinds Â· threat intel)", slider("refreshSec", 5, 300, 5, fmtDuration))}
+         ${row("Clock", "Display time as Zulu (UTC) or this device's local timezone", segmented("clock", [{v:"zulu",l:"ZULU"},{v:"local",l:"LOCAL"}]))}
          ${row("Reduce motion", "Pause sweep, ticker and ambient animation", toggle("reduceMotion"))}
          ${row("Performance mode", "Cut GPU load on slower machines \u2014 disables radar, blur effects and all ambient animation", toggle("perfMode"))}
        </div>
@@ -4614,8 +4637,8 @@ function exportDossier(list) {
    CyberSOC \u2014 Status Ticker (Azure regions + SolarWinds components)
    =================================================================== */
 (function () {
-  const COLOR = { operational: "var(--op)", degraded: "var(--deg)", outage: "var(--out)", maintenance: "#19c3d6" };
-  const LABEL = { operational: "OPERATIONAL", degraded: "DEGRADED", outage: "OUTAGE", maintenance: "MAINTENANCE" };
+  const COLOR = { operational: "var(--op)", degraded: "var(--deg)", outage: "var(--out)", maintenance: "#19c3d6", unknown: "var(--out)" };
+  const LABEL = { operational: "OPERATIONAL", degraded: "DEGRADED", outage: "OUTAGE", maintenance: "MAINTENANCE", unknown: "UNKNOWN" };
 
   function cfg(k, d) { return window.Settings ? window.Settings.get(k) : d; }
 
@@ -4630,7 +4653,9 @@ function exportDossier(list) {
   }
   function itemHtml(i) {
     const c = COLOR[i.status] || "var(--txt-dim)";
-    return `<span class="tk-item"><span class="tk-dot" style="background:${c};color:${c}"></span><span class="tk-name">${i.name}</span><span class="tk-status" style="color:${c}">${LABEL[i.status] || ""}</span><span class="tk-src">${i.src}</span></span>`;
+    // offline: dot/item red, but the status word is gray
+    const statusColor = i.status === "unknown" ? "var(--txt-dim)" : c;
+    return `<span class="tk-item"><span class="tk-dot" style="background:${c};color:${c}"></span><span class="tk-name">${i.name}</span><span class="tk-status" style="color:${statusColor}">${LABEL[i.status] || ""}</span><span class="tk-src">${i.src}</span></span>`;
   }
 
   function render() {
@@ -4656,7 +4681,7 @@ function exportDossier(list) {
       render();
       syncSolarWindsStatus().then(render);
       // SolarWinds now re-syncs with every other feed on the SITREP
-      // auto-refresh timer (see Sitrep.refreshAll) — no separate interval.
+      // auto-refresh timer (see Sitrep.refreshAll) â€” no separate interval.
     },
     refresh() { render(); }
   };
@@ -5133,3 +5158,4 @@ function exportDossier(list) {
 </script>
 </body>
 </html>
+
