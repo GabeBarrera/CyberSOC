@@ -18,6 +18,19 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="CyberSOC" />
 
+<!-- iOS detection â€” set as early as possible so the .ios hardening CSS applies
+     on the very first paint, before any blur layer is composited over the map. -->
+<script>
+  (function () {
+    var ua = navigator.userAgent || "";
+    var isIOS = /iP(hone|ad|od)/.test(ua) ||
+      // iPadOS 13+ reports as desktop Safari; fall back to touch-capable Mac.
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    if (isIOS) document.documentElement.classList.add("ios");
+    window.__IS_IOS__ = !!isIOS;
+  })();
+</script>
+
 <!-- Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -96,6 +109,21 @@
 :root.perf-mode .ticker-track,
 :root.perf-mode .ns-live,
 :root.perf-mode .tl-pulse { animation: none !important; }
+
+/* ===================== iOS HARDENING =====================
+   iOS WebKit caps per-tab GPU/IOSurface memory hard. backdrop-filter regions
+   composited OVER the continuously-repainting Leaflet map each allocate a
+   surface that re-renders every frame the map pans â€” a handful of them plus
+   tiles exhausts the cap and WebKit kills the page. Strip every live blur on
+   iOS unconditionally (independent of perf-mode / user toggles) and swap in an
+   opaque background so the panels stay legible. */
+:root.ios .hud-readout,
+:root.ios .map-legend,
+:root.ios .modal-scrim,
+:root.ios #cintel-ov,
+:root.ios .leaflet-popup-content-wrapper { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+:root.ios .hud-readout { background: rgba(10,6,8,0.92) !important; }
+:root.ios .map-legend  { background: rgba(10,6,8,0.92) !important; }
 
 * { box-sizing: border-box; }
 html, body {
@@ -4497,8 +4525,14 @@ function exportDossier(list) {
   let state = load();
   function load() {
     try {
-      const s = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(KEY)) || {});
+      const stored = JSON.parse(localStorage.getItem(KEY)) || {};
+      const s = Object.assign({}, DEFAULTS, stored);
       s.feeds = Object.assign({}, DEFAULTS.feeds, s.feeds || {}); // deep-merge feed flags
+      // On iOS, default Performance Mode ON the first time (no stored value yet):
+      // it forces the GPU-heavy rotating radar + ambient animation off, which
+      // together with the iOS blur-stripping keeps WebKit from killing the tab.
+      // A returning user who explicitly set perfMode keeps their choice.
+      if (window.__IS_IOS__ && !("perfMode" in stored)) s.perfMode = true;
       return s;
     } catch (e) { return Object.assign({}, DEFAULTS, { feeds: Object.assign({}, DEFAULTS.feeds) }); }
   }
