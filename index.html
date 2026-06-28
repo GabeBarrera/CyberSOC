@@ -470,6 +470,7 @@ a, button, summary, label, select, [role="button"], [onclick],
 .legend-diamond.status-operational { border-color: var(--op);  background: rgba(57,255,20,.28);  box-shadow: 0 0 6px rgba(57,255,20,.5); }
 .legend-diamond.status-degraded    { border-color: var(--deg); background: rgba(245,166,35,.26); box-shadow: 0 0 6px rgba(245,166,35,.5); }
 .legend-diamond.status-outage      { border-color: var(--out); background: rgba(255,59,59,.28);  box-shadow: 0 0 6px rgba(255,59,59,.55); }
+.legend-diamond.status-unknown     { border-color: var(--out); background: rgba(255,59,59,.28);  box-shadow: 0 0 6px rgba(255,59,59,.55); }
 .legend-circle { width: 10px; height: 10px; box-sizing: border-box; border-radius: 50%; border: 2px solid; }
 .legend-circle.sev-outage   { border-color: #ff3b3b; background: rgba(255,59,59,.40);  box-shadow: 0 0 6px rgba(255,59,59,.6); }
 .legend-circle.sev-degraded { border-color: #ffd23d; background: rgba(255,210,61,.36); box-shadow: 0 0 6px rgba(255,210,61,.55); }
@@ -527,6 +528,10 @@ a, button, summary, label, select, [role="button"], [onclick],
 .cc-left { border-right: 1px solid var(--line); padding: 20px; display: flex; flex-direction: column; gap: 14px; background: rgba(255,255,255,0.015); }
 .cc-photo { width: 100%; aspect-ratio: 3/4; border: 1px solid var(--line); position: relative; overflow: hidden; background: #0a0608; }
 .cc-photo img { width: 100%; height: 100%; object-fit: cover; filter: grayscale(.25) contrast(1.05); }
+.cc-deceased { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
+.cc-deceased::before, .cc-deceased::after { content: ""; position: absolute; top: 50%; left: -10%; width: 120%; height: 6px; margin-top: -3px; background: #ff2d4a; box-shadow: 0 0 14px rgba(255,45,74,.85); }
+.cc-deceased::before { transform: rotate(53deg); }
+.cc-deceased::after { transform: rotate(-53deg); }
 .cc-photo .ph-empty {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center;
   background: repeating-linear-gradient(45deg, #0c080b 0 9px, #110c10 9px 18px);
@@ -1154,7 +1159,7 @@ a, button, summary, label, select, [role="button"], [onclick],
             <select name="threat"><option>LOW</option><option>GUARDED</option><option selected>ELEVATED</option><option>HIGH</option><option>SEVERE</option></select>
           </label>
           <label>STATUS
-            <select name="status"><option>ACTIVE</option><option>AT LARGE</option><option>IN CUSTODY</option><option>SURVEILLANCE</option><option>CLEARED</option></select>
+            <select name="status"><option>ACTIVE</option><option>AT LARGE</option><option>IN CUSTODY</option><option>SURVEILLANCE</option><option>CLEARED</option><option>ALIVE</option><option>DECEASED</option></select>
           </label>
         </div>
         <label>LAST KNOWN LOCATION<input type="text" name="location" placeholder="city, region" /></label>
@@ -1525,7 +1530,7 @@ function exportDossier(list) {
   let threatLayers = { AZURE: true, C2: true, IOC: true, URL: true, RANSOM: true, TOR: true, AIR: true, CISA: true, SITREP: true };
   // master data-feed switches (mirrored from Settings) â€” a feed that is off is
   // never queried and its legend row is hidden entirely.
-  let feeds = { AZURE: true, CISA: true, C2: false, IOC: false, URL: false, RANSOM: false, TOR: false, AIR: false };
+  let feeds = { AZURE: true, SOLARWINDS: true, CISA: true, C2: false, IOC: false, URL: false, RANSOM: false, TOR: false, AIR: false };
   let lastThreatSig = "";    // avoid rebuilding pins when nothing changed
   let sweepAngle = 0, prevSweepAngle = 0;
   let SWEEP_SPEED = 0.7;   // deg per frame (~8.5s / revolution)
@@ -2193,6 +2198,9 @@ function exportDossier(list) {
     // (green operational, yellow degraded, red outage) â€” colours with zero
     // regions are omitted.
     const azureSwatch = () => {
+      if (!LIVE_MODE) {
+        return `<span class="legend-swatch legend-swatch-multi"><span class="legend-diamond status-unknown"></span></span>`;
+      }
       const sc = statusCounts();
       const shown = ["operational", "degraded", "outage"].filter((s) => sc[s] > 0);
       const list = shown.length ? shown : ["operational"];
@@ -2332,7 +2340,8 @@ function exportDossier(list) {
     // only query feeds that are enabled â€” a disabled feed is never hit
     const jobs = [];
     if (feeds.AZURE !== false) jobs.push(syncAzureStatus());
-    jobs.push(syncSolarWindsStatus()); // SolarWinds is always polled
+    if (feeds.SOLARWINDS !== false) jobs.push(syncSolarWindsStatus());
+    else setSolarWindsOffline();
     const intelOn = ["C2", "IOC", "URL", "RANSOM", "TOR", "AIR"].some((c) => feeds[c] !== false);
     if (intelOn) jobs.push(syncThreatIntel());
     else { THREAT_FEED.items = []; THREAT_FEED.feeds = {}; }
@@ -3121,15 +3130,17 @@ function exportDossier(list) {
   function resyncFeed() {
     cliPrint("> initiating full telemetry re-sync\u2026", "sys");
     const intelOn = ["C2", "IOC", "URL", "RANSOM", "TOR", "AIR"].some((c) => feeds[c] !== false);
-    const list = ["solarwinds"];
-    if (feeds.AZURE !== false) list.unshift("azure");
+    const list = [];
+    if (feeds.AZURE !== false) list.push("azure");
+    if (feeds.SOLARWINDS !== false) list.push("solarwinds");
     if (intelOn) list.push("threat-intel");
-    cliPrint(`  feeds: ${list.join(" \u00B7 ")}`, "sys");
+    cliPrint(`  feeds: ${list.length ? list.join(" \u00B7 ") : "none enabled"}`, "sys");
     // only query enabled feeds â€” mirrors refreshAll(), so disabled feeds are
     // never hit and we don't re-introduce the memory spike behind the crash
     const jobs = [];
     if (feeds.AZURE !== false) jobs.push(syncAzureStatus());
-    jobs.push(syncSolarWindsStatus()); // always polled
+    if (feeds.SOLARWINDS !== false) jobs.push(syncSolarWindsStatus());
+    else setSolarWindsOffline();
     if (intelOn) jobs.push(syncThreatIntel());
     else { THREAT_FEED.items = []; THREAT_FEED.feeds = {}; }
     Promise.all(jobs).then(() => {
@@ -3667,6 +3678,10 @@ function exportDossier(list) {
       renderLegend();
       sitrepVisible = true;
       startRadar();
+      // honor persisted data-feed toggles BEFORE the first query so a feed that
+      // is toggled off is never fetched on load
+      const sf = window.Settings && window.Settings.get("feeds");
+      if (sf) feeds = Object.assign({}, feeds, sf);
       refreshAll();
       const sec = (window.Settings && +window.Settings.get("refreshSec")) || 30;
       this.setRefreshInterval(sec * 1000);
@@ -3782,7 +3797,8 @@ function exportDossier(list) {
         dossierPinMarker(ll)
           .bindPopup(`<div class="rp-name">${label || "SUBJECT"}</div><div class="rp-meta">${(geo.display || query).slice(0, 60)}</div>`, { className: "region-popup", closeButton: false })
       ]).addTo(map);
-      map.flyTo(ll, 12, { duration: 1.4 });
+      allowDeepZoom();
+      map.flyTo(ll, LOCATE_ZOOM, { duration: 1.4 });
       pinPending = false;
       setTimeout(() => { window.__pinLayer && window.__pinLayer.getLayers()[1].openPopup(); }, 1500);
       return true;
@@ -3853,6 +3869,7 @@ function exportDossier(list) {
   function buildCard(p) {
     const card = document.createElement("div");
     card.className = "case-card";
+    const deceased = (p.status || "").toUpperCase() === "DECEASED";
     const locVal = (p.location && !/^(unknown|\u2014|-)?$/i.test(p.location.trim()))
       ? `<span class="loc-link" data-loc="${esc(p.location)}" title="Plot on SITREP map">${esc(p.location)} \u25C9</span>`
       : esc(p.location || "\u2014");
@@ -3865,9 +3882,8 @@ function exportDossier(list) {
         }).join("")
       : `<span class="assoc-empty">No known associates on file.</span>`;
     card.innerHTML = `
-      <div class="cc-stamp">${esc(p.status || "ACTIVE")}</div>
       <div class="cc-left">
-        <div class="cc-photo">${photoMarkup(p)}</div>
+        <div class="cc-photo">${photoMarkup(p)}${deceased ? '<div class="cc-deceased" aria-label="Deceased"></div>' : ''}</div>
         <div class="cc-badges">
           <div class="cc-badge threat-${p.threat}"><span class="b-lbl">THREAT</span><span class="b-val">${esc(p.threat || "\u2014")}</span></div>
           <div class="cc-badge"><span class="b-lbl">STATUS</span><span class="b-val">${esc(p.status || "\u2014")}</span></div>
@@ -4470,7 +4486,7 @@ function exportDossier(list) {
     theme: "dark", accent: "magenta", clock: "zulu",
     tickerVisible: true, tickerSource: "both", tickerIssuesOnly: false, tickerSpeed: 3,
     radar: true, radarMode: null, sweepSpeed: 0.7, pingSpeed: 160, refreshSec: 30, reduceMotion: false, perfMode: false,
-    feeds: { AZURE: true, CISA: true, C2: false, IOC: false, URL: false, RANSOM: false, TOR: false, AIR: false }
+    feeds: { AZURE: true, SOLARWINDS: true, CISA: true, C2: false, IOC: false, URL: false, RANSOM: false, TOR: false, AIR: false }
   };
   const ACCENTS = {
     magenta: ["#ff2d6f", "#7a1538", "rgba(255,45,111,0.45)"],
@@ -4581,6 +4597,7 @@ function exportDossier(list) {
        <div class="set-section"><h3>DATA FEEDS</h3>
          <div class="set-desc" style="margin:-4px 0 14px">Sources polled for the SITREP map. A feed that is off is never queried and its legend layer is hidden.</div>
          ${row("Azure regions", "Azure datacenter health \u2014 region status markers", feedToggle("AZURE"))}
+         ${row("SolarWinds Observability", "SolarWinds component status \u2014 powers the status ticker", feedToggle("SOLARWINDS"))}
          ${row("CISA offices", "Static reference markers \u2014 CISA HQ &amp; regional offices", feedToggle("CISA"))}
          ${row("Feodo Tracker (C2)", "Botnet command-and-control IPs", feedToggle("C2"))}
          ${row("ThreatFox (IOC)", "Indicators of compromise", feedToggle("IOC"))}
@@ -4679,7 +4696,9 @@ function exportDossier(list) {
   window.Ticker = {
     init() {
       render();
-      syncSolarWindsStatus().then(render);
+      // only query SolarWinds on boot if its data-feed toggle is enabled
+      const sf = window.Settings && window.Settings.get("feeds");
+      if (!sf || sf.SOLARWINDS !== false) syncSolarWindsStatus().then(render);
       // SolarWinds now re-syncs with every other feed on the SITREP
       // auto-refresh timer (see Sitrep.refreshAll) â€” no separate interval.
     },
