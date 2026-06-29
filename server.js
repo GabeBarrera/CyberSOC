@@ -544,6 +544,63 @@ async function geocode(q) {
   return { lat: +a[0].lat, lng: +a[0].lon, display: a[0].display_name };
 }
 
+/* ---------- whois / IP-domain intel ----------
+   IP or hostname -> geolocation + ASN/ISP/org via ip-api.com (free, no key,
+   resolves hostnames too). Domains additionally get registrar + key dates +
+   nameservers from RDAP (rdap.org bootstrap). Best-effort: any leg may fail
+   independently and the rest still returns. */
+const WHOIS_IPV4 = /^(?:\d{1,3}\.){3}\d{1,3}$/;
+async function whoisLookup(raw) {
+  if (typeof fetch !== "function") throw new Error("need Node 18+");
+  const q = String(raw || "").trim().replace(/^[a-z]+:\/\//i, "").replace(/\/.*$/, "").replace(/^["']|["']$/g, "");
+  if (!q) throw new Error("empty query");
+  const isIP = WHOIS_IPV4.test(q) || q.includes(":");
+  const out = { query: q, type: isIP ? "ip" : "domain", ok: false };
+
+  // geolocation + ASN (works for IPs and hostnames)
+  try {
+    const r = await fetch("http://ip-api.com/json/" + encodeURIComponent(q) +
+      "?fields=status,message,country,countryCode,regionName,city,lat,lon,timezone,isp,org,as,asname,reverse,query",
+      { headers: { "User-Agent": "CyberSOC/1.0 (local SOC console)" } });
+    if (r.ok) {
+      const j = await r.json();
+      if (j && j.status === "success") {
+        Object.assign(out, {
+          ok: true, ip: j.query, country: j.country, countryCode: j.countryCode,
+          region: j.regionName, city: j.city, lat: j.lat, lng: j.lon, timezone: j.timezone,
+          isp: j.isp, org: j.org, as: j.as, asname: j.asname, reverse: j.reverse
+        });
+      } else if (j && j.message) out.error = j.message;
+    }
+  } catch (e) { out.error = e.message; }
+
+  // RDAP registry record for domains
+  if (!isIP) {
+    try {
+      const r = await fetch("https://rdap.org/domain/" + encodeURIComponent(q), { headers: { "Accept": "application/rdap+json" } });
+      if (r.ok) {
+        const j = await r.json();
+        const ev = {};
+        (j.events || []).forEach((e) => { if (e.eventAction && e.eventDate) ev[e.eventAction] = e.eventDate; });
+        out.created = ev.registration || null;
+        out.updated = ev["last changed"] || null;
+        out.expires = ev.expiration || null;
+        out.nameservers = (j.nameservers || []).map((n) => (n.ldhName || "").toLowerCase()).filter(Boolean);
+        out.domainStatus = Array.isArray(j.status) ? j.status : (j.status ? [j.status] : null);
+        const reg = (j.entities || []).find((e) => (e.roles || []).includes("registrar"));
+        if (reg) {
+          const card = (reg.vcardArray && reg.vcardArray[1]) || [];
+          const fn = card.find((x) => x[0] === "fn");
+          out.registrar = (fn && fn[3]) || reg.handle || null;
+        }
+        out.rdap = true;
+        if (out.registrar || out.created) out.ok = true;
+      }
+    } catch (e) { /* RDAP optional */ }
+  }
+  return out;
+}
+
 /* ---------- static ---------- */
 function serveStatic(req, res, pathname) {
   let rel = decodeURIComponent(pathname);
@@ -668,6 +725,13 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return sendJSON(res, 502, { error: e.message }); }
   }
 
+  if (p === "/api/whois" && req.method === "GET") {
+    const q = u.searchParams.get("q");
+    if (!q) return sendJSON(res, 400, { error: "missing q" });
+    try { return sendJSON(res, 200, await whoisLookup(q)); }
+    catch (e) { return sendJSON(res, 502, { error: "whois unavailable", detail: e.message }); }
+  }
+
   /* ---------- localhost shell bridge ----------
      Runs an arbitrary command on the host machine and returns its output.
      ⚠ This is a remote-code-execution endpoint. The server binds to
@@ -716,5 +780,6 @@ server.listen(PORT, "127.0.0.1", () => {
   console.log("  Sitrep     : GET/PUT /api/sitrep   (writes data/soc_sitrep.json)");
   console.log("  Photo up   : POST /api/upload-image (writes assets/images/<file>)");
   console.log("  Geocode    : GET  /api/geocode?q=<address>");
+  console.log("  Whois      : GET  /api/whois?q=<ip|domain>  (ip-api geo/ASN + RDAP registry)");
   console.log("  Shell      : POST /api/exec   ⚠ runs host commands — loopback only, never expose\n");
 });
