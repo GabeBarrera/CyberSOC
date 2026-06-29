@@ -1,72 +1,176 @@
 [
   {
     "id": "sub-0001",
-    "name": "ARDEN, Mara",
-    "alias": "NIGHTJAR",
-    "dob": "1991-03-14",
-    "sex": "Female",
+    "name": "MITNICK, Kevin",
+    "alias": "CONDOR",
+    "dob": "1963-08-06",
+    "sex": "Male",
     "ethnicity": "White",
-    "threat": "HIGH",
-    "status": "AT LARGE",
-    "location": "Lisbon, PT",
-    "affiliations": "Helix Collective, ex-NSA contractor",
-    "caseNumber": "CS-2241-A",
+    "threat": "ELEVATED",
+    "status": "DECEASED",
+    "location": "Las Vegas, US",
+    "affiliations": "Mitnick Security Consulting; KnowBe4 (Chief Hacking Officer)",
+    "caseNumber": "CS-1995-CONDOR",
     "photo": "",
     "relationships": [
       { "id": "sub-0002", "type": "Associate" },
-      { "id": "sub-0003", "type": "Recruiter" }
+      { "id": "sub-0008", "type": "Peer" }
     ],
-    "description": "Former signals analyst turned broker of zero-day exploits. Operates through layered cut-outs and disposable hardware. Known for spear-phishing campaigns against utility SCADA networks. Identifying mark: small circuit-trace tattoo, left wrist."
+    "description": "Once the most-wanted computer criminal in the United States; arrested by the FBI in 1995 after a high-profile pursuit and convicted of wire fraud and unauthorized access. Pioneered social-engineering tradecraft against telecom and tech firms. After release he became a celebrated white-hat consultant, author and speaker. Died of pancreatic cancer in July 2023."
   },
   {
     "id": "sub-0002",
-    "name": "OKONKWO, Daniel",
-    "alias": "GHOSTWIRE",
-    "dob": "1986-11-02",
+    "name": "POULSEN, Kevin",
+    "alias": "DARK DANTE",
+    "dob": "1965-11-30",
     "sex": "Male",
-    "ethnicity": "Black or African American",
-    "threat": "SEVERE",
-    "status": "SURVEILLANCE",
-    "location": "Unknown",
-    "affiliations": "Independent · suspected state proxy",
-    "caseNumber": "CS-1908-C",
+    "ethnicity": "White",
+    "threat": "GUARDED",
+    "status": "REFORMED",
+    "location": "San Francisco, US",
+    "affiliations": "Journalist \u00B7 ex-WIRED \u00B7 co-creator of SecureDrop",
+    "caseNumber": "CS-1991-DANTE",
     "photo": "",
     "relationships": [
-      { "id": "sub-0001", "type": "Associate" }
+      { "id": "sub-0001", "type": "Associate" },
+      { "id": "sub-0003", "type": "Press contact" }
     ],
-    "description": "Believed responsible for the 'Tidewater' ransomware family. Highly disciplined OPSEC; no confirmed photograph on file. Communicates via rotating onion services. Considered a flight risk and technically sophisticated."
+    "description": "Notorious for seizing the phone lines of an LA radio station in 1990 to guarantee himself a winning call and claim a Porsche. Served prison time for hacking and wire fraud. Reinvented as an investigative journalist, co-authored the SecureDrop whistleblower platform, and reported extensively on cybercrime."
   },
   {
     "id": "sub-0003",
-    "name": "VOSS, Lena",
-    "alias": "CIPHER-9",
-    "dob": "1998-07-21",
-    "sex": "Female",
-    "ethnicity": "Two or More Races",
-    "threat": "ELEVATED",
-    "status": "IN CUSTODY",
-    "location": "Berlin, DE",
-    "affiliations": "Lattice crew",
-    "caseNumber": "CS-2310-B",
+    "name": "LAMO, Adrian",
+    "alias": "THE HOMELESS HACKER",
+    "dob": "1981-02-20",
+    "sex": "Male",
+    "ethnicity": "Hispanic or Latino",
+    "threat": "GUARDED",
+    "status": "DECEASED",
+    "location": "Wichita, US",
+    "affiliations": "Independent \u00B7 former threat analyst",
+    "caseNumber": "CS-2003-LAMO",
     "photo": "",
     "relationships": [
-      { "id": "sub-0004", "type": "Coworker" }
+      { "id": "sub-0002", "type": "Press contact" }
     ],
-    "description": "Apprehended following a coordinated takedown of a credential-stuffing marketplace. Cooperating witness. Specializes in botnet orchestration and residential proxy laundering."
+    "description": "Known for intrusions into The New York Times and Microsoft networks, often working from libraries and cafes. In 2010 he reported U.S. Army analyst Chelsea Manning to authorities over the WikiLeaks disclosures, a decision that drew lasting controversy. Died in 2018 at age 37."
   },
   {
     "id": "sub-0004",
-    "name": "KORHONEN, Aleksi",
-    "alias": "DEADBOLT",
-    "dob": "1979-01-30",
+    "name": "McKINNON, Gary",
+    "alias": "SOLO",
+    "dob": "1966-02-10",
+    "sex": "Male",
+    "ethnicity": "White",
+    "threat": "ELEVATED",
+    "status": "EXTRADITION BLOCKED",
+    "location": "London, UK",
+    "affiliations": "Independent",
+    "caseNumber": "CS-2002-SOLO",
+    "photo": "",
+    "relationships": [],
+    "description": "Scottish systems administrator accused of the largest-ever intrusion into U.S. military and NASA computers (2001\u20132002), reportedly searching for suppressed evidence of UFOs and free-energy technology. A decade-long extradition fight ended in 2012 when the UK Home Secretary blocked his removal on human-rights grounds, citing his Asperger's diagnosis."
+  },
+  {
+    "id": "sub-0005",
+    "name": "GONZALEZ, Albert",
+    "alias": "SOUPNAZI",
+    "dob": "1981-08-12",
+    "sex": "Male",
+    "ethnicity": "Hispanic or Latino",
+    "threat": "SEVERE",
+    "status": "INCARCERATED",
+    "location": "USP Atlanta, US",
+    "affiliations": "ShadowCrew \u00B7 Operation Get Rich or Die Tryin'",
+    "caseNumber": "CS-2008-SOUP",
+    "photo": "",
+    "relationships": [],
+    "description": "Mastermind behind the theft of more than 170 million card and ATM numbers from TJX, Heartland Payment Systems and others \u2014 among the largest data breaches on record. Operated partly as a paid Secret Service informant while continuing to run his own crews. Sentenced in 2010 to 20 years in federal prison."
+  },
+  {
+    "id": "sub-0006",
+    "name": "JAMES, Jonathan",
+    "alias": "C0MRADE",
+    "dob": "1983-12-12",
+    "sex": "Male",
+    "ethnicity": "White",
+    "threat": "ELEVATED",
+    "status": "DECEASED",
+    "location": "Pinecrest, US",
+    "affiliations": "Independent",
+    "caseNumber": "CS-1999-CMRD",
+    "photo": "",
+    "relationships": [],
+    "description": "As a teenager, breached the U.S. Department of Defense and NASA systems, intercepting thousands of messages and source code for the International Space Station's life-support software. In 2000 became the first juvenile incarcerated for cybercrime in the United States. Died in 2008 amid an investigation he denied involvement in."
+  },
+  {
+    "id": "sub-0007",
+    "name": "MORRIS, Robert Tappan",
+    "alias": "RTM",
+    "dob": "1965-11-08",
     "sex": "Male",
     "ethnicity": "White",
     "threat": "GUARDED",
     "status": "CLEARED",
-    "location": "Helsinki, FI",
-    "affiliations": "None (cleared)",
-    "caseNumber": "CS-1455-D",
+    "location": "Cambridge, US",
+    "affiliations": "MIT (professor) \u00B7 co-founder, Y Combinator & Viaweb",
+    "caseNumber": "CS-1988-WORM",
     "photo": "",
-    "description": "Initial person of interest in a supply-chain compromise; subsequently cleared after forensic timeline placed him offsite. File retained for reference only."
+    "relationships": [
+      { "id": "sub-0010", "type": "Peer" }
+    ],
+    "description": "Author of the 1988 Morris Worm, the first major worm to spread across the early internet and the first felony conviction under the U.S. Computer Fraud and Abuse Act. Now a tenured professor at MIT and co-founder of Viaweb and the startup accelerator Y Combinator. A respected figure in computer-science research."
+  },
+  {
+    "id": "sub-0008",
+    "name": "CALCE, Michael",
+    "alias": "MAFIABOY",
+    "dob": "1984-05-01",
+    "sex": "Male",
+    "ethnicity": "White",
+    "threat": "GUARDED",
+    "status": "REFORMED",
+    "location": "Montreal, CA",
+    "affiliations": "Security consultant \u00B7 author",
+    "caseNumber": "CS-2000-MAFIA",
+    "photo": "",
+    "relationships": [
+      { "id": "sub-0001", "type": "Peer" }
+    ],
+    "description": "At 15, launched a wave of distributed denial-of-service attacks in February 2000 that took down Yahoo, Amazon, eBay, CNN and Dell, briefly crippling some of the web's largest sites. Sentenced in juvenile court in Canada. Now works as a white-hat consultant and author on cybersecurity awareness."
+  },
+  {
+    "id": "sub-0009",
+    "name": "HUTCHINS, Marcus",
+    "alias": "MALWARETECH",
+    "dob": "1994-06-08",
+    "sex": "Male",
+    "ethnicity": "White",
+    "threat": "GUARDED",
+    "status": "RESEARCHER",
+    "location": "Ilfracombe, UK",
+    "affiliations": "Independent security researcher",
+    "caseNumber": "CS-2017-WCRY",
+    "photo": "",
+    "relationships": [],
+    "description": "Registered the kill-switch domain that halted the global WannaCry ransomware outbreak in May 2017, sparing untold systems including the UK's NHS. Later arrested in the U.S. and pleaded guilty to earlier involvement in the Kronos banking trojan; sentenced to time served. Continues to publish respected malware-analysis research."
+  },
+  {
+    "id": "sub-0010",
+    "name": "ZATKO, Peiter",
+    "alias": "MUDGE",
+    "dob": "1970-12-01",
+    "sex": "Male",
+    "ethnicity": "White",
+    "threat": "GUARDED",
+    "status": "ADVISOR",
+    "location": "Washington, US",
+    "affiliations": "L0pht / @stake \u00B7 ex-DARPA \u00B7 ex-Google/Stripe/Twitter",
+    "caseNumber": "CS-1998-MUDGE",
+    "photo": "",
+    "relationships": [
+      { "id": "sub-0007", "type": "Peer" }
+    ],
+    "description": "Leading member of the L0pht hacker think-tank who famously testified to the U.S. Senate in 1998 that the group could take down the internet in 30 minutes. Went on to run cyber programs at DARPA and lead security at Google, Stripe and Twitter. In 2022 became a high-profile whistleblower over Twitter's security practices."
   }
 ]
