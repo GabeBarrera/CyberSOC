@@ -251,17 +251,18 @@ body { position: relative; }
   position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
   border: 1px solid rgba(255,45,111,0.10); border-radius: 50%;
 }
-#radar-home {
-  position: absolute; width: 12px; height: 12px; left: 50%; top: 50%;
-  transform: translate(-50%,-50%); border-radius: 50%;
+/* operator "you are here" pin â€” a real Leaflet marker so it sits in the marker
+   pane (below popups) and gets the .pin-wrap crosshair hover. */
+.home-pin {
+  position: relative; width: 12px; height: 12px; border-radius: 50%;
   background: var(--accent); box-shadow: 0 0 0 3px rgba(255,45,111,0.18), 0 0 16px var(--accent-glow);
 }
-#radar-home::before, #radar-home::after {
+.home-pin::before, .home-pin::after {
   content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
-  border: 1px solid var(--accent); border-radius: 50%; opacity: .5;
+  border: 1px solid var(--accent); border-radius: 50%; opacity: .5; pointer-events: none;
 }
-#radar-home::before { width: 22px; height: 22px; }
-#radar-home::after { width: 34px; height: 34px; opacity: .25; }
+.home-pin::before { width: 22px; height: 22px; }
+.home-pin::after { width: 34px; height: 34px; opacity: .25; }
 #radar-ping {
   position: absolute; left: 50%; top: 50%; width: 0; height: 0;
   transform: translate(-50%, -50%); border-radius: 50%;
@@ -934,7 +935,6 @@ a, button, summary, label, select, [role="button"], [onclick],
     <div id="radar-sweep"></div>
     <div id="radar-ping"></div>
     <div id="radar-rings"></div>
-    <div id="radar-home" title="Operator position"></div>
   </div>
 
   <!-- Top-left HUD readout -->
@@ -1566,6 +1566,25 @@ async function whoisLookup(raw) {
   return out;
 }
 
+/* reverse-geocode coordinates -> { city, state, country, display } (Nominatim,
+   best-effort; null when offline). Used by the operator "current position" pin. */
+async function reverseGeocode(lat, lng) {
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=10&lat=${lat}&lon=${lng}`, { headers: { Accept: "application/json" } });
+    if (r.ok) {
+      const j = await r.json();
+      const a = j.address || {};
+      return {
+        city: a.city || a.town || a.village || a.hamlet || a.municipality || a.county || "",
+        state: a.state || a.region || a.province || "",
+        country: a.country || "",
+        display: j.display_name || ""
+      };
+    }
+  } catch (e) {}
+  return null;
+}
+
 function exportDossier(list) {
   const blob = new Blob([JSON.stringify(list, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -1584,6 +1603,7 @@ function exportDossier(list) {
    =================================================================== */
 (function () {
   let map, radarCenterLatLng = null;
+  let homeMarker = null, homePlace = null;   // operator "current position" pin
   const markers = {};        // code -> { marker, el, latlng, lastPing }
   let alertFilter = "ALL";   // ALL | AZURE | CVE | C2 | IOC | URL | RANSOM
   let alertWindow = "ALL";   // ALL | 24h | w | m | y
@@ -1631,23 +1651,76 @@ function exportDossier(list) {
 
   const $ = (s) => document.querySelector(s);
 
+  /* ---------- popup manager ----------
+     Pins behave like this:
+       â€¢ hover            -> transient preview popup (one at a time)
+       â€¢ click            -> pins the popup; it stays open until the user
+                             clicks the map background or another pin
+       â€¢ Ctrl/Cmd + click -> pins this popup ALONGSIDE the others (toggle)
+     Sticky popups are kept open by forcing autoClose/closeOnClick off on every
+     bound popup; Leaflet's own single-popup tracking is bypassed. */
+  let lastPinClick = 0;
+  const PopupMgr = {
+    sticky: new Set(),       // marker/path layers pinned open
+    loose: new Set(),        // standalone L.popup instances pinned open (CLI)
+    hovered: null,           // layer showing the transient hover preview
+    _multi(e) { const oe = e && e.originalEvent; return !!(oe && (oe.ctrlKey || oe.metaKey)); },
+    hover(layer) {
+      if (this.sticky.has(layer)) return;                 // already pinned
+      if (this.hovered && this.hovered !== layer && !this.sticky.has(this.hovered)) {
+        try { this.hovered.closePopup(); } catch (e) {}
+      }
+      this.hovered = layer;
+      try { layer.openPopup(); } catch (e) {}
+    },
+    unhover(layer) {
+      if (this.sticky.has(layer)) return;                 // pinned -> keep open
+      try { layer.closePopup(); } catch (e) {}
+      if (this.hovered === layer) this.hovered = null;
+    },
+    click(layer, e) {
+      if (this._multi(e)) {
+        if (this.sticky.has(layer)) { this.sticky.delete(layer); try { layer.closePopup(); } catch (_) {} }
+        else { this.sticky.add(layer); if (this.hovered === layer) this.hovered = null; try { layer.openPopup(); } catch (_) {} }
+      } else {
+        this.closeAll();
+        this.sticky.add(layer);
+        try { layer.openPopup(); } catch (_) {}
+      }
+      lastPinClick = Date.now();
+    },
+    pin(layer) { this.closeAll(); this.sticky.add(layer); try { layer.openPopup(); } catch (e) {} },
+    pinPopup(popup) { this.closeAll(); if (map && popup) { this.loose.add(popup); popup.addTo(map); } },
+    closeAll() {
+      this.sticky.forEach((l) => { try { l.closePopup(); } catch (e) {} }); this.sticky.clear();
+      this.loose.forEach((p) => { try { map && map.removeLayer(p); } catch (e) {} }); this.loose.clear();
+      if (this.hovered) { try { this.hovered.closePopup(); } catch (e) {} this.hovered = null; }
+    }
+  };
+
   /* ---------- map + markers ---------- */
   function initMap() {
-    // One-time patch: any layer that binds a popup also opens it on hover
-    // (in addition to click), and closes it when the pointer leaves.
+    // One-time patch: route every bound popup through the PopupMgr so hover
+    // previews, sticky click-to-pin and Ctrl-click multi-select all work, and
+    // a pinned popup is never auto-closed by Leaflet.
     if (L && L.Layer && !L.Layer.prototype.__hoverPopupPatched) {
       L.Layer.prototype.__hoverPopupPatched = true;
       const _bindPopup = L.Layer.prototype.bindPopup;
-      L.Layer.prototype.bindPopup = function () {
-        const res = _bindPopup.apply(this, arguments);
-        this.on("mouseover", function () { this.openPopup(); });
-        this.on("mouseout", function () { this.closePopup(); });
+      L.Layer.prototype.bindPopup = function (content, options) {
+        options = Object.assign({ autoClose: false, closeOnClick: false }, options || {});
+        const res = _bindPopup.call(this, content, options);
+        // drop Leaflet's default click-to-toggle â€” PopupMgr owns open/close
+        this.off("click", this._openPopup, this);
+        this.on("mouseover", function () { PopupMgr.hover(this); });
+        this.on("mouseout", function () { PopupMgr.unhover(this); });
+        this.on("click", function (e) { PopupMgr.click(this, e); });
         return res;
       };
     }
     map = L.map("map", {
       zoomControl: true,
       worldCopyJump: false,
+      closePopupOnClick: false,
       maxBounds: [[-85, -180], [85, 180]],
       maxBoundsViscosity: 1.0,
       minZoom: 2,
@@ -1665,6 +1738,8 @@ function exportDossier(list) {
 
     map.on("move zoom moveend zoomend", positionRadar);
     map.on("zoomend moveend", refreshMarkerAngles);
+    // click on empty map (not a pin) dismisses all pinned popups
+    map.on("click", () => { if (Date.now() - lastPinClick > 60) PopupMgr.closeAll(); });
 
     setupLongPress();
   }
@@ -1853,17 +1928,49 @@ function exportDossier(list) {
   /* ---------- radar ---------- */
   function setRadarCenter(latlng) {
     radarCenterLatLng = latlng;
+    ensureHomeMarker(latlng);
     positionRadar();
     refreshMarkerAngles();
     const loc = $("#m-loc");
     if (loc) loc.textContent = `POS ${latlng.lat.toFixed(2)}, ${latlng.lng.toFixed(2)}`;
   }
 
+  /* Operator "current position" pin â€” a real Leaflet marker (marker pane, below
+     popups; crosshair on hover via .pin-wrap). Popup shows CURRENT POSITION plus
+     the reverse-geocoded city / state. */
+  function homePopupHtml(place, ll) {
+    let line2;
+    if (place && (place.city || place.state || place.country)) {
+      line2 = [place.city, place.state || place.country].filter(Boolean).join(", ");
+    } else {
+      line2 = `LAT ${ll.lat.toFixed(4)} \u00B7 LNG ${ll.lng.toFixed(4)}`;
+    }
+    return `<div class="rp-name">\u25C9 CURRENT POSITION</div><div class="rp-meta">${escHtml(line2)}</div>`;
+  }
+  function ensureHomeMarker(ll) {
+    if (!map || !ll) return;
+    if (!homeMarker) {
+      homeMarker = L.marker(ll, {
+        keyboard: false, zIndexOffset: -200, riseOnHover: true,
+        icon: L.divIcon({ className: "", html: `<div class="pin-wrap"><div class="home-pin"></div></div>`, iconSize: [14, 14], iconAnchor: [7, 7] })
+      }).addTo(map);
+      homeMarker.bindPopup(homePopupHtml(homePlace, ll), { className: "region-popup", closeButton: false });
+    } else {
+      homeMarker.setLatLng(ll);
+      homeMarker.setPopupContent(homePopupHtml(homePlace, ll));
+    }
+    reverseGeocode(ll.lat, ll.lng).then((place) => {
+      if (!place) return;
+      homePlace = place;
+      if (homeMarker) homeMarker.setPopupContent(homePopupHtml(place, ll));
+    });
+  }
+
   function positionRadar() {
     if (!map || !radarCenterLatLng) return;
     const p = map.latLngToContainerPoint(radarCenterLatLng);
-    const sweep = $("#radar-sweep"), rings = $("#radar-rings"), home = $("#radar-home"), ping = $("#radar-ping");
-    [sweep, rings, home, ping].forEach((el) => {
+    const sweep = $("#radar-sweep"), rings = $("#radar-rings"), ping = $("#radar-ping");
+    [sweep, rings, ping].forEach((el) => {
       if (!el) return;
       el.style.left = p.x + "px";
       el.style.top = p.y + "px";
@@ -2198,7 +2305,7 @@ function exportDossier(list) {
     ]).addTo(map);
     allowDeepZoom();
     map.flyTo(ll, 9, { duration: 1.3 });
-    setTimeout(() => { try { marker.openPopup(); } catch (e) {} }, 1400);
+    setTimeout(() => { try { PopupMgr.pin(marker); } catch (e) {} }, 1400);
     return true;
   }
 
@@ -3359,9 +3466,9 @@ function exportDossier(list) {
       map.flyTo([r.lat, r.lng], 6, { duration: 1.2 });
       const ref = markers[r.code];
       setTimeout(() => {
-        if (ref && ref.marker) ref.marker.openPopup();
-        else L.popup({ className: "region-popup", closeButton: false }).setLatLng([r.lat, r.lng])
-          .setContent(`<div class="rp-name">\u25C9 ${escHtml(r.name)}</div><div class="rp-meta">${escHtml(r.geo)} \u00B7 ${escHtml(r.status)}</div>`).openOn(map);
+        if (ref && ref.marker) PopupMgr.pin(ref.marker);
+        else PopupMgr.pinPopup(L.popup({ className: "region-popup", closeButton: false, autoClose: false, closeOnClick: false }).setLatLng([r.lat, r.lng])
+          .setContent(`<div class="rp-name">\u25C9 ${escHtml(r.name)}</div><div class="rp-meta">${escHtml(r.geo)} \u00B7 ${escHtml(r.status)}</div>`));
         triggerPing(r.code);
       }, 1250);
     }
@@ -3399,12 +3506,11 @@ function exportDossier(list) {
     if (map) {
       map.flyTo([f.lat, f.lng], 7, { duration: 1.2 });
       setTimeout(() => {
-        L.popup({ className: "region-popup", closeButton: false })
+        PopupMgr.pinPopup(L.popup({ className: "region-popup", closeButton: false, autoClose: false, closeOnClick: false })
           .setLatLng([f.lat, f.lng])
           .setContent(`<div class="rp-name">\u2708 ${escHtml(f.title || "FLIGHT")}</div>
                        <div class="rp-meta">${escHtml((f.sub || "").slice(0, 54))}</div>
-                       <div class="rp-status" style="color:#38d6ff">${tele(f.msg)}</div>`)
-          .openOn(map);
+                       <div class="rp-status" style="color:#38d6ff">${tele(f.msg)}</div>`));
       }, 1300);
     }
   }
@@ -3903,7 +4009,7 @@ function exportDossier(list) {
       const lls = found.map((f) => f.ll);
       if (lls.length === 1) {
         map.flyTo(lls[0], LOCATE_ZOOM, { duration: 1.3 });
-        setTimeout(() => { window.__pinLayer && window.__pinLayer.getLayers()[1].openPopup(); }, 1400);
+        setTimeout(() => { window.__pinLayer && PopupMgr.pin(window.__pinLayer.getLayers()[1]); }, 1400);
       } else {
         map.flyToBounds(L.latLngBounds(lls), { padding: [80, 80], maxZoom: LOCATE_ZOOM, duration: 1.3 });
       }
@@ -3976,7 +4082,7 @@ function exportDossier(list) {
       allowDeepZoom();
       map.flyTo(ll, LOCATE_ZOOM, { duration: 1.4 });
       pinPending = false;
-      setTimeout(() => { window.__pinLayer && window.__pinLayer.getLayers()[1].openPopup(); }, 1500);
+      setTimeout(() => { window.__pinLayer && PopupMgr.pin(window.__pinLayer.getLayers()[1]); }, 1500);
       return true;
     }
   };
