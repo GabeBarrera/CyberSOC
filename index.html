@@ -976,6 +976,7 @@ a, button, summary, label, select, [role="button"], [onclick],
           <div class="alert-filters" id="alert-filters">
             <button class="af-chip active" data-cat="ALL">ALL</button>
         <button class="af-chip" data-cat="AZURE">AZURE</button>
+        <button class="af-chip" data-cat="SW">SOLARWINDS</button>
         <button class="af-chip" data-cat="CVE">CVE</button>
         <button class="af-chip" data-cat="C2">C2/IP</button>
         <button class="af-chip" data-cat="IOC">IOC</button>
@@ -2207,6 +2208,30 @@ function exportDossier(list) {
           title: r.name, sub: (d.service || "Multiple services") + " \u00B7 " + r.geo,
           msg: d.msg || "", src: "Azure Status",
           lat: r.lat, lng: r.lng, geo: r.geo
+        });
+      });
+    }
+    /* SolarWinds Observability â€” live component health (see syncSolarWindsStatus) */
+    if (!LIVE_MODE_SW) {
+      out.push({
+        cat: "SW", sev: "unknown", catLabel: "FEED OFFLINE", ts: null, time: "",
+        title: "SolarWinds component health unavailable",
+        sub: "Live status feed offline \u00B7 " + SOLARWINDS_COMPONENTS.length + " components UNKNOWN",
+        msg: "Cannot reach the SolarWinds status feed. Component health is unknown. Start the CyberSOC node server (or restore connectivity) to resume live monitoring.",
+        src: "SolarWinds Status"
+      });
+    } else {
+      SOLARWINDS_COMPONENTS.filter((c) => c.status !== "operational").forEach((c) => {
+        const lbl = c.status === "outage" ? "SW OUTAGE"
+          : c.status === "degraded" ? "SW DEGRADED"
+          : c.status === "maintenance" ? "SW MAINTENANCE"
+          : "SW " + c.status.toUpperCase();
+        out.push({
+          cat: "SW", sev: c.status === "maintenance" ? "degraded" : c.status,
+          catLabel: lbl, ts: null, time: "",
+          title: c.name, sub: "SolarWinds Observability \u00B7 component",
+          msg: c.status === "outage" ? "Service availability impacted." : c.status === "maintenance" ? "Scheduled maintenance in progress." : "Degraded performance reported.",
+          src: "SolarWinds Status"
         });
       });
     }
