@@ -629,6 +629,15 @@ const server = http.createServer(async (req, res) => {
     catch (e) { return sendJSON(res, 502, { error: "azure feed unavailable", detail: e.message }); }
   }
 
+  if (p === "/api/list-images" && req.method === "GET") {
+    ensureImgDir();
+    try {
+      const exts = new Set(Object.values(IMG_EXT));
+      const files = fs.readdirSync(IMG_DIR).filter((f) => exts.has(path.extname(f).slice(1).toLowerCase()));
+      return sendJSON(res, 200, { images: files.map((f) => ({ name: f, path: "assets/images/" + f })) });
+    } catch (e) { return sendJSON(res, 500, { error: e.message }); }
+  }
+
   if (p === "/api/solarwinds-status" && req.method === "GET") {
     try { return sendJSON(res, 200, await getSolarWindsStatus()); }
     catch (e) { return sendJSON(res, 502, { error: "solarwinds feed unavailable", detail: e.message }); }
@@ -779,6 +788,7 @@ server.listen(PORT, "127.0.0.1", () => {
   console.log("  Log files  : GET/PUT /api/files    (writes data/soc_files.json)");
   console.log("  Sitrep     : GET/PUT /api/sitrep   (writes data/soc_sitrep.json)");
   console.log("  Photo up   : POST /api/upload-image (writes assets/images/<file>)");
+  console.log("  Photo list : GET  /api/list-images  (lists assets/images/*)");
   console.log("  Geocode    : GET  /api/geocode?q=<address>");
   console.log("  Whois      : GET  /api/whois?q=<ip|domain>  (ip-api geo/ASN + RDAP registry)");
   console.log("  Shell      : POST /api/exec   ⚠ runs host commands — loopback only, never expose\n");
