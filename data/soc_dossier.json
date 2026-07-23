@@ -172,5 +172,59 @@
       { "id": "sub-0007", "type": "Peer" }
     ],
     "description": "Leading member of the L0pht hacker think-tank who famously testified to the U.S. Senate in 1998 that the group could take down the internet in 30 minutes. Went on to run cyber programs at DARPA and lead security at Google, Stripe and Twitter. In 2022 became a high-profile whistleblower over Twitter's security practices."
+  },
+  {
+    "id": "org-0001", "type": "org", "name": "Lazarus Group", "groupType": "Nation-State / APT",
+    "founded": "2009-01-01", "status": "ACTIVE", "location": "Pyongyang, North Korea", "photo": "",
+    "caseNumber": "ORG-2009-LZR", "members": [],
+    "description": "North Korea-linked state-sponsored threat actor attributed to the DPRK's Reconnaissance General Bureau. Tied to the Sony Pictures breach, the WannaCry ransomware outbreak, and a long-running campaign of cryptocurrency-exchange heists funding the regime."
+  },
+  {
+    "id": "org-0002", "type": "org", "name": "APT28 (Fancy Bear)", "groupType": "Nation-State / APT",
+    "founded": "2004-01-01", "status": "ACTIVE", "location": "Moscow, Russia", "photo": "",
+    "caseNumber": "ORG-2004-FCB", "members": [],
+    "description": "Military cyber-espionage unit linked to Russia's GRU. Attributed to the 2016 DNC intrusion, repeated NATO and European government targeting, and long-running credential-phishing campaigns against journalists and defense contractors."
+  },
+  {
+    "id": "org-0003", "type": "org", "name": "REvil (Sodinokibi)", "groupType": "Cybercriminal Syndicate",
+    "founded": "2019-01-01", "status": "DISBANDED", "location": "Saint Petersburg, Russia", "photo": "",
+    "caseNumber": "ORG-2019-RVL", "members": [],
+    "description": "Ransomware-as-a-service syndicate behind the Kaseya and JBS Foods attacks. Disrupted by a multinational law-enforcement operation in 2021\u20132022 after extracting hundreds of millions in ransom payments."
+  },
+  {
+    "id": "org-0004", "type": "org", "name": "Anonymous", "groupType": "Hacktivist Collective",
+    "founded": "2003-01-01", "status": "ACTIVE", "location": "Distributed / Global", "photo": "",
+    "caseNumber": "ORG-2003-ANON", "members": [],
+    "description": "Decentralized, leaderless hacktivist collective with no formal membership or hierarchy. Known for DDoS campaigns and doxxing operations against corporations, governments, and extremist groups under a shared banner and imagery."
+  },
+  {
+    "id": "org-0005", "type": "org", "name": "LulzSec", "groupType": "Hacktivist Collective",
+    "founded": "2011-05-01", "status": "DISBANDED", "location": "Distributed / Global", "photo": "",
+    "caseNumber": "ORG-2011-LULZ", "members": [],
+    "description": "Short-lived hacktivist splinter group that breached Sony Pictures, PBS, and several U.S. government contractors over a 50-day spree in 2011, motivated as much by publicity as by protest, before several members were identified and prosecuted."
+  },
+  {
+    "id": "org-0006", "type": "org", "name": "L0pht Heavy Industries", "groupType": "Hacktivist Collective",
+    "founded": "1992-01-01", "status": "DISBANDED", "location": "Boston, Massachusetts, US", "photo": "",
+    "caseNumber": "ORG-1992-L0PHT", "members": [ { "id": "sub-0010", "role": "Leading Member" } ],
+    "description": "Boston hacker collective and think-tank that testified before the U.S. Senate in 1998 on the fragility of internet infrastructure. Folded into the security firm @stake in 2000, seeding a generation of professional security researchers."
+  },
+  {
+    "id": "org-0007", "type": "org", "name": "FBI Cyber Division", "groupType": "Law Enforcement / Government Agency",
+    "founded": "2002-01-01", "status": "ACTIVE", "location": "Washington, D.C., US", "photo": "",
+    "caseNumber": "ORG-2002-FBICD", "members": [ { "id": "sub-0001", "role": "Subject (historical arrest)" } ],
+    "description": "FBI headquarters division responsible for investigating cyber intrusions, ransomware, and nation-state threat actors, and for coordinating national incident response with CISA and the intelligence community."
+  },
+  {
+    "id": "org-0008", "type": "org", "name": "National Security Agency (NSA)", "groupType": "Law Enforcement / Government Agency",
+    "founded": "1952-11-04", "status": "ACTIVE", "location": "Fort Meade, Maryland, US", "photo": "",
+    "caseNumber": "ORG-1952-NSA", "members": [],
+    "description": "U.S. signals-intelligence and cybersecurity agency. Its Cybersecurity Directorate publishes threat advisories and defensive guidance, while historically disclosed programs cover offensive computer-network operations."
+  },
+  {
+    "id": "org-0009", "type": "org", "name": "Europol EC3", "groupType": "Law Enforcement / Government Agency",
+    "founded": "2013-01-01", "status": "ACTIVE", "location": "The Hague, Netherlands", "photo": "",
+    "caseNumber": "ORG-2013-EC3", "members": [],
+    "description": "European Cybercrime Centre coordinating cross-border law-enforcement operations against ransomware syndicates, card-fraud networks, and child-exploitation rings across EU member states."
   }
 ]

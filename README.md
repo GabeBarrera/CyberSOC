@@ -30,6 +30,7 @@ When served this way the page detects the API and goes live:
 | Read / write log documentation repository | `GET` / `PUT /api/files` → `data/soc_files.json` |
 | Address geocoding for map pins | `GET /api/geocode?q=...` (proxies Nominatim) |
 | IP / domain whois lookup (powers `whois`) | `GET /api/whois?q=...` (ip-api.com geo + ASN/ISP/org; RDAP registry data for domains) |
+| DownDetector search (powers `sitrep -s`) | `GET /api/downdetector?q=<service>` (best-effort scrape of the public DownDetector status page — resolves a free-text query to its status-page slug, then parses the page's embedded 24h report chart; no API key, since DownDetector has none. Cloudflare can occasionally block the request — the CLI falls back to a direct link.) |
 | Host shell bridge (powers `localhost`) | `POST /api/exec` — ⚠ runs commands on the host; loopback-only, **never expose publicly** |
 
 The **NEW / EDIT / DELETE** buttons in the Dossier persist straight to `data/soc_dossier.json` through the server. The nav badge reads **AZURE LIVE** when the proxy feed is active, **SIM FEED** when falling back.
@@ -55,11 +56,13 @@ Open it from the right-edge **CMD** tab on the SITREP view. Commands are single 
 | `sitrep <country>` | Zoom + outline a country's border by threat posture and print its intel. Accepts ISO codes or names — e.g. `sitrep US`, `sitrep "United Kingdom"`. |
 | `sitrep -m <country>` | Open the intel editor (posture · diplomacy · brief · alerts). |
 | `sitrep -d <country>` | Diplomatic map — highlights the country's allies (blue) and adversaries (red) from its logged diplomacy, with a best-fit zoom across all of them. |
-| `sitrep -s` | Force a re-sync of the status feed. |
+| `sitrep -s <service>` | Search DownDetector for a service (e.g. `sitrep -s azure`) and print its live status, a text outage graph, and a link to the DownDetector page. |
+| `sitrep -r` | Force a re-sync of the status feed. |
 | `sitrep -h` | Show the `sitrep` flag/parameter reference. |
 | `locate <keyword>` | Search the dossier (name, alias, city, affiliation…) and plot matching subjects' last-known locations on the map. With no keyword, prints the operator's current position. |
 | `locate -s <server>` | Center the map on an Azure region by name or code — e.g. `locate -s "Central US"` or `locate -s centralus`. With no value, lists monitored regions. |
 | `locate -f <flight>` | Center the map on a live flight pin by call sign — e.g. `locate -f UAL245`. With no code, lists tracked aircraft. |
+| `locate -c` | Clear dossier subject pins placed on the map by `locate <keyword>`. |
 | `locate -h` | Show the `locate` flag/parameter reference. |
 | `dossier` | Print the names (and aliases) of every subject on file. |
 | `whois <ip\|domain>` | Geolocate an IP or resolve a domain — ASN/ISP/org, reverse DNS, and (for domains) registrar, registration/expiry dates and nameservers via RDAP — then plot the host on the SITREP map. Live geo needs the Node server; domain registry data works offline (best-effort RDAP). |

@@ -449,6 +449,7 @@ body { position: relative; }
 :root.reduce-motion .tm-RANSOM::after { animation: none !important; opacity: 0; }
 .tm-AIR { width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 13px solid #38d6ff; background: none; filter: drop-shadow(0 0 5px rgba(56,214,255,.75)); transform-origin: 50% 65%; }
 .tm-CISA { border: 1.5px solid #5b8def; background: rgba(91,141,239,.30); box-shadow: 0 0 8px rgba(91,141,239,.6); border-radius: 2px; }
+.tm-GROUP { border: 1.5px solid var(--accent); background: rgba(255,45,111,.28); box-shadow: 0 0 8px rgba(255,45,111,.55); border-radius: 3px; transform: rotate(45deg); }
 .tm-AZURE { border-radius: 50%; border: 1.5px solid var(--op); background: rgba(57,255,20,.26); box-shadow: 0 0 8px rgba(57,255,20,.5); }
 
 /* country-alert pins (analyst) — coloured by alert severity */
@@ -586,6 +587,8 @@ a, button, summary, label, select, [role="button"], [onclick],
 .ph-corner.tr { top: 6px; right: 6px; border-left: none; border-bottom: none; }
 .ph-corner.bl { bottom: 6px; left: 6px; border-right: none; border-top: none; }
 .ph-corner.br { bottom: 6px; right: 6px; border-left: none; border-top: none; }
+.ef-photo-frame .ph-empty { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 8px; align-items: center; justify-content: center; text-align: center; background: repeating-linear-gradient(45deg, #0c080b 0 9px, #110c10 9px 18px); color: var(--txt-dim); font-family: var(--mono); font-size: 10px; letter-spacing: 2px; }
+.ph-orgmark { font-size: 32px; font-weight: 800; color: var(--txt-dim); }
 
 .cc-badges { display: flex; flex-direction: column; gap: 8px; }
 .cc-badge { font-family: var(--mono); font-size: 10px; letter-spacing: 1.5px; padding: 7px 10px; border: 1px solid var(--line-soft); display: flex; justify-content: space-between; }
@@ -630,6 +633,7 @@ a, button, summary, label, select, [role="button"], [onclick],
 .roster-item:hover { background: var(--bg-1); }
 .roster-item.active { background: rgba(255,45,111,0.08); border-left: 3px solid var(--accent); padding-left: 11px; }
 .ri-thumb { width: 34px; height: 42px; flex-shrink: 0; border: 1px solid var(--line-soft); object-fit: cover; background: repeating-linear-gradient(45deg,#0c080b 0 6px,#110c10 6px 12px); filter: grayscale(.3); }
+.ri-thumb-org { display: flex; align-items: center; justify-content: center; font-family: var(--sans); font-weight: 800; font-size: 12px; color: var(--txt-dim); }
 .ri-meta { min-width: 0; }
 .ri-name { font-family: var(--sans); font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ri-sub { font-family: var(--mono); font-size: 9px; color: var(--txt-dim); letter-spacing: 1px; }
@@ -637,6 +641,13 @@ a, button, summary, label, select, [role="button"], [onclick],
 
 .btn-new { margin: 12px; padding: 11px; background: var(--accent); color: #0a0608; border: none; cursor: pointer; font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: 2px; flex-shrink: 0; }
 .btn-new:hover { box-shadow: 0 0 18px var(--accent-glow); }
+
+.subtype-choices { display: flex; flex-direction: column; gap: 10px; padding: 20px; }
+.subtype-choice { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 16px 18px; background: var(--bg-1); border: 1px solid var(--line); cursor: pointer; text-align: left; color: var(--txt); transition: border-color .15s, background .15s; }
+.subtype-choice:hover { border-color: var(--accent); box-shadow: 0 0 18px var(--accent-glow); }
+.stc-glyph { font-size: 20px; color: var(--accent); }
+.stc-lbl { font-family: var(--mono); font-weight: 700; font-size: 13px; letter-spacing: 2px; }
+.stc-desc { font-family: var(--mono); font-size: 10px; color: var(--txt-dim); letter-spacing: .5px; }
 
 /* ===================== LOG (dummy) ===================== */
 .log-placeholder { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; overflow: hidden;
@@ -879,6 +890,8 @@ a, button, summary, label, select, [role="button"], [onclick],
 .wv-node-name { font-family: var(--sans); font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wv-node-sub { font-family: var(--mono); font-size: 9px; letter-spacing: 1px; color: var(--txt-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wv-edge-label { font-family: var(--mono); font-size: 9px; fill: var(--txt-mut); letter-spacing: 1px; }
+.wv-node.org { border-color: var(--accent); border-width: 1.5px; background: linear-gradient(180deg,#151009,#0d0c0a); }
+.wv-node.org .wv-node-name { color: var(--accent); }
 
 /* ===================== RESPONSIVE ===================== */
 @media (max-width: 720px) {
@@ -1251,6 +1264,94 @@ a, button, summary, label, select, [role="button"], [onclick],
   </div>
 </div>
 
+<!-- ===================== NEW SUBJECT: TYPE CHOICE ===================== -->
+<div class="modal-scrim" id="subtype-scrim">
+  <div class="modal" style="width:min(420px,94vw)" role="dialog" aria-modal="true" aria-labelledby="subtype-title">
+    <div class="modal-head">
+      <h2 id="subtype-title">NEW FILE</h2>
+      <button class="modal-close" id="subtype-close" aria-label="Close">&#x2715;</button>
+    </div>
+    <div class="subtype-choices">
+      <button type="button" class="subtype-choice" id="subtype-person">
+        <span class="stc-glyph">&#x25C6;</span>
+        <span class="stc-lbl">PERSON</span>
+        <span class="stc-desc">Individual subject file &#x2014; DOB, description, relationships</span>
+      </button>
+      <button type="button" class="subtype-choice" id="subtype-org">
+        <span class="stc-glyph">&#x25C8;</span>
+        <span class="stc-lbl">ORGANIZATION</span>
+        <span class="stc-desc">Group, syndicate or agency &#x2014; logo, founding date, member roster</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== ORGANIZATION EDITOR MODAL ===================== -->
+<div class="modal-scrim" id="org-editor-scrim">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="org-editor-title">
+    <div class="modal-head">
+      <h2 id="org-editor-title">NEW ORGANIZATION</h2>
+      <button class="modal-close" id="org-editor-close" aria-label="Close">&#x2715;</button>
+    </div>
+    <form id="org-editor-form" class="editor-form">
+      <div class="ef-photo">
+        <div class="ef-photo-frame" id="oef-photo-frame"></div>
+        <button type="button" class="ef-photo-btn" id="oef-photo-open">UPLOAD LOGO</button>
+        <input type="file" id="oef-photo-input" accept="image/*" hidden />
+        <button type="button" class="ef-photo-clear" id="oef-photo-clear">CLEAR</button>
+      </div>
+      <div class="ef-fields">
+        <label>ORGANIZATION NAME<input type="text" name="name" required placeholder="e.g. Shadow Collective" /></label>
+        <label>GROUP TYPE
+          <select name="groupType">
+            <option>Nation-State / APT</option>
+            <option>Hacktivist Collective</option>
+            <option>Cybercriminal Syndicate</option>
+            <option>Vigilante</option>
+            <option>Terrorist Organization</option>
+            <option>Extremist Network</option>
+            <option>Private Intelligence / Mercenary</option>
+            <option>Corporate / Private Sector</option>
+            <option>Law Enforcement / Government Agency</option>
+            <option>Unknown / Unaffiliated</option>
+          </select>
+        </label>
+        <div class="ef-row">
+          <label>FOUNDING DATE<input type="date" name="founded" /></label>
+          <label>STATUS
+            <select name="status"><option>ACTIVE</option><option>DORMANT</option><option>DISBANDED</option><option>UNDER INVESTIGATION</option><option>UNKNOWN</option></select>
+          </label>
+        </div>
+        <label>LOCATION / BASE OF OPERATIONS<input type="text" name="location" placeholder="city, region, or 'distributed'" /></label>
+        <label>DESCRIPTION / NOTES<textarea name="description" rows="4" placeholder="mission, tactics, known campaigns&#x2026;"></textarea></label>
+      </div>
+      <div class="ef-rels">
+        <div class="ef-rels-head">MEMBER ROSTER</div>
+        <div class="ef-rels-list" id="oef-mem-list"></div>
+        <div class="ef-rels-add">
+          <div class="ef-rel-search">
+            <input type="text" id="oef-mem-search" placeholder="search person subjects&#x2026;" autocomplete="off" spellcheck="false" />
+            <div class="ef-rel-results" id="oef-mem-results"></div>
+          </div>
+          <input type="text" id="oef-mem-role" list="mem-roles" placeholder="role (e.g. leader)" autocomplete="off" />
+          <datalist id="mem-roles">
+            <option>Leader</option><option>Founder</option><option>Member</option><option>Lieutenant</option>
+            <option>Operator</option><option>Recruiter</option><option>Financier</option><option>Informant</option>
+          </datalist>
+          <button type="button" class="btn-ghost" id="oef-mem-add">+ ADD</button>
+        </div>
+      </div>
+      <div class="ef-actions">
+        <button type="button" class="btn-ghost btn-delete" id="oef-delete">DELETE</button>
+        <div class="ef-actions-right">
+          <button type="button" class="btn-ghost" id="oef-cancel">CANCEL</button>
+          <button type="submit" class="btn-primary">SAVE FILE</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- ===================== RELATIONSHIP WEB VIEW ===================== -->
 <div class="webview-scrim" id="webview-scrim">
   <div class="webview-head">
@@ -1378,6 +1479,31 @@ async function syncSolarWindsStatus() {
   return false;
 }
 
+/* DownDetector auto-scan watchlist (Azure / SolarWinds / Cloudflare) — powers
+   the ticker's DOWNDETECTOR source. Populated from the server's cached
+   /api/downdetector-status (itself refreshed in the background every 60s). */
+const DOWNDETECTOR_STATUS = [
+  { key: "AZURE", name: "Azure", status: "unknown", url: "https://downdetector.com/status/windows-azure/" },
+  { key: "SOLARWINDS", name: "SolarWinds", status: "unknown", url: "https://downdetector.com/status/solarwinds/" },
+  { key: "CLOUDFLARE", name: "Cloudflare", status: "unknown", url: "https://downdetector.com/status/cloudflare/" }
+];
+async function syncDownDetectorStatus() {
+  try {
+    const res = await fetch("/api/downdetector-status", { cache: "no-store" });
+    if (res.ok) {
+      const j = await res.json();
+      if (j && Array.isArray(j.items)) {
+        j.items.forEach((it) => {
+          const row = DOWNDETECTOR_STATUS.find((d) => d.key === it.key);
+          if (row) { row.status = it.status; row.url = it.url || row.url; }
+        });
+        return true;
+      }
+    }
+  } catch (e) { /* server not running */ }
+  return false;
+}
+
 async function syncAzureStatus() {
   try {
     const res = await fetch("/api/azure-status", { cache: "no-store" });
@@ -1458,7 +1584,7 @@ async function syncThreatIntel() {
 const DOSSIER_KEY = "soc_dossier";
 /* Bump when the bundled seed roster changes so a stale localStorage
    working copy is superseded by the new bundled data. */
-const DOSSIER_SEED_VERSION = "2026.06-icons10";
+const DOSSIER_SEED_VERSION = "2026.07-orgs2";
 const DOSSIER_SEED_VER_KEY = "soc_dossier_seed_ver";
 
 const DOSSIER_FALLBACK = [
@@ -1551,6 +1677,60 @@ const DOSSIER_FALLBACK = [
     caseNumber: "CS-1998-MUDGE", photo: "",
     relationships: [ { id: "sub-0007", type: "Peer" } ],
     description: "Leading member of the L0pht hacker think-tank who famously testified to the U.S. Senate in 1998 that the group could take down the internet in 30 minutes. Went on to run cyber programs at DARPA and lead security at Google, Stripe and Twitter. In 2022 became a high-profile whistleblower over Twitter's security practices."
+  },
+  {
+    id: "org-0001", type: "org", name: "Lazarus Group", groupType: "Nation-State / APT",
+    founded: "2009-01-01", status: "ACTIVE", location: "Pyongyang, North Korea", photo: "",
+    caseNumber: "ORG-2009-LZR", members: [],
+    description: "North Korea-linked state-sponsored threat actor attributed to the DPRK's Reconnaissance General Bureau. Tied to the Sony Pictures breach, the WannaCry ransomware outbreak, and a long-running campaign of cryptocurrency-exchange heists funding the regime."
+  },
+  {
+    id: "org-0002", type: "org", name: "APT28 (Fancy Bear)", groupType: "Nation-State / APT",
+    founded: "2004-01-01", status: "ACTIVE", location: "Moscow, Russia", photo: "",
+    caseNumber: "ORG-2004-FCB", members: [],
+    description: "Military cyber-espionage unit linked to Russia's GRU. Attributed to the 2016 DNC intrusion, repeated NATO and European government targeting, and long-running credential-phishing campaigns against journalists and defense contractors."
+  },
+  {
+    id: "org-0003", type: "org", name: "REvil (Sodinokibi)", groupType: "Cybercriminal Syndicate",
+    founded: "2019-01-01", status: "DISBANDED", location: "Saint Petersburg, Russia", photo: "",
+    caseNumber: "ORG-2019-RVL", members: [],
+    description: "Ransomware-as-a-service syndicate behind the Kaseya and JBS Foods attacks. Disrupted by a multinational law-enforcement operation in 2021\u20132022 after extracting hundreds of millions in ransom payments."
+  },
+  {
+    id: "org-0004", type: "org", name: "Anonymous", groupType: "Hacktivist Collective",
+    founded: "2003-01-01", status: "ACTIVE", location: "Distributed / Global", photo: "",
+    caseNumber: "ORG-2003-ANON", members: [],
+    description: "Decentralized, leaderless hacktivist collective with no formal membership or hierarchy. Known for DDoS campaigns and doxxing operations against corporations, governments, and extremist groups under a shared banner and imagery."
+  },
+  {
+    id: "org-0005", type: "org", name: "LulzSec", groupType: "Hacktivist Collective",
+    founded: "2011-05-01", status: "DISBANDED", location: "Distributed / Global", photo: "",
+    caseNumber: "ORG-2011-LULZ", members: [],
+    description: "Short-lived hacktivist splinter group that breached Sony Pictures, PBS, and several U.S. government contractors over a 50-day spree in 2011, motivated as much by publicity as by protest, before several members were identified and prosecuted."
+  },
+  {
+    id: "org-0006", type: "org", name: "L0pht Heavy Industries", groupType: "Hacktivist Collective",
+    founded: "1992-01-01", status: "DISBANDED", location: "Boston, Massachusetts, US", photo: "",
+    caseNumber: "ORG-1992-L0PHT", members: [ { id: "sub-0010", role: "Leading Member" } ],
+    description: "Boston hacker collective and think-tank that testified before the U.S. Senate in 1998 on the fragility of internet infrastructure. Folded into the security firm @stake in 2000, seeding a generation of professional security researchers."
+  },
+  {
+    id: "org-0007", type: "org", name: "FBI Cyber Division", groupType: "Law Enforcement / Government Agency",
+    founded: "2002-01-01", status: "ACTIVE", location: "Washington, D.C., US", photo: "",
+    caseNumber: "ORG-2002-FBICD", members: [ { id: "sub-0001", role: "Subject (historical arrest)" } ],
+    description: "FBI headquarters division responsible for investigating cyber intrusions, ransomware, and nation-state threat actors, and for coordinating national incident response with CISA and the intelligence community."
+  },
+  {
+    id: "org-0008", type: "org", name: "National Security Agency (NSA)", groupType: "Law Enforcement / Government Agency",
+    founded: "1952-11-04", status: "ACTIVE", location: "Fort Meade, Maryland, US", photo: "",
+    caseNumber: "ORG-1952-NSA", members: [],
+    description: "U.S. signals-intelligence and cybersecurity agency. Its Cybersecurity Directorate publishes threat advisories and defensive guidance, while historically disclosed programs cover offensive computer-network operations."
+  },
+  {
+    id: "org-0009", type: "org", name: "Europol EC3", groupType: "Law Enforcement / Government Agency",
+    founded: "2013-01-01", status: "ACTIVE", location: "The Hague, Netherlands", photo: "",
+    caseNumber: "ORG-2013-EC3", members: [],
+    description: "European Cybercrime Centre coordinating cross-border law-enforcement operations against ransomware syndicates, card-fraud networks, and child-exploitation rings across EU member states."
   }
 ];
 
@@ -1566,7 +1746,12 @@ function saveDossier(list) {
   try { localStorage.setItem(DOSSIER_KEY, JSON.stringify(list)); } catch (e) {}
 }
 
-function normalizeProfile(p) { if (!Array.isArray(p.relationships)) p.relationships = []; return p; }
+function normalizeProfile(p) {
+  if (!Array.isArray(p.relationships)) p.relationships = [];
+  if (p.type === "org") { if (!Array.isArray(p.members)) p.members = []; }
+  else p.type = "person";
+  return p;
+}
 
 /* Seed order: (1) live server, (2) localStorage working copy,
    (3) bundled data/soc_dossier.json, (4) embedded fallback. */
@@ -1700,10 +1885,10 @@ function exportDossier(list) {
   let alertFilter = "ALL";   // ALL | AZURE | CVE | C2 | IOC | URL | RANSOM
   let alertWindow = "ALL";   // ALL | 24h | w | m | y
   let threatLayer = null;    // Leaflet layer group for plotted threat intel
-  let threatLayers = { AZURE: true, C2: true, IOC: true, URL: true, RANSOM: true, TOR: true, AIR: true, CISA: true, SITREP: true };
+  let threatLayers = { AZURE: true, C2: true, IOC: true, URL: true, RANSOM: true, TOR: true, AIR: true, CISA: true, GROUP: true, SITREP: true };
   // master data-feed switches (mirrored from Settings) — a feed that is off is
   // never queried and its legend row is hidden entirely.
-  let feeds = { AZURE: true, SOLARWINDS: true, CISA: true, C2: false, IOC: false, URL: false, RANSOM: false, TOR: false, AIR: false };
+  let feeds = { AZURE: true, SOLARWINDS: true, CISA: true, GROUP: true, C2: false, IOC: false, URL: false, RANSOM: false, TOR: false, AIR: false };
   let lastThreatSig = "";    // avoid rebuilding pins when nothing changed
   let sweepAngle = 0, prevSweepAngle = 0;
   let SWEEP_SPEED = 0.7;   // deg per frame (~8.5s / revolution)
@@ -2553,12 +2738,49 @@ function exportDossier(list) {
     { id: "cisa-r10", cat: "CISA", sev: "info", title: "CISA Region 10", sub: "Regional Office \u00B7 Seattle, WA", msg: "Region 10 \u2014 AK, ID, OR, WA", src: "CISA", lat: 47.6062, lng: -122.3321, geo: "US" }
   ];
 
+  /* Dossier organization pins — every org profile with a resolvable last-known
+     location shows up on the map (geocoded once, then cached to localStorage
+     so repeat visits don't re-hit Nominatim). Recomputed whenever the roster
+     changes (see Dossier.persist hook wired in init()). */
+  const ORG_GEO_CACHE_KEY = "soc_org_geo_cache";
+  let ORG_PINS = [];
+  function loadOrgGeoCache() { try { return JSON.parse(localStorage.getItem(ORG_GEO_CACHE_KEY)) || {}; } catch (e) { return {}; } }
+  function saveOrgGeoCache(c) { try { localStorage.setItem(ORG_GEO_CACHE_KEY, JSON.stringify(c)); } catch (e) {} }
+  async function refreshOrgPins() {
+    const profs = (window.Dossier && window.Dossier.getProfiles()) || [];
+    const gc = (window.Dossier && window.Dossier.groupColor) || (() => "var(--accent)");
+    const orgs = profs.filter((p) => p.type === "org" && p.location && !/^\s*(unknown|n\/a|\u2014|-)?\s*$/i.test(p.location.trim()));
+    const cache = loadOrgGeoCache();
+    const pins = [];
+    for (const o of orgs) {
+      const key = o.location.trim().toLowerCase();
+      let geo = cache[key];
+      if (!geo) {
+        try { geo = await geocodeAddress(o.location); } catch (e) { geo = null; }
+        if (geo) cache[key] = { lat: geo.lat, lng: geo.lng };
+      }
+      if (geo && geo.lat != null) {
+        pins.push({
+          id: "grp-" + o.id, cat: "GROUP", sev: "info",
+          title: o.name, sub: o.groupType || "Organization",
+          msg: (o.description || "").slice(0, 160),
+          src: "Dossier", lat: geo.lat, lng: geo.lng,
+          color: gc(o.groupType), orgId: o.id
+        });
+      }
+    }
+    saveOrgGeoCache(cache);
+    ORG_PINS = pins;
+    renderLegend();
+    renderThreatPins(true);
+  }
+
   /* Map legend with per-source layer toggles. */
-  const LEGEND_CATS = [["AZURE", "Azure regions"], ["CISA", "CISA offices (US)"], ["C2", "C2 / IP"], ["IOC", "IOC"], ["URL", "Malicious URL"], ["RANSOM", "Ransomware"], ["TOR", "Tor exit"], ["AIR", "Aircraft (OpenSky)"]];
+  const LEGEND_CATS = [["AZURE", "Azure regions"], ["CISA", "CISA offices (US)"], ["GROUP", "Known groups (Dossier)"], ["C2", "C2 / IP"], ["IOC", "IOC"], ["URL", "Malicious URL"], ["RANSOM", "Ransomware"], ["TOR", "Tor exit"], ["AIR", "Aircraft (OpenSky)"]];
   function renderLegend() {
     const el = $("#map-legend"); if (!el) return;
     const counts = { AZURE: AZURE_REGIONS.length };
-    THREAT_FEED.items.concat(CISA_OFFICES).forEach((it) => { if (it.lat != null) counts[it.cat] = (counts[it.cat] || 0) + 1; });
+    THREAT_FEED.items.concat(CISA_OFFICES).concat(ORG_PINS).forEach((it) => { if (it.lat != null) counts[it.cat] = (counts[it.cat] || 0) + 1; });
 
     // Azure swatch: one diamond per status colour actually present on the map
     // (green operational, yellow degraded, red outage) — colours with zero
@@ -2644,7 +2866,7 @@ function exportDossier(list) {
   /* Plot geo-tagged threat intel on the map (filtered by enabled layers). */
   function renderThreatPins(force) {
     if (!map) return;
-    const geoItems = THREAT_FEED.items.concat(CISA_OFFICES).filter((it) => it.lat != null && it.lng != null && feeds[it.cat] !== false && threatLayers[it.cat] !== false);
+    const geoItems = THREAT_FEED.items.concat(CISA_OFFICES).concat(ORG_PINS).filter((it) => it.lat != null && it.lng != null && feeds[it.cat] !== false && threatLayers[it.cat] !== false);
     const sig = geoItems.map((it) => it.id + it.sev).join("|") + "||" + JSON.stringify(threatLayers) + "||" + JSON.stringify(feeds);
     if (!force && sig === lastThreatSig && threatLayer) return; // nothing changed
     lastThreatSig = sig;
@@ -2652,13 +2874,16 @@ function exportDossier(list) {
     if (!geoItems.length) return;
     const palette = { C2: "var(--out)", IOC: "var(--deg)", URL: "#ff7a3d", TOR: "#9b6dff", RANSOM: "var(--accent)", AIR: "#38d6ff", CISA: "#5b8def" };
     const layers = geoItems.map((it) => {
-      const rot = (it.cat === "AIR" && it.hdg != null) ? ` style="transform:rotate(${Math.round(it.hdg)}deg)"` : "";
+      const extraStyle = [];
+      if (it.cat === "AIR" && it.hdg != null) extraStyle.push(`transform:rotate(${Math.round(it.hdg)}deg)`);
+      if (it.cat === "GROUP" && it.color) extraStyle.push(`border-color:${it.color}`, `background:${it.color}26`, `box-shadow:0 0 8px ${it.color}80`);
+      const styleAttr = extraStyle.length ? ` style="${extraStyle.join(";")}"` : "";
       const icon = L.divIcon({
         className: "",
-        html: `<div class="pin-wrap"><div class="tm tm-${it.cat} sev-${it.sev}"${rot}></div></div>`,
+        html: `<div class="pin-wrap"><div class="tm tm-${it.cat} sev-${it.sev}"${styleAttr}></div></div>`,
         iconSize: [14, 14], iconAnchor: [7, 7]
       });
-      const color = palette[it.cat] || "var(--accent)";
+      const color = it.color || palette[it.cat] || "var(--accent)";
       const loc = it.city ? (it.city + (it.geo ? ", " + it.geo : "")) : (it.geo || "");
       return L.marker([it.lat, it.lng], { icon, keyboard: false })
         .on("click", () => { if (map) map.flyTo([it.lat, it.lng], Math.min(map.getZoom() + 2, map.getMaxZoom()), { duration: 1.0 }); })
@@ -2722,6 +2947,7 @@ function exportDossier(list) {
     if (feeds.AZURE !== false) jobs.push(syncAzureStatus());
     if (feeds.SOLARWINDS !== false) jobs.push(syncSolarWindsStatus());
     else setSolarWindsOffline();
+    jobs.push(syncDownDetectorStatus());
     const intelOn = ["C2", "IOC", "URL", "RANSOM", "TOR", "AIR"].some((c) => feeds[c] !== false);
     if (intelOn) jobs.push(syncThreatIntel());
     else { THREAT_FEED.items = []; THREAT_FEED.feeds = {}; }
@@ -3636,6 +3862,63 @@ function exportDossier(list) {
     });
   }
 
+  /* ---------- DownDetector search (sitrep -s <service>) ---------- */
+  const DD_ALIASES_CLIENT = {
+    azure: "windows-azure", aws: "amazon-web-services-aws", "office 365": "office-365",
+    o365: "office-365", teams: "microsoft-teams", github: "github", gitlab: "gitlab",
+    slack: "slack", discord: "discord", cloudflare: "cloudflare", google: "google",
+    gmail: "gmail", youtube: "youtube", facebook: "facebook", instagram: "instagram",
+    whatsapp: "whatsapp", twitter: "twitter", x: "twitter", tiktok: "tiktok",
+    reddit: "reddit", zoom: "zoom", spotify: "spotify", netflix: "netflix",
+    playstation: "playstation-network", psn: "playstation-network", xbox: "xbox-live",
+    steam: "steam", chatgpt: "openai", openai: "openai", paypal: "paypal", venmo: "venmo"
+  };
+  function ddGuessSlug(q) {
+    const key = String(q || "").toLowerCase().trim();
+    return DD_ALIASES_CLIENT[key] || key.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  }
+  function ddSparkline(points) {
+    if (!points || !points.length) return "";
+    const chars = "\u2581\u2582\u2583\u2584\u2585\u2586\u2587\u2588";
+    const vals = points.map((p) => +p.value || 0);
+    const max = Math.max(1, ...vals);
+    return vals.map((v) => chars[Math.max(0, Math.min(chars.length - 1, Math.round((v / max) * (chars.length - 1))))]).join("");
+  }
+  function ddSearch(query) {
+    cliPrint(`> querying DownDetector for '${escHtml(query)}'\u2026`, "sys");
+    fetch("/api/downdetector?q=" + encodeURIComponent(query), { cache: "no-store" })
+      .then(async (r) => {
+        const j = await r.json().catch(() => null);
+        if (!r.ok || !j) throw Object.assign(new Error((j && (j.detail || j.error)) || "request failed"), { url: j && j.url });
+        return j;
+      })
+      .then((res) => {
+        cliPrint(`\u25C6 DOWNDETECTOR // ${escHtml((res.name || query).toUpperCase())}`, "head");
+        const st = res.status || "unknown";
+        const stCls = st === "outage" ? "err" : st === "elevated" ? "warn" : st === "normal" ? "ok" : "sys";
+        const stLabel = { outage: "LIKELY OUTAGE", elevated: "ELEVATED REPORTS", normal: "NORMAL", unknown: "UNKNOWN" }[st];
+        cliPrint(`  STATUS: ${stLabel}${res.via === "guess" ? "  (slug guessed \u2014 results may be off)" : ""}`, stCls);
+        if (res.summary) cliPrint(`  ${escHtml(res.summary.slice(0, 200))}`, "sys");
+        cliPrint("\u2014".repeat(40), "sys");
+        if (res.reports && res.reports.length) {
+          const spark = ddSparkline(res.reports);
+          const last = res.reports[res.reports.length - 1];
+          cliPrint(`  REPORTS (24H)  <span style="letter-spacing:1px">${spark}</span>`, stCls);
+          cliPrint(`  latest sample: ${Math.round(last.value)} report(s) @ ${escHtml(fmtStamp(Date.parse(last.date) || Date.now()))}`, "sys");
+        } else {
+          cliPrint("  \u25CB no chart data parsed \u2014 DownDetector may have changed its markup, or blocked the request.", "warn");
+        }
+        cliPrint("\u2014".repeat(40), "sys");
+        cliPrint(`  \u2197 <a href="${escHtml(res.url)}" target="_blank" rel="noopener" style="color:var(--accent)">${escHtml(res.url)}</a>`, "sys");
+      })
+      .catch((e) => {
+        const url = e.url || ("https://downdetector.com/status/" + ddGuessSlug(query) + "/");
+        cliPrint(`\u2715 could not reach DownDetector for '${escHtml(query)}': ${escHtml(e.message)}`, "err");
+        cliPrint("  requires the local Node server (node server.js); DownDetector's .com domain can also block scraping.", "warn");
+        cliPrint(`  \u2197 <a href="${escHtml(url)}" target="_blank" rel="noopener" style="color:var(--accent)">${escHtml(url)}</a>`, "sys");
+      });
+  }
+
   function resyncFeed() {
     cliPrint("> initiating full telemetry re-sync\u2026", "sys");
     const intelOn = ["C2", "IOC", "URL", "RANSOM", "TOR", "AIR"].some((c) => feeds[c] !== false);
@@ -3650,6 +3933,7 @@ function exportDossier(list) {
     if (feeds.AZURE !== false) jobs.push(syncAzureStatus());
     if (feeds.SOLARWINDS !== false) jobs.push(syncSolarWindsStatus());
     else setSolarWindsOffline();
+    jobs.push(syncDownDetectorStatus());
     if (intelOn) jobs.push(syncThreatIntel());
     else { THREAT_FEED.items = []; THREAT_FEED.feeds = {}; }
     Promise.all(jobs).then(() => {
@@ -3965,18 +4249,26 @@ function exportDossier(list) {
           ["sitrep &lt;country&gt;", "country threat posture \u2014 zoom + outline border"],
           ["sitrep -m &lt;country&gt;", "open intel editor (posture \u00B7 diplomacy \u00B7 alerts)"],
           ["sitrep -d &lt;country&gt;", "diplomatic map \u2014 allies (blue) &amp; adversaries (red)"],
-          ["sitrep -s", "force a re-sync of the status feed"]
+          ["sitrep -s &lt;service&gt;", "search DownDetector for a service &amp; graph its outage reports"],
+          ["sitrep -r", "force a re-sync of the status feed"]
         ]);
         return;
       }
       if (/^-v$/i.test(raw)) { sitrepAll(); return; }
-      if (/^-s$/i.test(raw)) { resyncFeed(); return; }
+      if (/^-r$/i.test(raw)) { resyncFeed(); return; }
       if (/^-az$/i.test(raw)) { printAzureAlerts(); return; }
       if (/^-sw$/i.test(raw)) { printSolarWindsAlerts(); return; }
       if (/^-i$/i.test(raw)) { printThreatIntelReport(); return; }
       if (/^-me$/i.test(raw)) { sitrepMe(); return; }
       const dm = raw.match(/^-d\b\s*(.*)$/i);
       if (dm) { sitrepDiplomacy(dm[1].trim()); return; }
+      const sm = raw.match(/^-s\b\s*(.*)$/i);
+      if (sm) {
+        const svc = sm[1].trim().replace(/^["']|["']$/g, "");
+        if (!svc) { cliPrint("usage: sitrep -s &lt;service&gt;  \u2014 e.g. sitrep -s azure", "warn"); return; }
+        ddSearch(svc);
+        return;
+      }
       if (!raw) {
         sitrep24h();
         cliPrint("\u2014".repeat(40), "sys");
@@ -4014,7 +4306,8 @@ function exportDossier(list) {
         printFlagHelp("LOCATE // FLAGS &amp; PARAMETERS", [
           ["locate &lt;keyword&gt;", "find &amp; plot matching dossier subjects on the map"],
           ["locate -s &lt;server&gt;", "center on an Azure region \u2014 e.g. locate -s centralus"],
-          ["locate -f &lt;flight&gt;", "center the map on a live flight pin \u2014 e.g. locate -f UAL245"]
+          ["locate -f &lt;flight&gt;", "center the map on a live flight pin \u2014 e.g. locate -f UAL245"],
+          ["locate -c", "clear dossier subject pins placed by locate"]
         ]);
         return;
       }
@@ -4022,6 +4315,11 @@ function exportDossier(list) {
       if (sm) { locateServer(sm[1].trim().replace(/^["']|["']$/g, "")); return; }
       const fm = raw.match(/^-f\b\s*(.*)$/i);
       if (fm) { locateFlight(fm[1].trim()); return; }
+      if (/^-c$/i.test(raw)) {
+        const cleared = window.Sitrep && window.Sitrep.clearSubjectPins();
+        cliPrint(cleared ? "\u2713 dossier subject pins cleared." : "\u25CB no subject pins on the map.", cleared ? "ok" : "sys");
+        return;
+      }
       if (!arg) {
         if (!radarCenterLatLng) { cliPrint("usage: locate &lt;keyword&gt;  \u2014 search & plot dossier subjects", "warn"); return; }
         cliPrint("\u25C6 OPERATOR POSITION", "head");
@@ -4212,6 +4510,7 @@ function exportDossier(list) {
 
   /* ---------- public init ---------- */
   window.Sitrep = {
+    refreshOrgPins,
     init() {
       initMap();
       buildRings();
@@ -4279,6 +4578,13 @@ function exportDossier(list) {
         map.flyToBounds(L.latLngBounds(lls), { padding: [80, 80], maxZoom: LOCATE_ZOOM, duration: 1.3 });
       }
       return found.length;
+    },
+    /* remove any dossier-subject pins placed by the CLI 'locate' command */
+    clearSubjectPins() {
+      if (!window.__pinLayer) return false;
+      if (map) map.removeLayer(window.__pinLayer);
+      window.__pinLayer = null;
+      return true;
     },
     setRadarMode(mode) {
       radarMode = (mode === "sweep" || mode === "ping") ? mode : "off";
@@ -4366,20 +4672,41 @@ function exportDossier(list) {
   let profiles = [];
   let currentIndex = 0;
   let editingId = null;
+  let editorKind = "person"; // 'person' | 'org' — which editor last opened editingId
+  let photoTarget = "person"; // which editor's frame the shared image picker/upload targets
   let tempPhoto = "";
   let editRels = [];
   let pendingRelId = null;
+  let editMembers = [];
+  let pendingMemberId = null;
 
   const THREATS = ["LOW", "GUARDED", "ELEVATED", "HIGH", "SEVERE"];
   const threatColor = {
     LOW: "var(--op)", GUARDED: "#8fd14f", ELEVATED: "var(--deg)", HIGH: "#ff7a3d", SEVERE: "var(--out)"
   };
+  const GROUP_COLORS = {
+    "NATION-STATE / APT": "#ff2d6f",
+    "HACKTIVIST COLLECTIVE": "#ffae00",
+    "CYBERCRIMINAL SYNDICATE": "#d12b2b",
+    "VIGILANTE": "#38d6ff",
+    "TERRORIST ORGANIZATION": "#7a1010",
+    "EXTREMIST NETWORK": "#a83232",
+    "PRIVATE INTELLIGENCE / MERCENARY": "#8a7cff",
+    "CORPORATE / PRIVATE SECTOR": "#3fae6a",
+    "LAW ENFORCEMENT / GOVERNMENT AGENCY": "#2b7fd1",
+    "UNKNOWN / UNAFFILIATED": "#8d7f86"
+  };
+  function groupTypeColor(gt) { return GROUP_COLORS[(gt || "").toUpperCase()] || "var(--txt-dim)"; }
+  function initials(name) {
+    const w = (name || "?").trim().split(/\s+/).filter(Boolean);
+    return (w.map((x) => x[0]).slice(0, 2).join("") || "?").toUpperCase();
+  }
 
   /* ---------- helpers ---------- */
   function sortProfiles() {
     profiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
   }
-  function persist() { saveDossier(profiles); saveDossierRemote(profiles); }
+  function persist() { saveDossier(profiles); saveDossierRemote(profiles); if (window.Sitrep && window.Sitrep.refreshOrgPins) window.Sitrep.refreshOrgPins(); }
   function nameOf(id) { const p = profiles.find((x) => x.id === id); return p ? p.name : null; }
   function age(dob) {
     if (!dob) return "\u2014";
@@ -4411,6 +4738,12 @@ function exportDossier(list) {
     if (p.photo) return `<img src="${esc(p.photo)}" alt="${esc(p.name)}" onerror="this.onerror=null;this.src='${sil}';this.classList.add('ph-fallimg')" />${corners}`;
     return `<img class="ph-silhouette" src="${sil}" alt="No image on file" />
             <div class="ph-tag">NO IMAGE ON FILE</div>${corners}`;
+  }
+  function orgLogoMarkup(p) {
+    const corners = `<span class="ph-corner tl"></span><span class="ph-corner tr"></span>
+            <span class="ph-corner bl"></span><span class="ph-corner br"></span>`;
+    if (p.photo) return `<img src="${esc(p.photo)}" alt="${esc(p.name)}" />${corners}`;
+    return `<div class="ph-empty" style="flex-direction:column;gap:8px"><span class="ph-orgmark">${esc(initials(p.name))}</span><span>NO LOGO ON FILE</span></div>${corners}`;
   }
 
   function buildCard(p) {
@@ -4473,19 +4806,78 @@ function exportDossier(list) {
     return card;
   }
 
+  function buildOrgCard(p) {
+    const card = document.createElement("div");
+    card.className = "case-card";
+    const color = groupTypeColor(p.groupType);
+    const locVal = (p.location && !/^(unknown|\u2014|-)?$/i.test(p.location.trim()))
+      ? `<span class="loc-link" data-loc="${esc(p.location)}" title="Plot on SITREP map">${esc(p.location)} \u25C9</span>`
+      : esc(p.location || "\u2014");
+    const members = (p.members || []).filter((m) => m && m.id);
+    const memHtml = members.length
+      ? members.map((m) => {
+          const nm = nameOf(m.id);
+          if (!nm) return "";
+          return `<span class="assoc-chip"><span class="assoc-name" data-open="${m.id}">${esc(nm)}</span><span class="assoc-type">${esc(m.role || "member")}</span></span>`;
+        }).join("")
+      : `<span class="assoc-empty">No members on file.</span>`;
+    card.innerHTML = `
+      <div class="cc-left">
+        <div class="cc-photo">${orgLogoMarkup(p)}</div>
+        <div class="cc-badges">
+          <div class="cc-badge" style="border-color:${color}"><span class="b-lbl">GROUP TYPE</span><span class="b-val" style="color:${color}">${esc(p.groupType || "\u2014")}</span></div>
+          <div class="cc-badge"><span class="b-lbl">STATUS</span><span class="b-val">${esc(p.status || "\u2014")}</span></div>
+          <div class="cc-badge"><span class="b-lbl">CASE&nbsp;#</span><span class="b-val">${esc(p.caseNumber || "\u2014")}</span></div>
+        </div>
+      </div>
+      <div class="cc-right">
+        <div class="cc-filehdr">
+          <span class="cc-fileno">FILE ${esc(p.caseNumber || p.id)}</span>
+          <span class="cc-class">CONFIDENTIAL</span>
+        </div>
+        <div class="cc-name">${esc(p.name)}</div>
+        <div class="cc-alias">ORGANIZATION</div>
+        <div class="cc-grid">
+          <div class="cc-field"><div class="f-lbl">FOUNDING DATE</div><div class="f-val">${fmtDob(p.founded)}</div></div>
+          <div class="cc-field"><div class="f-lbl">MEMBERS ON FILE</div><div class="f-val">${members.length}</div></div>
+          <div class="cc-field" style="grid-column:1/-1"><div class="f-lbl">LOCATION / BASE OF OPERATIONS</div><div class="f-val">${locVal}</div></div>
+        </div>
+        <div class="cc-assoc"><div class="f-lbl">MEMBER ROSTER</div><div class="assoc-wrap">${memHtml}</div></div>
+        <div class="cc-desc"><div class="f-lbl">DESCRIPTION / NOTES</div><div class="f-val">${esc(p.description || "No notes on file.")}</div></div>
+      </div>
+      <button class="btn-primary cc-edit" data-edit>EDIT FILE</button>`;
+    card.querySelector("[data-edit]").addEventListener("click", (e) => { e.stopPropagation(); openOrgEditor(p.id); });
+    const loc = card.querySelector(".loc-link");
+    if (loc) loc.addEventListener("click", (e) => {
+      e.stopPropagation();
+      loc.classList.add("loc-loading");
+      window.Sitrep.expectPin();
+      window.App.setView("sitrep");
+      window.Sitrep.dropPin(loc.dataset.loc, p.name).then((ok) => {
+        loc.classList.remove("loc-loading");
+        if (!ok) { window.App.setView("dossier"); alert("Could not locate that address."); }
+      });
+    });
+    card.querySelectorAll(".assoc-name").forEach((el) => {
+      el.addEventListener("click", (e) => { e.stopPropagation(); openProfile(el.dataset.open); });
+    });
+    return card;
+  }
+
   function renderCard(animateFrom) {
     const track = $("#case-track");
     if (!profiles.length) {
       track.innerHTML = `<div class="case-empty"><div class="ce-glyph">\u25C6</div>
         <p>NO SUBJECTS ON FILE</p>
         <button class="btn-primary" id="empty-new">+ CREATE FIRST FILE</button></div>`;
-      const b = $("#empty-new"); if (b) b.addEventListener("click", () => openEditor(null));
+      const b = $("#empty-new"); if (b) b.addEventListener("click", () => openSubtypeChoice());
       return;
     }
     if (currentIndex >= profiles.length) currentIndex = profiles.length - 1;
     if (currentIndex < 0) currentIndex = 0;
     track.innerHTML = "";
-    const card = buildCard(profiles[currentIndex]);
+    const cp = profiles[currentIndex];
+    const card = cp.type === "org" ? buildOrgCard(cp) : buildCard(cp);
     track.appendChild(card);
     if (animateFrom) {
       card.style.transform = `translateX(${animateFrom === "right" ? 100 : -100}%)`;
@@ -4526,19 +4918,22 @@ function exportDossier(list) {
     $("#roster-count").textContent = profiles.length;
     $("#roster-count").classList.toggle("zero", profiles.length === 0);
     const filtered = profiles.filter((p) =>
-      !q || p.name.toLowerCase().includes(q) || (p.alias || "").toLowerCase().includes(q));
+      !q || p.name.toLowerCase().includes(q) || (p.alias || "").toLowerCase().includes(q) || (p.groupType || "").toLowerCase().includes(q));
     list.innerHTML = filtered.map((p) => {
       const idx = profiles.indexOf(p);
-      const thumb = p.photo
-        ? `<img class="ri-thumb" src="${esc(p.photo)}" alt="" onerror="this.onerror=null;this.src='${silhouetteFor(p)}'" />`
-        : `<img class="ri-thumb" src="${silhouetteFor(p)}" alt="" />`;
+      const isOrg = p.type === "org";
+      const thumb = isOrg
+        ? (p.photo ? `<img class="ri-thumb" src="${esc(p.photo)}" alt="" />` : `<div class="ri-thumb ri-thumb-org">${esc(initials(p.name))}</div>`)
+        : (p.photo ? `<img class="ri-thumb" src="${esc(p.photo)}" alt="" onerror="this.onerror=null;this.src='${silhouetteFor(p)}'" />` : `<img class="ri-thumb" src="${silhouetteFor(p)}" alt="" />`);
+      const dotColor = isOrg ? groupTypeColor(p.groupType) : (threatColor[p.threat] || "var(--txt-dim)");
+      const sub = isOrg ? (p.groupType || "ORGANIZATION") : (p.alias || p.caseNumber || "\u2014");
       return `<div class="roster-item ${idx === currentIndex ? "active" : ""}" data-idx="${idx}">
         ${thumb}
         <div class="ri-meta">
           <div class="ri-name">${esc(p.name)}</div>
-          <div class="ri-sub">${esc(p.alias || p.caseNumber || "\u2014")}</div>
+          <div class="ri-sub">${esc(sub)}</div>
         </div>
-        <span class="ri-dot" style="background:${threatColor[p.threat] || "var(--txt-dim)"}"></span>
+        <span class="ri-dot" style="background:${dotColor}"></span>
       </div>`;
     }).join("") || `<div class="alert-empty">NO MATCHES</div>`;
     list.querySelectorAll(".roster-item").forEach((el) => {
@@ -4632,7 +5027,7 @@ function exportDossier(list) {
         if (!imgs.length) { grid.innerHTML = `<div style="grid-column:1/-1;font-family:var(--mono);font-size:10px;color:var(--txt-dim)">no saved images on file yet.</div>`; return; }
         grid.innerHTML = imgs.map((im) => `<div class="img-pick-cell" data-path="${esc(im.path)}" style="aspect-ratio:1;border:1px solid var(--line);cursor:pointer;overflow:hidden"><img src="${esc(im.path)}" style="width:100%;height:100%;object-fit:cover" alt="${esc(im.name)}" /></div>`).join("");
         grid.querySelectorAll(".img-pick-cell").forEach((cell) => {
-          cell.addEventListener("click", () => { setEditorPhoto(cell.dataset.path); closeImagePicker(); });
+          cell.addEventListener("click", () => { (photoTarget === "org" ? setOrgPhoto : setEditorPhoto)(cell.dataset.path); closeImagePicker(); });
         });
       })
       .catch(() => { grid.innerHTML = `<div style="grid-column:1/-1;font-family:var(--mono);font-size:10px;color:var(--txt-dim)">server offline \u2014 start node server.js to browse saved images.</div>`; });
@@ -4656,6 +5051,8 @@ function exportDossier(list) {
   }
   function openEditor(id) {
     editingId = id;
+    editorKind = "person";
+    photoTarget = "person";
     const form = $("#editor-form");
     form.reset();
     const p = id ? profiles.find((x) => x.id === id) : null;
@@ -4687,6 +5084,124 @@ function exportDossier(list) {
   }
   function closeEditor() { $("#editor-scrim").classList.remove("open"); editingId = null; }
 
+  /* ---------- organization editor ---------- */
+  function setOrgPhoto(src) {
+    tempPhoto = src || "";
+    const frame = $("#oef-photo-frame");
+    if (tempPhoto) frame.innerHTML = `<img src="${esc(tempPhoto)}" alt="" />`;
+    else frame.innerHTML = `<div class="ph-empty" style="flex-direction:column;gap:8px"><span>NO LOGO<br>ON FILE</span></div>`;
+  }
+  function setOrgPhotoLoading() {
+    $("#oef-photo-frame").innerHTML = `<div class="ef-uploading">SAVING\u2026</div>`;
+  }
+  function renderEditMembers() {
+    const wrap = $("#oef-mem-list");
+    if (!editMembers.length) { wrap.innerHTML = `<span class="assoc-empty">No members added.</span>`; return; }
+    wrap.innerHTML = editMembers.map((m, i) => {
+      const nm = nameOf(m.id) || "(removed)";
+      return `<span class="rel-chip"><b>${esc(nm)}</b> \u00B7 ${esc(m.role || "member")}<button type="button" data-rm="${i}">\u2715</button></span>`;
+    }).join("");
+    wrap.querySelectorAll("[data-rm]").forEach((b) => b.addEventListener("click", () => {
+      editMembers.splice(+b.dataset.rm, 1); renderEditMembers();
+    }));
+  }
+  function renderMemberResults(q) {
+    const box = $("#oef-mem-results");
+    q = (q || "").toLowerCase();
+    const taken = new Set(editMembers.map((m) => m.id));
+    const matches = profiles.filter((p) => p.type !== "org" && !taken.has(p.id) &&
+      (!q || p.name.toLowerCase().includes(q) || (p.alias || "").toLowerCase().includes(q))).slice(0, 6);
+    if (!matches.length) { box.innerHTML = ""; box.style.display = "none"; return; }
+    box.style.display = "block";
+    box.innerHTML = matches.map((p) =>
+      `<div class="rel-result" data-id="${p.id}">${esc(p.name)} <span>${esc(p.alias || "")}</span></div>`).join("");
+    box.querySelectorAll(".rel-result").forEach((el) => el.addEventListener("click", () => {
+      pendingMemberId = el.dataset.id;
+      $("#oef-mem-search").value = nameOf(pendingMemberId);
+      box.innerHTML = ""; box.style.display = "none";
+      $("#oef-mem-role").focus();
+    }));
+  }
+  function addMember() {
+    const role = $("#oef-mem-role").value.trim();
+    if (!pendingMemberId) { $("#oef-mem-search").focus(); return; }
+    editMembers.push({ id: pendingMemberId, role: role || "member" });
+    pendingMemberId = null;
+    $("#oef-mem-search").value = ""; $("#oef-mem-role").value = "";
+    renderEditMembers();
+  }
+  function wireMemberEditor() {
+    $("#oef-mem-search").addEventListener("input", (e) => { pendingMemberId = null; renderMemberResults(e.target.value); });
+    $("#oef-mem-search").addEventListener("focus", (e) => renderMemberResults(e.target.value));
+    $("#oef-mem-add").addEventListener("click", addMember);
+    $("#oef-mem-role").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addMember(); } });
+  }
+  function openOrgEditor(id) {
+    editingId = id;
+    editorKind = "org";
+    photoTarget = "org";
+    const form = $("#org-editor-form");
+    form.reset();
+    const p = id ? profiles.find((x) => x.id === id) : null;
+    $("#org-editor-title").textContent = p ? "MODIFY ORGANIZATION" : "NEW ORGANIZATION";
+    $("#oef-delete").style.display = p ? "" : "none";
+    if (p) {
+      form.name.value = p.name || "";
+      form.groupType.value = p.groupType || "Unknown / Unaffiliated";
+      form.founded.value = p.founded || "";
+      form.status.value = p.status || "ACTIVE";
+      form.location.value = p.location || "";
+      form.description.value = p.description || "";
+      setOrgPhoto(p.photo || "");
+      editMembers = (p.members || []).map((m) => ({ id: m.id, role: m.role }));
+    } else {
+      setOrgPhoto("");
+      editMembers = [];
+    }
+    pendingMemberId = null;
+    $("#oef-mem-search").value = ""; $("#oef-mem-role").value = "";
+    $("#oef-mem-results").innerHTML = ""; $("#oef-mem-results").style.display = "none";
+    renderEditMembers();
+    $("#org-editor-scrim").classList.add("open");
+    setTimeout(() => form.name.focus(), 50);
+  }
+  function closeOrgEditor() { $("#org-editor-scrim").classList.remove("open"); editingId = null; }
+  function saveOrgEditor(e) {
+    e.preventDefault();
+    const form = e.target;
+    const data = {
+      type: "org",
+      name: form.name.value.trim(),
+      groupType: form.groupType.value,
+      founded: form.founded.value,
+      status: form.status.value,
+      location: form.location.value.trim(),
+      description: form.description.value.trim(),
+      photo: tempPhoto,
+      members: editMembers.filter((m) => m.id && profiles.some((x) => x.id === m.id))
+    };
+    if (!data.name) { form.name.focus(); return; }
+    let savedId;
+    if (editingId) {
+      const p = profiles.find((x) => x.id === editingId);
+      Object.assign(p, data);
+      savedId = p.id;
+    } else {
+      savedId = "org-" + Date.now().toString(36);
+      profiles.push(Object.assign({ id: savedId, caseNumber: "ORG-" + Math.floor(1000 + Math.random() * 8999) }, data));
+    }
+    sortProfiles();
+    persist();
+    currentIndex = profiles.findIndex((x) => x.id === savedId);
+    closeOrgEditor();
+    renderRoster();
+    renderCard();
+  }
+
+  /* ---------- new-subject type choice ---------- */
+  function openSubtypeChoice() { $("#subtype-scrim").classList.add("open"); }
+  function closeSubtypeChoice() { $("#subtype-scrim").classList.remove("open"); }
+
   function saveEditor(e) {
     e.preventDefault();
     const form = e.target;
@@ -4702,6 +5217,7 @@ function exportDossier(list) {
       affiliations: form.affiliations.value.trim(),
       description: form.description.value.trim(),
       photo: tempPhoto,
+      type: "person",
       relationships: editRels.filter((r) => r.id && profiles.some((x) => x.id === r.id))
     };
     if (!data.name) { form.name.focus(); return; }
@@ -4724,12 +5240,16 @@ function exportDossier(list) {
 
   function deleteCurrent() {
     if (!editingId) return;
-    if (!confirm("Permanently delete this subject file?")) return;
+    const kind = editorKind;
+    if (!confirm(`Permanently delete this ${kind === "org" ? "organization" : "subject"} file?`)) return;
     const goneId = editingId;
     profiles = profiles.filter((x) => x.id !== goneId);
-    profiles.forEach((p) => { p.relationships = (p.relationships || []).filter((r) => r.id !== goneId); });
+    profiles.forEach((p) => {
+      p.relationships = (p.relationships || []).filter((r) => r.id !== goneId);
+      if (p.type === "org") p.members = (p.members || []).filter((m) => m.id !== goneId);
+    });
     persist();
-    closeEditor();
+    if (kind === "org") closeOrgEditor(); else closeEditor();
     if (currentIndex >= profiles.length) currentIndex = profiles.length - 1;
     renderRoster();
     renderCard();
@@ -4840,7 +5360,7 @@ function exportDossier(list) {
       sortProfiles();
       $("#roster-tab").addEventListener("click", () => $("#roster-panel").classList.toggle("open"));
       $("#roster-search").addEventListener("input", renderRoster);
-      $("#btn-new").addEventListener("click", () => openEditor(null));
+      $("#btn-new").addEventListener("click", () => openSubtypeChoice());
       $("#prev-subject").addEventListener("click", () => go(-1));
       $("#next-subject").addEventListener("click", () => go(1));
       $("#editor-close").addEventListener("click", closeEditor);
@@ -4858,20 +5378,43 @@ function exportDossier(list) {
         e.target.value = "";
       });
       $("#ef-photo-clear").addEventListener("click", () => setEditorPhoto(""));
-      $("#ef-photo-open").addEventListener("click", openImagePicker);
+      $("#ef-photo-open").addEventListener("click", () => { photoTarget = "person"; openImagePicker(); });
       $("#img-picker-close").addEventListener("click", closeImagePicker);
       $("#img-picker-scrim").addEventListener("click", (e) => { if (e.target === $("#img-picker-scrim")) closeImagePicker(); });
-      $("#img-picker-upload").addEventListener("click", () => { closeImagePicker(); $("#ef-photo-input").click(); });
+      $("#img-picker-upload").addEventListener("click", () => { closeImagePicker(); (photoTarget === "org" ? $("#oef-photo-input") : $("#ef-photo-input")).click(); });
       wireRelEditor();
+      $("#subtype-close").addEventListener("click", closeSubtypeChoice);
+      $("#subtype-scrim").addEventListener("click", (e) => { if (e.target === $("#subtype-scrim")) closeSubtypeChoice(); });
+      $("#subtype-person").addEventListener("click", () => { closeSubtypeChoice(); openEditor(null); });
+      $("#subtype-org").addEventListener("click", () => { closeSubtypeChoice(); openOrgEditor(null); });
+      $("#org-editor-close").addEventListener("click", closeOrgEditor);
+      $("#oef-cancel").addEventListener("click", closeOrgEditor);
+      $("#oef-delete").addEventListener("click", deleteCurrent);
+      $("#org-editor-form").addEventListener("submit", saveOrgEditor);
+      $("#org-editor-scrim").addEventListener("click", (e) => { if (e.target === $("#org-editor-scrim")) closeOrgEditor(); });
+      $("#oef-photo-input").addEventListener("change", (e) => {
+        const f = e.target.files[0];
+        if (!f) return;
+        setOrgPhotoLoading();
+        uploadPhoto(f)
+          .then((src) => setOrgPhoto(src))
+          .catch(() => setOrgPhoto(""));
+        e.target.value = "";
+      });
+      $("#oef-photo-clear").addEventListener("click", () => setOrgPhoto(""));
+      $("#oef-photo-open").addEventListener("click", () => { photoTarget = "org"; openImagePicker(); });
+      wireMemberEditor();
       injectExport();
       wireSwipe();
       wireKeys();
       renderRoster();
       renderCard();
+      if (window.Sitrep && window.Sitrep.refreshOrgPins) window.Sitrep.refreshOrgPins();
     },
     getProfiles() { return profiles; },
     openProfile,
-    threatColor
+    threatColor,
+    groupColor: groupTypeColor
   };
 })();
 
@@ -4960,14 +5503,31 @@ function exportDossier(list) {
     const ps = profiles();
     const saved = reset ? {} : loadPos();
     pos = {};
+    const orgs = ps.filter((p) => p.type === "org");
+    const memberIds = new Set();
+    orgs.forEach((o) => (o.members || []).forEach((m) => { if (m && m.id) memberIds.add(m.id); }));
+    const mains = ps.filter((p) => p.type === "org" || !memberIds.has(p.id));
     const cx = W / 2, cy = H / 2, R = Math.max(150, Math.min(W, H) / 2 - 140);
-    ps.forEach((p, i) => {
+    mains.forEach((p, i) => {
       if (saved[p.id]) pos[p.id] = { x: saved[p.id].x, y: saved[p.id].y };
       else {
-        const a = (i / Math.max(1, ps.length)) * Math.PI * 2 - Math.PI / 2;
+        const a = (i / Math.max(1, mains.length)) * Math.PI * 2 - Math.PI / 2;
         pos[p.id] = { x: cx + Math.cos(a) * R, y: cy + Math.sin(a) * R };
       }
     });
+    // cluster each org's members in a small ring around it
+    orgs.forEach((o) => {
+      const mem = (o.members || []).map((m) => ps.find((p) => p.id === m.id)).filter(Boolean);
+      if (!mem.length || !pos[o.id]) return;
+      const base = pos[o.id];
+      const rr = Math.max(90, 46 + mem.length * 8);
+      mem.forEach((mp, i) => {
+        if (saved[mp.id]) { pos[mp.id] = { x: saved[mp.id].x, y: saved[mp.id].y }; return; }
+        const a = (i / mem.length) * Math.PI * 2;
+        pos[mp.id] = { x: base.x + Math.cos(a) * rr, y: base.y + Math.sin(a) * rr };
+      });
+    });
+    ps.forEach((p) => { if (!pos[p.id]) pos[p.id] = { x: cx, y: cy }; });
   }
 
   function edges() {
@@ -4982,9 +5542,32 @@ function exportDossier(list) {
     return out;
   }
 
+  function orgGroups() {
+    const ps = profiles();
+    return ps.filter((p) => p.type === "org").map((o) => ({
+      org: o,
+      members: (o.members || []).map((m) => ps.find((p) => p.id === m.id)).filter(Boolean)
+    })).filter((g) => g.members.length);
+  }
   function drawLines() {
     const svg = $("#wv-lines");
     let h = "";
+    const gc = (window.Dossier && window.Dossier.groupColor) || (() => "var(--txt-dim)");
+    orgGroups().forEach((g) => {
+      const A0 = pos[g.org.id];
+      const pts = [A0, ...g.members.map((m) => pos[m.id])].filter(Boolean);
+      if (!pts.length) return;
+      const color = gc(g.org.groupType);
+      const pad = 60;
+      const minX = Math.min(...pts.map((p) => p.x)) - pad, maxX = Math.max(...pts.map((p) => p.x)) + pad;
+      const minY = Math.min(...pts.map((p) => p.y)) - pad, maxY = Math.max(...pts.map((p) => p.y)) + pad - 8;
+      h += `<rect x="${minX}" y="${minY}" width="${maxX - minX}" height="${maxY - minY}" rx="14" fill="${color}" fill-opacity="0.05" stroke="${color}" stroke-opacity="0.55" stroke-width="1.5" stroke-dasharray="6 5" />`;
+      h += `<text class="wv-edge-label" x="${minX + 12}" y="${minY + 16}" style="fill:${color};font-weight:700">${escp((g.org.name || "").toUpperCase())}</text>`;
+      g.members.forEach((m) => {
+        const B = pos[m.id]; if (!A0 || !B) return;
+        h += `<line x1="${A0.x}" y1="${A0.y}" x2="${B.x}" y2="${B.y}" stroke="${color}" stroke-opacity="0.35" stroke-width="1" stroke-dasharray="2 4" />`;
+      });
+    });
     edges().forEach((e) => {
       const A = pos[e.a], B = pos[e.b]; if (!A || !B) return;
       h += `<line x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}" stroke="rgba(255,45,111,0.42)" stroke-width="1.5" />`;
@@ -5023,12 +5606,17 @@ function exportDossier(list) {
     const canvas = $("#webview-canvas");
     canvas.querySelectorAll(".wv-node").forEach((n) => n.remove());
     const tc = (window.Dossier && window.Dossier.threatColor) || {};
+    const gc = (window.Dossier && window.Dossier.groupColor) || (() => "var(--txt-dim)");
     if (!profiles().length) return;
     profiles().forEach((p) => {
       const n = document.createElement("div");
-      n.className = "wv-node"; n.dataset.id = p.id;
+      const isOrg = p.type === "org";
+      n.className = "wv-node" + (isOrg ? " org" : "");
+      n.dataset.id = p.id;
       n.style.left = pos[p.id].x + "px"; n.style.top = pos[p.id].y + "px";
-      n.innerHTML = `<div class="wv-node-top"><span class="wv-node-dot" style="background:${tc[p.threat] || 'var(--txt-dim)'}"></span><span class="wv-node-name">${escp(p.name)}</span></div><div class="wv-node-sub">${escp(p.alias || p.caseNumber || '')}</div>`;
+      const dotColor = isOrg ? gc(p.groupType) : (tc[p.threat] || 'var(--txt-dim)');
+      const sub = isOrg ? (p.groupType || "ORGANIZATION") : (p.alias || p.caseNumber || '');
+      n.innerHTML = `<div class="wv-node-top"><span class="wv-node-dot" style="background:${dotColor}"></span><span class="wv-node-name">${escp(p.name)}</span></div><div class="wv-node-sub">${escp(sub)}</div>`;
       canvas.appendChild(n);
       wireNode(n);
     });
@@ -5052,9 +5640,9 @@ function exportDossier(list) {
   const KEY = "soc_settings";
   const DEFAULTS = {
     theme: "dark", accent: "magenta", clock: "zulu",
-    tickerVisible: true, tickerSource: "both", tickerIssuesOnly: false, tickerSpeed: 3,
+    tickerVisible: true, tickerSources: { AZURE: true, SOLARWINDS: true, DOWNDETECTOR: true }, tickerIssuesOnly: false, tickerSpeed: 3,
     radar: true, radarMode: null, sweepSpeed: 0.7, pingSpeed: 160, refreshSec: 30, reduceMotion: false, perfMode: false,
-    feeds: { AZURE: true, SOLARWINDS: true, CISA: true, C2: false, IOC: false, URL: false, RANSOM: false, TOR: false, AIR: false }
+    feeds: { AZURE: true, SOLARWINDS: true, CISA: true, GROUP: true, C2: false, IOC: false, URL: false, RANSOM: false, TOR: false, AIR: false }
   };
   const ACCENTS = {
     magenta: ["#ff2d6f", "#7a1538", "rgba(255,45,111,0.45)"],
@@ -5068,13 +5656,14 @@ function exportDossier(list) {
       const stored = JSON.parse(localStorage.getItem(KEY)) || {};
       const s = Object.assign({}, DEFAULTS, stored);
       s.feeds = Object.assign({}, DEFAULTS.feeds, s.feeds || {}); // deep-merge feed flags
+      s.tickerSources = Object.assign({}, DEFAULTS.tickerSources, s.tickerSources || {}); // deep-merge ticker source flags
       // On iOS, default Performance Mode ON the first time (no stored value yet):
       // it forces the GPU-heavy rotating radar + ambient animation off, which
       // together with the iOS blur-stripping keeps WebKit from killing the tab.
       // A returning user who explicitly set perfMode keeps their choice.
       if (window.__IS_IOS__ && !("perfMode" in stored)) s.perfMode = true;
       return s;
-    } catch (e) { return Object.assign({}, DEFAULTS, { feeds: Object.assign({}, DEFAULTS.feeds) }); }
+    } catch (e) { return Object.assign({}, DEFAULTS, { feeds: Object.assign({}, DEFAULTS.feeds), tickerSources: Object.assign({}, DEFAULTS.tickerSources) }); }
   }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
   function get(k) { return state[k]; }
@@ -5121,7 +5710,7 @@ function exportDossier(list) {
     if (k === "theme") applyTheme();
     else if (k === "accent") applyAccent();
     else if (k === "tickerVisible") applyTicker();
-    else if (k === "tickerSource" || k === "tickerIssuesOnly") { if (window.Ticker) window.Ticker.refresh(); }
+    else if (k === "tickerIssuesOnly") { if (window.Ticker) window.Ticker.refresh(); }
     else if (k === "tickerSpeed") document.documentElement.style.setProperty("--ticker-dur", tickerDuration());
     else if (k === "reduceMotion" || k === "perfMode") { applyMotion(); render(); }
     else if (k === "radarMode") { applyRadar(); render(); }
@@ -5135,6 +5724,7 @@ function exportDossier(list) {
   }
   function toggle(key) { return `<div class="toggle ${state[key] ? "on" : ""}" data-toggle="${key}"></div>`; }
   function feedToggle(key) { return `<div class="toggle ${state.feeds[key] ? "on" : ""}" data-feed="${key}"></div>`; }
+  function tickerSrcToggle(key) { return `<div class="toggle ${state.tickerSources[key] ? "on" : ""}" data-ticksrc="${key}"></div>`; }
   function segmented(key, opts) { return `<div class="segmented" data-seg="${key}">${opts.map(o => `<button data-val="${o.v}" class="${state[key] === o.v ? "on" : ""}">${o.l}</button>`).join("")}</div>`; }
   function slider(key, min, max, step, fmt) { return `<div class="set-slider"><input type="range" min="${min}" max="${max}" step="${step}" value="${state[key]}" data-slider="${key}"><span class="sv" data-sv="${key}">${fmt(state[key])}</span></div>`; }
   function swatches() { return `<div class="swatches" data-swatch>${Object.keys(ACCENTS).map(n => `<span class="swatch ${state.accent === n ? "on" : ""}" data-accent="${n}" style="background:${ACCENTS[n][0]};color:${ACCENTS[n][0]}"></span>`).join("")}</div>`; }
@@ -5152,7 +5742,9 @@ function exportDossier(list) {
        </div>
        <div class="set-section"><h3>STATUS TICKER</h3>
          ${row("Show ticker", "Scrolling status bar beneath the navigation", toggle("tickerVisible"))}
-         ${row("Data source", "Which systems feed the ticker", segmented("tickerSource", [{v:"azure",l:"AZURE"},{v:"solarwinds",l:"SOLARWINDS"},{v:"both",l:"BOTH"}]))}
+         ${row("Azure", "Azure region status in the ticker", tickerSrcToggle("AZURE"))}
+         ${row("SolarWinds", "SolarWinds component status in the ticker", tickerSrcToggle("SOLARWINDS"))}
+         ${row("DownDetector", "Auto-scanned DownDetector status for Azure \u00B7 SolarWinds \u00B7 Cloudflare", tickerSrcToggle("DOWNDETECTOR"))}
          ${row("Only show issues", "Hide operational entries; surface degraded / outages", toggle("tickerIssuesOnly"))}
          ${row("Scroll speed", "Marquee velocity", slider("tickerSpeed", 1, 5, 1, v => ["","SLOW","RELAXED","NORMAL","BRISK","FAST"][v]))}
        </div>
@@ -5173,6 +5765,7 @@ function exportDossier(list) {
          ${row("Azure regions", "Azure datacenter health \u2014 region status markers", feedToggle("AZURE"))}
          ${row("SolarWinds Observability", "SolarWinds component status \u2014 powers the status ticker", feedToggle("SOLARWINDS"))}
          ${row("CISA offices", "Static reference markers \u2014 CISA HQ &amp; regional offices", feedToggle("CISA"))}
+         ${row("Known groups (Dossier)", "Threat-actor &amp; government org pins from the Dossier's organization files", feedToggle("GROUP"))}
          ${row("Feodo Tracker (C2)", "Botnet command-and-control IPs", feedToggle("C2"))}
          ${row("ThreatFox (IOC)", "Indicators of compromise", feedToggle("IOC"))}
          ${row("URLhaus", "Malicious URLs", feedToggle("URL"))}
@@ -5190,6 +5783,12 @@ function exportDossier(list) {
     }));
     wrap.querySelectorAll("[data-feed]").forEach(el => el.addEventListener("click", () => {
       const k = el.dataset.feed; const on = !state.feeds[k]; setFeed(k, on); el.classList.toggle("on", on);
+    }));
+    wrap.querySelectorAll("[data-ticksrc]").forEach(el => el.addEventListener("click", () => {
+      const k = el.dataset.ticksrc; const on = !state.tickerSources[k];
+      state.tickerSources = Object.assign({}, state.tickerSources, { [k]: on }); save();
+      el.classList.toggle("on", on);
+      if (window.Ticker) window.Ticker.refresh();
     }));
     wrap.querySelectorAll("[data-seg]").forEach(seg => seg.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
       const k = seg.dataset.seg; let v = b.dataset.val;
@@ -5216,7 +5815,7 @@ function exportDossier(list) {
     const rb = wrap.querySelector("#set-reset");
     if (rb) rb.addEventListener("click", () => {
       if (!confirm("Reset all console settings to defaults?")) return;
-      state = Object.assign({}, DEFAULTS, { feeds: Object.assign({}, DEFAULTS.feeds) }); save(); applyAll(); render();
+      state = Object.assign({}, DEFAULTS, { feeds: Object.assign({}, DEFAULTS.feeds), tickerSources: Object.assign({}, DEFAULTS.tickerSources) }); save(); applyAll(); render();
     });
   }
 
@@ -5233,13 +5832,15 @@ function exportDossier(list) {
 
   function cfg(k, d) { return window.Settings ? window.Settings.get(k) : d; }
 
+  function srcs() { return cfg("tickerSources", { AZURE: true, SOLARWINDS: true, DOWNDETECTOR: true }); }
   function items() {
-    const src = cfg("tickerSource", "both");
+    const s = srcs();
     const issuesOnly = cfg("tickerIssuesOnly", false);
     let list = [];
-    if (src === "azure" || src === "both") list = list.concat(AZURE_REGIONS.map(r => ({ name: r.name, status: r.status, src: "AZ" })));
-    if (src === "solarwinds" || src === "both") list = list.concat(SOLARWINDS_COMPONENTS.map(c => ({ name: c.name, status: c.status, src: "SW" })));
-    if (issuesOnly) list = list.filter(i => i.status !== "operational");
+    if (s.AZURE !== false) list = list.concat(AZURE_REGIONS.map(r => ({ name: r.name, status: r.status, src: "AZ" })));
+    if (s.SOLARWINDS !== false) list = list.concat(SOLARWINDS_COMPONENTS.map(c => ({ name: c.name, status: c.status, src: "SW" })));
+    if (s.DOWNDETECTOR) list = list.concat(DOWNDETECTOR_STATUS.map(d => ({ name: d.name, status: d.status === "elevated" ? "degraded" : (d.status === "normal" ? "operational" : d.status), src: "DD" })));
+    if (issuesOnly) list = list.filter(i => i.status !== "operational" && i.status !== "unknown");
     return list;
   }
   function itemHtml(i) {
@@ -5252,9 +5853,10 @@ function exportDossier(list) {
   function render() {
     const track = document.getElementById("ticker-track");
     if (!track) return;
-    const src = cfg("tickerSource", "both");
+    const s = srcs();
+    const on = [s.AZURE !== false && "AZURE", s.SOLARWINDS !== false && "SOLARWINDS", s.DOWNDETECTOR && "DOWNDETECTOR"].filter(Boolean);
     const lbl = document.getElementById("ticker-label-text");
-    if (lbl) lbl.textContent = src === "azure" ? "AZURE" : src === "solarwinds" ? "SOLARWINDS" : "STATUS";
+    if (lbl) lbl.textContent = on.length === 1 ? on[0] : "STATUS";
 
     const list = items();
     let half = list.length ? list.map(itemHtml).join("") : `<span class="tk-allgood">\u2713 ALL MONITORED SYSTEMS OPERATIONAL</span>`;
@@ -5273,7 +5875,8 @@ function exportDossier(list) {
       // only query SolarWinds on boot if its data-feed toggle is enabled
       const sf = window.Settings && window.Settings.get("feeds");
       if (!sf || sf.SOLARWINDS !== false) syncSolarWindsStatus().then(render);
-      // SolarWinds now re-syncs with every other feed on the SITREP
+      syncDownDetectorStatus().then(render);
+      // SolarWinds/DownDetector now re-sync with every other feed on the SITREP
       // auto-refresh timer (see Sitrep.refreshAll) — no separate interval.
     },
     refresh() { render(); }

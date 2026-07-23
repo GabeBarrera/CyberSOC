@@ -544,6 +544,125 @@ async function geocode(q) {
   return { lat: +a[0].lat, lng: +a[0].lon, display: a[0].display_name };
 }
 
+/* ---------- DownDetector search (best-effort scrape, no API key) ----------
+   Resolves a free-text query ("azure") to a DownDetector status-page slug
+   ("windows-azure"), then scrapes the page's embedded chart script for its
+   24h report-volume series (same data DavideViolante/downdetector-api pulls,
+   without the headless-browser dependency — the points are already present
+   in the server-rendered HTML). Cloudflare occasionally blocks the .com
+   domain for non-browser requests; callers get a clear error + a direct
+   link to open manually when that happens. */
+const DD_ALIASES = {
+  azure: "windows-azure", "microsoft azure": "windows-azure", "windows azure": "windows-azure",
+  aws: "amazon-web-services-aws", "amazon web services": "amazon-web-services-aws",
+  "office 365": "office-365", "microsoft 365": "office-365", o365: "office-365",
+  outlook: "outlook", hotmail: "outlook",
+  teams: "microsoft-teams", "microsoft teams": "microsoft-teams",
+  github: "github", gitlab: "gitlab", slack: "slack", discord: "discord",
+  cloudflare: "cloudflare", google: "google", gmail: "gmail", youtube: "youtube",
+  "google cloud": "google-cloud", gcp: "google-cloud",
+  facebook: "facebook", instagram: "instagram", whatsapp: "whatsapp", messenger: "facebook-messenger",
+  twitter: "twitter", x: "twitter", tiktok: "tiktok", reddit: "reddit", snapchat: "snapchat",
+  zoom: "zoom", spotify: "spotify", netflix: "netflix",
+  playstation: "playstation-network", psn: "playstation-network",
+  xbox: "xbox-live", "xbox live": "xbox-live",
+  steam: "steam", "epic games": "epic-games", fortnite: "fortnite",
+  chatgpt: "openai", openai: "openai",
+  verizon: "verizon", "at&t": "att", att: "att", "t-mobile": "t-mobile", tmobile: "t-mobile",
+  comcast: "comcast-xfinity", xfinity: "comcast-xfinity", spectrum: "spectrum",
+  paypal: "paypal", venmo: "venmo", "cash app": "cash-app", robinhood: "robinhood",
+  coinbase: "coinbase", chase: "chase", "bank of america": "bank-of-america", "wells fargo": "wells-fargo",
+  amazon: "amazon", ebay: "ebay", salesforce: "salesforce"
+};
+function ddSlugify(q) {
+  return String(q || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+const DD_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
+async function ddResolveSlug(query) {
+  const key = String(query || "").toLowerCase().trim();
+  if (DD_ALIASES[key]) return { slug: DD_ALIASES[key], via: "alias" };
+  try {
+    const r = await fetch("https://downdetector.com/search/?q=" + encodeURIComponent(query),
+      { headers: { "User-Agent": DD_UA, "Accept": "text/html" } });
+    if (r.ok) {
+      const html = await r.text();
+      const m = html.match(/href="\/status\/([a-z0-9-]+)\/"/i);
+      if (m) return { slug: m[1], via: "search" };
+    }
+  } catch (e) { /* fall through to guess */ }
+  return { slug: ddSlugify(query), via: "guess" };
+}
+async function fetchDDPage(slug) {
+  if (typeof fetch !== "function") throw new Error("global fetch unavailable (need Node 18+)");
+  const url = "https://downdetector.com/status/" + slug + "/";
+  const r = await fetch(url, { headers: { "User-Agent": DD_UA, "Accept": "text/html" } });
+  if (!r.ok) throw Object.assign(new Error("downdetector http " + r.status), { url });
+  const html = await r.text();
+  const titleM = html.match(/<title>([^<]+)<\/title>/i);
+  const name = titleM ? titleM[1].replace(/\s*Outage.*$/i, "").replace(/\s*\|.*$/, "").trim() : slug;
+  const descM = html.match(/<meta[^>]+(?:name|property)="(?:og:)?description"[^>]+content="([^"]*)"/i);
+  const summary = descM ? descM[1].replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"') : null;
+
+  let dataScript = null;
+  const scriptRe = /<script[^>]*>([\s\S]*?)<\/script>/gi;
+  let sm;
+  while ((sm = scriptRe.exec(html))) {
+    if (sm[1].includes("{ x:")) { dataScript = sm[1]; break; }
+  }
+  let reports = [], baseline = [];
+  if (dataScript) {
+    const pts = [];
+    const ptRe = /\{\s*x:\s*'([^']+)',\s*y:\s*([\d.]+)\s*\}/g;
+    let pm;
+    while ((pm = ptRe.exec(dataScript))) pts.push({ date: pm[1], value: +pm[2] });
+    const half = Math.floor(pts.length / 2);
+    reports = half ? pts.slice(0, half) : pts;
+    baseline = half ? pts.slice(half) : [];
+  }
+  const latest = reports.length ? reports[reports.length - 1].value : null;
+  const base = baseline.length ? baseline[baseline.length - 1].value : null;
+  let status = "unknown";
+  if (latest != null && base != null) {
+    if (latest > 5 && latest > base * 3) status = "outage";
+    else if (latest > base * 1.5) status = "elevated";
+    else status = "normal";
+  }
+  return { url, name, summary, status, reports, baseline };
+}
+async function getDownDetector(query) {
+  const { slug, via } = await ddResolveSlug(query);
+  const page = await fetchDDPage(slug);
+  return Object.assign({ query, slug, via, fetchedAt: new Date().toISOString() }, page);
+}
+
+/* ---- auto-scan: Azure / SolarWinds / Cloudflare on DownDetector, for the ticker ----
+   Small fixed watchlist (no free-text resolution needed — slugs are known),
+   refreshed on the same 60s background cycle as threat intel and served
+   instantly from cache via /api/downdetector-status. */
+const DD_WATCHLIST = [
+  { key: "AZURE", slug: "windows-azure", name: "Azure" },
+  { key: "SOLARWINDS", slug: "solarwinds", name: "SolarWinds" },
+  { key: "CLOUDFLARE", slug: "cloudflare", name: "Cloudflare" }
+];
+const DOWNDETECTOR_STATUS = { fetchedAt: null, items: [] };
+let _ddRefreshing = false;
+async function refreshDownDetectorStatus() {
+  if (_ddRefreshing) return DOWNDETECTOR_STATUS;
+  _ddRefreshing = true;
+  const results = await Promise.allSettled(DD_WATCHLIST.map((w) => fetchDDPage(w.slug)));
+  const items = results.map((res, i) => {
+    const w = DD_WATCHLIST[i];
+    if (res.status === "fulfilled") {
+      return { key: w.key, name: w.name, slug: w.slug, url: res.value.url, status: res.value.status, ok: true };
+    }
+    return { key: w.key, name: w.name, slug: w.slug, url: "https://downdetector.com/status/" + w.slug + "/", status: "unknown", ok: false, error: res.reason && res.reason.message };
+  });
+  DOWNDETECTOR_STATUS.fetchedAt = new Date().toISOString();
+  DOWNDETECTOR_STATUS.items = items;
+  _ddRefreshing = false;
+  return DOWNDETECTOR_STATUS;
+}
+
 /* ---------- whois / IP-domain intel ----------
    IP or hostname -> geolocation + ASN/ISP/org via ip-api.com (free, no key,
    resolves hostnames too). Domains additionally get registrar + key dates +
@@ -741,6 +860,27 @@ const server = http.createServer(async (req, res) => {
     catch (e) { return sendJSON(res, 502, { error: "whois unavailable", detail: e.message }); }
   }
 
+  if (p === "/api/downdetector" && req.method === "GET") {
+    const q = u.searchParams.get("q");
+    if (!q) return sendJSON(res, 400, { error: "missing q" });
+    try { return sendJSON(res, 200, await getDownDetector(q)); }
+    catch (e) {
+      return sendJSON(res, 502, {
+        error: "downdetector unavailable", detail: e.message,
+        url: e.url || ("https://downdetector.com/status/" + ddSlugify(q) + "/")
+      });
+    }
+  }
+
+  /* Ticker auto-scan cache — Azure / SolarWinds / Cloudflare on DownDetector.
+     Served instantly; refreshed in the background every 60s. */
+  if (p === "/api/downdetector-status" && req.method === "GET") {
+    try {
+      if (u.searchParams.get("refresh") === "1" || !DOWNDETECTOR_STATUS.fetchedAt) await refreshDownDetectorStatus();
+      return sendJSON(res, 200, DOWNDETECTOR_STATUS);
+    } catch (e) { return sendJSON(res, 502, { error: "downdetector-status unavailable", detail: e.message }); }
+  }
+
   /* ---------- localhost shell bridge ----------
      Runs an arbitrary command on the host machine and returns its output.
      ⚠ This is a remote-code-execution endpoint. The server binds to
@@ -777,6 +917,8 @@ ensureImgDir();
    the page can pick up new CVEs / C2s / IOCs without a manual reload. */
 refreshThreatIntel().catch((e) => console.error("threat-intel init:", e.message));
 setInterval(() => refreshThreatIntel().catch((e) => console.error("threat-intel refresh:", e.message)), 60000);
+refreshDownDetectorStatus().catch((e) => console.error("downdetector-status init:", e.message));
+setInterval(() => refreshDownDetectorStatus().catch((e) => console.error("downdetector-status refresh:", e.message)), 60000);
 
 server.listen(PORT, "127.0.0.1", () => {
   console.log("\n  ◆ CyberSOC server running");
@@ -791,5 +933,7 @@ server.listen(PORT, "127.0.0.1", () => {
   console.log("  Photo list : GET  /api/list-images  (lists assets/images/*)");
   console.log("  Geocode    : GET  /api/geocode?q=<address>");
   console.log("  Whois      : GET  /api/whois?q=<ip|domain>  (ip-api geo/ASN + RDAP registry)");
+  console.log("  DownDetector: GET /api/downdetector?q=<service>  (best-effort scrape + 24h report graph)");
+  console.log("  DD watchlist: GET /api/downdetector-status  (Azure/SolarWinds/Cloudflare on DownDetector, auto-refresh 60s — powers the ticker)");
   console.log("  Shell      : POST /api/exec   ⚠ runs host commands — loopback only, never expose\n");
 });
