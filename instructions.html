@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CyberSOC — Instructions</title>
+<link rel="icon" type="image/png" href="assets/favicon/favicon.png" />
+<style>
+  :root {
+    --bg: #0c090b; --panel: #151014; --line: #2c2229; --txt: #ece6ea; --mut: #a99ea5; --dim: #7d727a;
+    --accent: #ff2d6f; --ok: #3ddc84; --code-bg: #0a0709;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #f6f5f7; --panel: #ffffff; --line: #dcd7dc; --txt: #1b1519; --mut: #564d54; --dim: #7a7078; --accent: #c8104f; --ok: #12824a; --code-bg: #f0edf0; }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--txt); font-family: var(--sans); font-size: 16px; line-height: 1.6; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 40px 20px 80px; }
+  .kicker { font-family: var(--mono); font-size: 12px; letter-spacing: 3px; text-transform: uppercase; color: var(--accent); }
+  h1 { font-size: clamp(28px, 5vw, 38px); line-height: 1.15; margin: 8px 0 14px; text-wrap: balance; }
+  h2 { font-size: 23px; margin: 0 0 12px; padding-top: 10px; scroll-margin-top: 12px; }
+  h3 { font-size: 17px; margin: 28px 0 8px; scroll-margin-top: 12px; }
+  p, li { color: var(--mut); }
+  p { margin: 0 0 14px; max-width: 70ch; }
+  .lede { font-size: 17px; }
+  b { color: var(--txt); font-weight: 600; }
+  a { color: var(--accent); }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  section { margin-top: 46px; padding-top: 22px; border-top: 1px solid var(--line); }
+  ul, ol { padding-left: 22px; margin: 0 0 14px; }
+  li { margin-bottom: 7px; max-width: 70ch; }
+  ol.steps > li { margin-bottom: 12px; }
+  code { font-family: var(--mono); font-size: .88em; background: var(--code-bg); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; color: var(--txt); overflow-wrap: anywhere; }
+  .toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+  .toc a { font-size: 13px; text-decoration: none; color: var(--mut); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; background: var(--panel); }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .code { margin: 12px 0 18px; border: 1px solid var(--line); border-radius: 8px; background: var(--code-bg); overflow: hidden; }
+  .code-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 8px 7px 14px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .code-label { font-family: var(--mono); font-size: 12px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .copy { flex: 0 0 auto; font-family: var(--mono); font-size: 12px; color: var(--txt); background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 6px 14px; min-width: 76px; cursor: pointer; }
+  .copy:hover { border-color: var(--accent); color: var(--accent); }
+  .copy.done { border-color: var(--ok); color: var(--ok); }
+  pre { margin: 0; padding: 14px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  pre code { display: block; background: none; border: none; padding: 0; font-size: 13px; line-height: 1.55; white-space: pre; overflow-wrap: normal; tab-size: 2; }
+  .tw { overflow-x: auto; margin: 12px 0 18px; border: 1px solid var(--line); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+  th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+  th { font-family: var(--mono); font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--dim); background: var(--panel); white-space: nowrap; }
+  td { color: var(--mut); min-width: 110px; }
+  tr:last-child td { border-bottom: none; }
+  footer { margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 13px; color: var(--dim); }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div class="kicker">CyberSOC v2.0</div>
+  <h1>Setup &amp; operating instructions</h1>
+  <p class="lede">CyberSOC is a single-page security operations console: a status map, an alert feed and command line, a dossier of subjects and organizations, a documentation repository, and an RSS log view. Data is stored in Firebase (Firestore) and access is controlled by per-account roles. Public feeds are fetched through a small Cloudflare Worker.</p>
+</header>
+
+<nav class="toc" aria-label="Contents">
+  <a href="#overview">Overview</a><a href="#files">Project files</a><a href="#quick-start">Quick start</a><a href="#firebase-config">Firebase config</a><a href="#roles">Roles &amp; access</a><a href="#data-model">Data model</a><a href="#worker">Cloudflare Worker</a><a href="#configuration">Configuration</a><a href="#feeds">Feeds &amp; Logs tab</a><a href="#migration">Migrating old data</a><a href="#commands">Command line</a><a href="#security">Security notes</a><a href="#troubleshooting">Troubleshooting</a>
+</nav>
+
+<section id="overview">
+  <h2>Overview</h2>
+  <p>The app is one file, <code>index.html</code> (HTML, CSS and JavaScript). There is no application server any more. Three outside services do the work the old <code>server.js</code> did:</p>
+  <ul>
+    <li><b>Firebase Authentication</b> signs people in (Google or email and password).</li>
+    <li><b>Cloud Firestore</b> stores the dossier, files, country intel, each user's RSS feed list and the role of every account. Security rules decide who can read and write.</li>
+    <li><b>A Cloudflare Worker</b> (<code>worker/worker.js</code>) fetches public feeds for the browser: RSS, threat intelligence, IP geolocation and DownDetector. It is read-only and stores nothing.</li>
+  </ul>
+  <h3>What each tab does</h3>
+  <div class="tw"><table><thead><tr><th>Tab</th><th>Purpose</th></tr></thead><tbody><tr><td>SITREP</td><td>World map with Azure region health, CISA offices, dossier organizations and country intel. Alert feed on the left, command line on the right.</td></tr><tr><td>DOSSIER</td><td>Case files for people and organizations, with relationships and a relationship web view.</td></tr><tr><td>FILES</td><td>Folder tree of rich-text documents (this was the old LOG tab).</td></tr><tr><td>LOGS</td><td>Every connected RSS or Atom feed and its entries. Anyone can add a feed.</td></tr><tr><td>SETTINGS</td><td>Appearance, ticker, data-feed switches, the feed proxy URL, your account, and (admins) access control and legacy import.</td></tr></tbody></table></div>
+  <h3>Who sees what</h3>
+  <div class="tw"><table><thead><tr><th>State</th><th>Dossier, files, country intel</th><th>Can change data</th></tr></thead><tbody><tr><td>Not signed in</td><td>Fictional dummy data. An amber <b>DUMMY DATA</b> badge shows in the top bar.</td><td>No</td></tr><tr><td>Signed in, role <code>pending</code></td><td>Dummy data, badge reads <b>ACCESS PENDING</b>.</td><td>No</td></tr><tr><td>Signed in, role <code>viewer</code></td><td>Live data, except dossier files marked confidential.</td><td>No</td></tr><tr><td>Signed in, role <code>admin</code></td><td>All live data.</td><td>Yes: add, edit, delete</td></tr></tbody></table></div>
+  <p>Status feeds, the map and the LOGS tab work for everyone, signed in or not.</p>
+</section>
+
+<section id="files">
+  <h2>Project files</h2>
+  <div class="tw"><table><thead><tr><th>Path</th><th>What it is</th></tr></thead><tbody><tr><td><code>index.html</code></td><td>The whole app.</td></tr><tr><td><code>instructions.html</code></td><td>This page.</td></tr><tr><td><code>firestore.rules</code></td><td>The security rules shown below, as a file for the Firebase CLI.</td></tr><tr><td><code>firebase.json</code>, <code>.firebaserc</code></td><td>Optional: lets <code>firebase deploy</code> publish the rules and host the site. Excludes <code>worker/</code> and <code>legacy-data/</code> from hosting.</td></tr><tr><td><code>worker/worker.js</code>, <code>worker/wrangler.toml</code></td><td>The Cloudflare Worker and its config.</td></tr><tr><td><code>assets/</code></td><td>Favicon, web manifest and the three placeholder silhouettes.</td></tr><tr><td><code>legacy-data/</code></td><td>Your old <code>soc_*.json</code> files, kept only so you can import them. Delete after importing. Do not host this folder.</td></tr></tbody></table></div>
+  <p><code>server.js</code> has been removed. Nothing in the project needs Node to run.</p>
+</section>
+
+<section id="quick-start">
+  <h2>Quick start</h2>
+  <ol class="steps">
+    <li><b>Firebase:</b> turn on the sign-in methods, create the Firestore database and publish the rules. See <a href="#firebase-config">Firebase config</a>.</li>
+    <li><b>Serve the folder</b> over http. Sign-in does not work from a <code>file://</code> path. For a local test, run one of these in the project folder and open <code>http://localhost:8080</code>:
+      <div class="code"><div class="code-bar"><span class="code-label">macOS / Linux</span><button type="button" class="copy" aria-label="Copy macOS / Linux to clipboard">Copy</button></div><pre><code>python3 -m http.server 8080</code></pre></div>
+      <div class="code"><div class="code-bar"><span class="code-label">Windows</span><button type="button" class="copy" aria-label="Copy Windows to clipboard">Copy</button></div><pre><code>py -m http.server 8080</code></pre></div>
+    </li>
+    <li><b>Sign in once</b> with the account that should be the first admin, then make it an admin in the Firebase console. See <a href="#first-admin">First admin</a>.</li>
+    <li><b>Deploy the Worker</b> and paste its URL into SETTINGS &rarr; Feed proxy. See <a href="#worker">Cloudflare Worker</a>.</li>
+    <li><b>Import your old data</b> if you want it. See <a href="#migration">Migrating old data</a>.</li>
+  </ol>
+</section>
+
+<section id="firebase-config">
+  <h2>Firebase config</h2>
+  <p>This is the web configuration for the <code>infosec-database</code> project. It is already in <code>index.html</code> as <code>FIREBASE_CONFIG</code> near the top of the first large script. These values identify the project. They are not secrets: what protects the data is the rules below.</p>
+  <div class="code"><div class="code-bar"><span class="code-label">Firebase config</span><button type="button" class="copy" aria-label="Copy Firebase config to clipboard">Copy</button></div><pre><code>const firebaseConfig = {
+  apiKey: &quot;AIzaSyAhgYBDUWvADx70vc5BnuoYX-I6U0_OkgU&quot;,
+  authDomain: &quot;infosec-database.firebaseapp.com&quot;,
+  projectId: &quot;infosec-database&quot;,
+  storageBucket: &quot;infosec-database.firebasestorage.app&quot;,
+  messagingSenderId: &quot;987912439151&quot;,
+  appId: &quot;1:987912439151:web:54572ec2ef54cbe529d49a&quot;,
+  measurementId: &quot;G-GJ5XTKTLYD&quot;
+};</code></pre></div>
+
+  <h3>Security rules</h3>
+  <p>Paste these into <b>Firebase console &rarr; Firestore Database &rarr; Rules</b> and press <b>Publish</b>. The same text is in <code>firestore.rules</code>.</p>
+  <div class="code"><div class="code-bar"><span class="code-label">Firestore rules</span><button type="button" class="copy" aria-label="Copy Firestore rules to clipboard">Copy</button></div><pre><code>rules_version = &#x27;2&#x27;;
+
+// CyberSOC — Firestore security rules
+// Roles live in soc_roles/{uid}.role :  &quot;admin&quot; | &quot;viewer&quot; | &quot;pending&quot;
+//   admin   read + create / update / delete in soc_dossier, soc_files, soc_sitrep
+//   viewer  read only; never receives dossier documents with confidential == true
+//   pending signed in, not yet approved: no access to any data collection
+// Anything not matched below is denied.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+    function rolePath() {
+      return /databases/$(database)/documents/soc_roles/$(request.auth.uid);
+    }
+    function hasRole(r) {
+      return signedIn() &amp;&amp; exists(rolePath()) &amp;&amp; get(rolePath()).data.role == r;
+    }
+    function isAdmin()  { return hasRole(&#x27;admin&#x27;); }
+    function isViewer() { return hasRole(&#x27;viewer&#x27;); }
+    function validRole(r) { return r in [&#x27;admin&#x27;, &#x27;viewer&#x27;, &#x27;pending&#x27;]; }
+
+    // ---- accounts &amp; roles -------------------------------------------------
+    match /soc_roles/{uid} {
+      allow get:  if signedIn() &amp;&amp; (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+
+      // First sign-in: a user may register THEMSELVES, and only as &quot;pending&quot;.
+      allow create: if signedIn()
+                    &amp;&amp; request.auth.uid == uid
+                    &amp;&amp; request.resource.data.keys().hasOnly([&#x27;role&#x27;, &#x27;email&#x27;, &#x27;displayName&#x27;, &#x27;createdAt&#x27;])
+                    &amp;&amp; request.resource.data.role == &#x27;pending&#x27;
+                    &amp;&amp; request.resource.data.email == request.auth.token.get(&#x27;email&#x27;, &#x27;&#x27;);
+      allow create: if isAdmin() &amp;&amp; validRole(request.resource.data.role);
+
+      // Admins manage other accounts. Nobody can change or delete their own
+      // role document (no self-promotion, no accidental lock-out).
+      allow update: if isAdmin() &amp;&amp; request.auth.uid != uid &amp;&amp; validRole(request.resource.data.role);
+      allow delete: if isAdmin() &amp;&amp; request.auth.uid != uid;
+    }
+
+    // ---- dossier ----------------------------------------------------------
+    // Viewers can only read documents whose confidential flag is false, and
+    // their queries must filter on it:  where(&#x27;confidential&#x27;, &#x27;==&#x27;, false)
+    match /soc_dossier/{id} {
+      allow read:           if isAdmin() || (isViewer() &amp;&amp; resource.data.confidential == false);
+      allow create, update: if isAdmin() &amp;&amp; request.resource.data.confidential is bool;
+      allow delete:         if isAdmin();
+    }
+
+    // ---- documentation files ---------------------------------------------
+    match /soc_files/{id} {
+      allow read:  if isAdmin() || isViewer();
+      allow write: if isAdmin();
+    }
+
+    // ---- country intel (document id = ISO-3 code) ------------------------
+    match /soc_sitrep/{id} {
+      allow read:  if isAdmin() || isViewer();
+      allow write: if isAdmin();
+    }
+
+    // ---- each user&#x27;s own RSS feed list -----------------------------------
+    match /soc_feeds/{uid} {
+      allow read, delete:   if signedIn() &amp;&amp; request.auth.uid == uid;
+      allow create, update: if signedIn() &amp;&amp; request.auth.uid == uid
+                            &amp;&amp; request.resource.data.feeds is list
+                            &amp;&amp; request.resource.data.feeds.size() &lt;= 40;
+    }
+  }
+}</code></pre></div>
+  <p>Or publish them from a terminal in the project folder:</p>
+  <div class="code"><div class="code-bar"><span class="code-label">Deploy rules with the Firebase CLI</span><button type="button" class="copy" aria-label="Copy Deploy rules with the Firebase CLI to clipboard">Copy</button></div><pre><code>npm install -g firebase-tools
+firebase login
+firebase deploy --only firestore:rules</code></pre></div>
+
+  <h3>One-time console setup</h3>
+  <ol class="steps">
+    <li><b>Authentication &rarr; Sign-in method:</b> enable <b>Google</b> and <b>Email/Password</b>.</li>
+    <li><b>Authentication &rarr; Settings &rarr; Authorized domains:</b> add the domain you host the site on. <code>localhost</code> and the project's <code>web.app</code> and <code>firebaseapp.com</code> domains are there by default.</li>
+    <li><b>Firestore Database &rarr; Create database</b> in production mode, then publish the rules above.</li>
+  </ol>
+
+  <h3 id="first-admin">First admin</h3>
+  <p>The rules do not let anyone make themselves an admin, so the first one is set by hand:</p>
+  <ol class="steps">
+    <li>Open the site, press <b>SIGN IN</b> and sign in. The app creates <code>soc_roles/&lt;your uid&gt;</code> with <code>role: "pending"</code>.</li>
+    <li>In the Firebase console open <b>Firestore Database &rarr; soc_roles</b>, open your document and change <code>role</code> to <code>admin</code>.</li>
+    <li>Back in the app the badge disappears within a second or two. From now on you manage everyone else in <b>SETTINGS &rarr; Access control</b>.</li>
+  </ol>
+
+  <h3>Optional: host on Firebase</h3>
+  <div class="code"><div class="code-bar"><span class="code-label">Deploy site and rules</span><button type="button" class="copy" aria-label="Copy Deploy site and rules to clipboard">Copy</button></div><pre><code>firebase deploy</code></pre></div>
+  <p>The site is then at <code>https://infosec-database.web.app</code>. The Worker's allow-list already includes that address.</p>
+</section>
+
+<section id="roles">
+  <h2>Roles &amp; access</h2>
+  <p>Every account that has signed in has a document in <code>soc_roles</code>, keyed by its user id.</p>
+  <div class="tw"><table><thead><tr><th>Role</th><th>Read</th><th>Write</th></tr></thead><tbody><tr><td><code>admin</code></td><td>Everything</td><td>Add, edit and delete dossier files, documents and country intel. Manage roles. Import legacy data.</td></tr><tr><td><code>viewer</code></td><td>Files, country intel, and dossier files whose <b>Confidential</b> switch is off</td><td>Nothing</td></tr><tr><td><code>pending</code></td><td>Nothing (dummy data)</td><td>Nothing</td></tr></tbody></table></div>
+  <ul>
+    <li><b>Granting access:</b> a new person signs in, then an admin opens SETTINGS &rarr; Access control and changes their row from PENDING to VIEWER or ADMIN.</li>
+    <li><b>Removing access:</b> press REMOVE on their row. If they sign in again they reappear as pending.</li>
+    <li>You cannot change or remove your own role. Ask another admin, or use the Firebase console.</li>
+    <li><b>Confidential switch:</b> every dossier editor has a Confidential switch, on by default. While it is on, only admins receive that file; the rules stop it being sent to viewers at all. Turn it off to release a file to viewers. Released files show a green VIEWER-RELEASABLE stamp; confidential ones show a red square in the roster.</li>
+  </ul>
+</section>
+
+<section id="data-model">
+  <h2>Data model</h2>
+  <p>All collections start with <code>soc_</code>. Every write records <code>updatedBy</code> (user id), <code>updatedByEmail</code> and <code>updatedAt</code>.</p>
+  <div class="tw"><table><thead><tr><th>Collection</th><th>Document id</th><th>Contents</th></tr></thead><tbody><tr><td><code>soc_roles</code></td><td>user id</td><td><code>role</code>, <code>email</code>, <code>displayName</code>, <code>createdAt</code></td></tr><tr><td><code>soc_dossier</code></td><td>profile id (<code>sub-…</code>, <code>org-…</code>)</td><td>One person or organization. Includes <code>confidential</code> (boolean) and the photo as an embedded, downscaled image.</td></tr><tr><td><code>soc_files</code></td><td>node id (<code>fld-…</code>, <code>file-…</code>)</td><td>One folder or one document (<code>title</code>, <code>subtitle</code>, <code>tags</code>, <code>body</code>, <code>parent</code>).</td></tr><tr><td><code>soc_sitrep</code></td><td>ISO-3 country code</td><td>Posture, summary, allies, adversaries and alerts for one country.</td></tr><tr><td><code>soc_feeds</code></td><td>user id</td><td><code>feeds</code>: that user's own RSS feeds (name and URL). Private to the user.</td></tr></tbody></table></div>
+  <p>Firestore limits a document to 1&nbsp;MiB. Photos are downscaled to 384&nbsp;px and images pasted into documents to 1100&nbsp;px so entries stay well under it; the app refuses to save anything over about 900&nbsp;KB.</p>
+  <p>Console preferences (theme, toggles, which folders are collapsed, the proxy URL, the geocoding cache) stay in the browser's local storage on each device.</p>
+</section>
+
+<section id="worker">
+  <h2>Cloudflare Worker</h2>
+  <p>Browsers refuse to read most third-party feeds directly, so the Worker fetches them. It only answers <code>GET</code> requests from the site origins you list, has no write or shell routes, and keeps nothing.</p>
+  <div class="tw"><table><thead><tr><th>Route</th><th>Returns</th></tr></thead><tbody><tr><td><code>/api/health</code></td><td>Liveness check</td></tr><tr><td><code>/api/rss?url=</code></td><td>An RSS or Atom feed (XML only, 2&nbsp;MB cap, public hosts only, cached 2 minutes)</td></tr><tr><td><code>/api/threat-intel?cats=</code></td><td>CISA KEV, Feodo, ThreatFox, URLhaus, Tor, ransomware.live, OpenSky. Only the categories switched on in SETTINGS are contacted.</td></tr><tr><td><code>/api/ip-intel?q=</code></td><td>Geolocation and ASN for the <code>whois</code> command</td></tr><tr><td><code>/api/downdetector?q=</code>, <code>/api/downdetector-status</code></td><td>DownDetector report series (best effort; DownDetector often blocks automated requests)</td></tr></tbody></table></div>
+  <h3>Deploy</h3>
+  <p>You need a free Cloudflare account and Node.js installed on your computer (only for the deploy tool).</p>
+  <div class="code"><div class="code-bar"><span class="code-label">Deploy the Worker</span><button type="button" class="copy" aria-label="Copy Deploy the Worker to clipboard">Copy</button></div><pre><code>cd worker
+npx wrangler login
+npx wrangler deploy</code></pre></div>
+  <p>The command prints the Worker's address, like <code>https://cybersoc-feeds.yourname.workers.dev</code>.</p>
+  <h3>Allow your site</h3>
+  <p>Edit <code>ALLOWED_ORIGINS</code> in <code>worker/wrangler.toml</code> so it lists every address the site is opened from (scheme, host and port, no trailing slash), then deploy again. Requests from any other origin get <code>403</code>.</p>
+  <div class="code"><div class="code-bar"><span class="code-label">worker/wrangler.toml</span><button type="button" class="copy" aria-label="Copy worker/wrangler.toml to clipboard">Copy</button></div><pre><code># CyberSOC feed proxy — deploy with:  npx wrangler deploy
+name = &quot;cybersoc-feeds&quot;
+main = &quot;worker.js&quot;
+compatibility_date = &quot;2024-11-01&quot;
+workers_dev = true
+
+[vars]
+# Comma-separated list of site origins allowed to call this worker.
+# Use the exact origin of wherever index.html is served (scheme + host + port,
+# no trailing slash). &quot;*&quot; allows any site — avoid it outside of testing.
+ALLOWED_ORIGINS = &quot;https://infosec-database.web.app,https://infosec-database.firebaseapp.com,http://localhost:5000,http://localhost:8080,http://127.0.0.1:8080&quot;</code></pre></div>
+  <h3>Point the app at it</h3>
+  <p>Either open SETTINGS &rarr; Feed proxy, paste the address and press SAVE (stored on that device), or set it for everyone by editing this line near the top of the first large script in <code>index.html</code>:</p>
+  <div class="code"><div class="code-bar"><span class="code-label">index.html</span><button type="button" class="copy" aria-label="Copy index.html to clipboard">Copy</button></div><pre><code>const WORKER_URL = &quot;https://cybersoc-feeds.yourname.workers.dev&quot;;</code></pre></div>
+  <p>Press TEST in SETTINGS to check it. Opening the Worker address straight in a browser tab shows <code>origin not allowed</code>; that is expected, because a typed address sends no origin.</p>
+  <h3>Without the Worker</h3>
+  <p>The app still runs. RSS feeds are fetched directly, so only publishers that allow cross-site reads will load, and the others show as unreachable in the LOGS tab. Threat intelligence, IP geolocation and DownDetector stay off.</p>
+</section>
+
+<section id="configuration">
+  <h2>Configuration</h2>
+  <div class="tw"><table><thead><tr><th>Where</th><th>Setting</th><th>Notes</th></tr></thead><tbody><tr><td><code>index.html</code></td><td><code>FIREBASE_CONFIG</code></td><td>Firebase project. Change only if you move projects.</td></tr><tr><td><code>index.html</code></td><td><code>WORKER_URL</code></td><td>Default feed proxy for all visitors. Empty by default.</td></tr><tr><td><code>index.html</code></td><td><code>Feeds.BUILTIN</code></td><td>The four built-in status feeds (URLs below).</td></tr><tr><td><code>wrangler.toml</code></td><td><code>ALLOWED_ORIGINS</code></td><td>Sites allowed to use the Worker.</td></tr><tr><td>SETTINGS</td><td>Data feeds</td><td>Switch each source on or off. Threat-intel categories are off by default.</td></tr><tr><td>SETTINGS</td><td>Auto-refresh</td><td>How often the console re-syncs (5 seconds to 5 minutes). A status RSS feed is re-fetched at most every 5 minutes whatever this is set to.</td></tr><tr><td>SETTINGS</td><td>Feed proxy</td><td>Per-device Worker address.</td></tr></tbody></table></div>
+</section>
+
+<section id="feeds">
+  <h2>Feeds &amp; the Logs tab</h2>
+  <h3>Built-in status feeds</h3>
+  <div class="tw"><table><thead><tr><th>Source</th><th>Feed</th><th>Drives</th></tr></thead><tbody><tr><td>Microsoft Azure</td><td><code>https://rssfeed.azure.status.microsoft/en-us/status/feed/</code></td><td>Region markers, HUD counts, AZURE alerts, ticker</td></tr><tr><td>Microsoft 365 admin center</td><td><code>https://status.cloud.microsoft/api/feed/mac</code></td><td>M365 alerts, ticker</td></tr><tr><td>Power Platform admin center</td><td><code>https://status.cloud.microsoft/api/feed/ppac</code></td><td>M365 alerts, ticker</td></tr><tr><td>SolarWinds Observability</td><td><code>https://status.cloud.solarwinds.com/history.rss</code></td><td>SOLARWINDS alerts, ticker</td></tr></tbody></table></div>
+  <h3>How status is read from a feed</h3>
+  <ul>
+    <li><b>Azure</b> lists only incidents that are open now. A region turns degraded or outage when an open incident names it. Names are matched whole, longest first, so &ldquo;East US 2&rdquo; does not also flag &ldquo;East US&rdquo;. Incidents that name no region appear in the alert feed without a marker.</li>
+    <li><b>SolarWinds</b> is an incident history. Each entry's newest update label decides its state: Investigating, Identified, Update and Monitoring count as open; Resolved, Completed and Scheduled do not.</li>
+    <li><b>Microsoft 365 and Power Platform</b> publish a running status. Only the newest entry counts. Microsoft's standard &ldquo;This site is updated when service issues…&rdquo; text is treated as healthy; wording such as &ldquo;investigating&rdquo; or &ldquo;unable to access&rdquo; raises an alert. This is a wording heuristic, so check the entry itself in the LOGS tab if an alert looks wrong.</li>
+    <li>When a feed cannot be loaded the console says <b>FEED OFFLINE</b> and shows that source as unknown. It never invents a status.</li>
+  </ul>
+  <h3>Adding your own feeds</h3>
+  <p>Open LOGS, type a feed address (RSS 2.0, Atom or RDF) and an optional name, and press ADD FEED. Click a feed to filter the entries to it; press &times; to remove one of yours.</p>
+  <ul>
+    <li><b>Signed in:</b> the list is saved to your account (<code>soc_feeds/&lt;your uid&gt;</code>) and follows you to other devices.</li>
+    <li><b>Not signed in:</b> the feed works until you reload the page. It is not saved anywhere.</li>
+    <li>Up to 40 feeds per account. Feed text is always shown as plain text; links open in a new tab.</li>
+  </ul>
+</section>
+
+<section id="migration">
+  <h2>Migrating old data</h2>
+  <p>The app no longer reads or writes local <code>.json</code> files. Your previous files are in <code>legacy-data/</code>.</p>
+  <ol class="steps">
+    <li>Sign in as an admin.</li>
+    <li>Open SETTINGS &rarr; Import legacy data &rarr; CHOOSE FILE.</li>
+    <li>Pick <code>soc_dossier.json</code>, then repeat for <code>soc_files.json</code> and <code>soc_sitrep.json</code>. The app works out which is which.</li>
+    <li>Delete the <code>legacy-data</code> folder.</li>
+  </ol>
+  <p>Imported dossier files are all marked confidential; release individual ones to viewers by editing them. Importing a file twice overwrites the same documents rather than duplicating them. Photos that pointed at files in <code>assets/images/</code> keep working only if those image files are still hosted; re-upload them in the editor to embed them.</p>
+</section>
+
+<section id="commands">
+  <h2>Command line</h2>
+  <p>Open the CMD tab on the right of SITREP. Add <code>-h</code> to any command for its flags.</p>
+  <div class="tw"><table><thead><tr><th>Command</th><th>Does</th></tr></thead><tbody><tr><td><code>help</code></td><td>List commands</td></tr><tr><td><code>server</code></td><td>Azure region health plus Microsoft 365, Power Platform and SolarWinds status</td></tr><tr><td><code>server -s</code></td><td>Check Firebase sign-in state and whether the feed proxy answers</td></tr><tr><td><code>sitrep</code></td><td>Country alerts from the last 24 hours, then Azure, Microsoft 365 and SolarWinds incidents</td></tr><tr><td><code>sitrep -az</code> / <code>-ms</code> / <code>-sw</code></td><td>Only Azure / Microsoft 365 / SolarWinds incidents</td></tr><tr><td><code>sitrep -i</code></td><td>Threat-intelligence summary (needs the Worker)</td></tr><tr><td><code>sitrep -v</code></td><td>Every country alert on file</td></tr><tr><td><code>sitrep &lt;country&gt;</code></td><td>Posture and alerts for a country, outlined on the map</td></tr><tr><td><code>sitrep -m &lt;country&gt;</code></td><td>Edit a country's intel (admin)</td></tr><tr><td><code>sitrep -d &lt;country&gt;</code></td><td>Show allies and adversaries on the map</td></tr><tr><td><code>sitrep -s &lt;service&gt;</code></td><td>DownDetector lookup (needs the Worker)</td></tr><tr><td><code>sitrep -me</code></td><td>Zoom to your location</td></tr><tr><td><code>sitrep -r</code></td><td>Re-fetch every enabled feed now</td></tr><tr><td><code>dossier</code></td><td>List dossier names</td></tr><tr><td><code>locate &lt;keyword&gt;</code></td><td>Plot matching dossier subjects; <code>-s</code> Azure region, <code>-f</code> flight, <code>-c</code> clear pins</td></tr><tr><td><code>whois &lt;ip or domain&gt;</code></td><td>Registration data, plus location and ASN when the Worker is set</td></tr><tr><td><code>run diagnostic</code></td><td>Memory and storage footprint</td></tr><tr><td><code>safemode</code></td><td>Toggle performance mode</td></tr><tr><td><code>clear</code></td><td>Clear the console; <code>clear -a &lt;country&gt;</code> deletes that country's alerts (admin)</td></tr></tbody></table></div>
+  <p>The <code>localhost</code> shell command has been removed along with the server.</p>
+</section>
+
+<section id="security">
+  <h2>Security notes</h2>
+  <ul>
+    <li><b>The rules are the control.</b> Hiding buttons in the page is a convenience. A viewer who edits the page still cannot write, and cannot read a confidential dossier file, because Firestore refuses.</li>
+    <li><b>Consider App Check</b> (Firebase console) if you host this publicly, to limit use of the project from other sites.</li>
+    <li><b>Keep <code>ALLOWED_ORIGINS</code> specific.</b> <code>*</code> lets any website use your Worker as a feed proxy.</li>
+    <li><b>Document bodies are sanitized</b> when saved and again when shown: only basic formatting, http(s) links and raster images survive.</li>
+    <li><b>Anyone can create an account</b> (that is how Google sign-in works), but a new account is <code>pending</code> and can read nothing until an admin approves it.</li>
+    <li><b>Do not host <code>legacy-data/</code>.</b></li>
+    <li>Geocoding (OpenStreetMap Nominatim), country borders (jsDelivr), map tiles (CARTO), Leaflet (unpkg), fonts (Google) and domain registration data (rdap.org) are requested by the browser directly.</li>
+  </ul>
+</section>
+
+<section id="troubleshooting">
+  <h2>Troubleshooting</h2>
+  <div class="tw"><table><thead><tr><th>Symptom</th><th>Cause and fix</th></tr></thead><tbody><tr><td>Badge says DUMMY DATA after signing in</td><td>Your role is <code>pending</code>. An admin must set it in SETTINGS &rarr; Access control, or follow <a href="#first-admin">First admin</a>.</td></tr><tr><td>SIGN IN button is greyed out</td><td>The Firebase scripts did not load (offline or blocked). Reload when connected.</td></tr><tr><td>&ldquo;This sign-in method is not enabled&rdquo;</td><td>Enable Google and Email/Password under Authentication &rarr; Sign-in method.</td></tr><tr><td>&ldquo;This site's domain is not authorised&rdquo;</td><td>Add your domain under Authentication &rarr; Settings &rarr; Authorized domains.</td></tr><tr><td>Google pop-up never opens</td><td>Sign-in needs <code>http://</code> or <code>https://</code>, not <code>file://</code>. Allow pop-ups for the site; the app falls back to a redirect when a pop-up is blocked.</td></tr><tr><td>Signed in as admin but saves fail with &ldquo;permission-denied&rdquo;</td><td>The rules are not published, or your <code>soc_roles</code> document says something other than <code>admin</code>. Run <code>server -s</code> to see your role.</td></tr><tr><td>Viewer sees no dossier files</td><td>Every file is confidential by default. An admin must switch Confidential off on the files viewers may see.</td></tr><tr><td>FEEDS OFFLINE or PARTIAL in the top bar</td><td>Open LOGS to see which feed failed and why. Without a Worker, &ldquo;blocked by the browser&rdquo; is normal for most publishers.</td></tr><tr><td>Proxy TEST says not reachable</td><td>Check the address, and that the site's exact origin is in <code>ALLOWED_ORIGINS</code> and the Worker was redeployed.</td></tr><tr><td>Threat-intel layers are empty</td><td>They are off by default and need the Worker. Switch categories on in SETTINGS &rarr; Data feeds.</td></tr><tr><td>DownDetector shows UNKNOWN</td><td>DownDetector blocks most automated requests. The command prints a link to open instead.</td></tr><tr><td>MAP LIBRARY UNAVAILABLE</td><td>Leaflet could not be downloaded from unpkg. The rest of the console still works; reload when the network allows it.</td></tr><tr><td>&ldquo;This entry is too large to store&rdquo;</td><td>A document or profile passed about 900 KB, usually from many embedded images. Remove some or split the document.</td></tr><tr><td>Copy buttons on this page do nothing</td><td>Some browsers block clipboard access on <code>file://</code> pages. The button then selects the code so you can press Ctrl+C or Cmd+C.</td></tr></tbody></table></div>
+</section>
+
+<footer>CyberSOC v2.0 &middot; Firebase project <code>infosec-database</code></footer>
+
+</div>
+<script>
+  // Copy buttons: put the whole code block on the clipboard.
+  (function () {
+    function fallbackCopy(text) {
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed"; ta.style.top = "0"; ta.style.left = "0"; ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.focus(); ta.select(); ta.setSelectionRange(0, text.length);   // iOS needs an explicit range
+      var ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+      document.body.removeChild(ta);
+      return ok;
+    }
+    function selectBlock(codeEl) {
+      var range = document.createRange();
+      range.selectNodeContents(codeEl);
+      var sel = window.getSelection();
+      sel.removeAllRanges(); sel.addRange(range);
+    }
+    function flash(btn, label, good) {
+      btn.textContent = label;
+      btn.classList.toggle("done", good);
+      clearTimeout(btn._t);
+      btn._t = setTimeout(function () { btn.textContent = "Copy"; btn.classList.remove("done"); }, 1800);
+    }
+    document.querySelectorAll(".code").forEach(function (block) {
+      var btn = block.querySelector(".copy");
+      var codeEl = block.querySelector("pre code");
+      btn.addEventListener("click", function () {
+        var text = codeEl.textContent;
+        var done = function (ok) {
+          if (ok) flash(btn, "Copied", true);
+          else { selectBlock(codeEl); flash(btn, "Selected", false); }
+        };
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(fallbackCopy(text)); });
+        } else {
+          done(fallbackCopy(text));
+        }
+      });
+    });
+  })();
+</script>
+</body>
+</html>
