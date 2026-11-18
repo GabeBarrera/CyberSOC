@@ -33,7 +33,8 @@ troubleshooting are in [`instructions.html`](instructions.html).**
 | --- | --- |
 | `index.html` | The app |
 | `instructions.html` | Full instructions |
-| `firestore.rules`, `firebase.json`, `.firebaserc` | Rules and optional Firebase Hosting config |
+| `privacy.html` | Privacy Notice and Acceptable Use terms (accepted at sign-in) |
+| `firestore.rules`, `firebase.json`, `.firebaserc` | Optional: only for deploying with the Firebase CLI; the app never reads them |
 | `worker/` | Cloudflare Worker (feed proxy) |
 | `assets/` | Favicon, manifest, placeholder silhouettes |
 | `legacy-data/` | Old JSON data, for one-time import only — do not host |

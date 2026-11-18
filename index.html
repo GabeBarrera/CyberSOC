@@ -891,6 +891,12 @@ a, button, summary, label, select, [role="button"], [onclick],
 .auth-msg { min-height: 16px; font-family: var(--mono); font-size: 11px; line-height: 1.5; color: var(--out); }
 .auth-msg.ok { color: var(--op); }
 .auth-foot { font-family: var(--mono); font-size: 10px; line-height: 1.6; color: var(--txt-dim); }
+.auth-foot a, .auth-agree a, .set-foot a { color: var(--accent); }
+.auth-banner { font-family: var(--mono); font-size: 10.5px; line-height: 1.6; color: var(--txt-mut); border: 1px solid var(--deg); border-left-width: 3px; padding: 9px 11px; background: rgba(255,176,32,.06); }
+.auth-banner b { color: var(--deg); letter-spacing: 1.5px; font-weight: 600; }
+.logfile-form label.auth-agree { flex-direction: row; align-items: flex-start; gap: 10px; cursor: pointer; font-size: 11px; letter-spacing: .3px; line-height: 1.55; color: var(--txt-mut); text-transform: none; }
+.auth-agree input { flex: 0 0 auto; width: 16px; height: 16px; margin: 1px 0 0; accent-color: var(--accent); cursor: pointer; }
+.auth-agree.need span { color: var(--out); }
 /* controls that only make sense for an admin */
 :root:not(.can-edit) .needs-edit { display: none !important; }
 .map-unavailable { position: absolute; inset: 0; z-index: 500; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px; text-align: center; font-family: var(--mono); font-size: 13px; letter-spacing: 3px; color: var(--deg); background: var(--bg); }
@@ -1310,6 +1316,10 @@ a, button, summary, label, select, [role="button"], [onclick],
       <button class="modal-close" id="auth-close" aria-label="Close">&#x2715;</button>
     </div>
     <form id="auth-form" class="logfile-form" novalidate>
+      <div class="auth-banner" role="note"><b>AUTHORIZED USERS ONLY.</b> This console is for approved security work. Changes you make are recorded with your account, and access can be revoked at any time.</div>
+      <label class="auth-agree"><input type="checkbox" id="auth-agree" />
+        <span>I have read and agree to the <a href="privacy.html#acceptable-use" target="_blank" rel="noopener">Acceptable Use terms</a> and <a href="privacy.html" target="_blank" rel="noopener">Privacy Notice</a>.</span>
+      </label>
       <button type="button" class="btn-ghost auth-google" id="auth-google">CONTINUE WITH GOOGLE</button>
       <div class="auth-or"><span>OR</span></div>
       <label>EMAIL<input type="email" id="auth-email" autocomplete="username" spellcheck="false" autocapitalize="off" /></label>
@@ -1322,7 +1332,7 @@ a, button, summary, label, select, [role="button"], [onclick],
           <button type="submit" class="btn-primary" id="auth-submit">SIGN IN</button>
         </div>
       </div>
-      <div class="auth-foot">New accounts start with no access. An admin must grant the viewer or admin role before live data appears.</div>
+      <div class="auth-foot">New accounts start with no access. An admin must grant the viewer or admin role before live data appears. &#xB7; <a href="privacy.html" target="_blank" rel="noopener">Privacy &amp; acceptable use</a></div>
     </form>
   </div>
 </div>
@@ -5944,7 +5954,14 @@ function normalizeProfile(p) {
     $("#auth-pass").autocomplete = create ? "new-password" : "current-password";
     authMsg("");
   }
-  function openAuth() { setAuthMode(false); $("#auth-form").reset(); $("#auth-scrim").classList.add("open"); setTimeout(() => $("#auth-email").focus(), 50); }
+  /* Sign-in (Google or email) requires ticking the acceptable-use / privacy box. */
+  function agreed() {
+    const ok = $("#auth-agree").checked;
+    $(".auth-agree").classList.toggle("need", !ok);
+    if (!ok) { authMsg("Tick the box to accept the Acceptable Use terms and Privacy Notice first."); $("#auth-agree").focus(); }
+    return ok;
+  }
+  function openAuth() { setAuthMode(false); $("#auth-form").reset(); $(".auth-agree").classList.remove("need"); $("#auth-scrim").classList.add("open"); setTimeout(() => $("#auth-email").focus(), 50); }
   function closeAuth() { $("#auth-scrim").classList.remove("open"); }
 
   function renderAuth() {
@@ -5977,7 +5994,8 @@ function normalizeProfile(p) {
     $("#auth-close").addEventListener("click", closeAuth);
     $("#auth-scrim").addEventListener("click", (e) => { if (e.target === $("#auth-scrim")) closeAuth(); });
     $("#auth-mode").addEventListener("click", () => setAuthMode(!authCreate));
-    $("#auth-google").addEventListener("click", () => { authMsg(""); Backend.signInGoogle().catch(authFail); });
+    $("#auth-agree").addEventListener("change", () => { if ($("#auth-agree").checked) { $(".auth-agree").classList.remove("need"); authMsg(""); } });
+    $("#auth-google").addEventListener("click", () => { if (!agreed()) return; authMsg(""); Backend.signInGoogle().catch(authFail); });
     $("#auth-reset").addEventListener("click", () => {
       const email = $("#auth-email").value.trim();
       if (!email) { authMsg("Enter your email first, then press RESET PASSWORD."); return; }
@@ -5986,6 +6004,7 @@ function normalizeProfile(p) {
     $("#auth-form").addEventListener("submit", (e) => {
       e.preventDefault();
       const email = $("#auth-email").value.trim(), pw = $("#auth-pass").value;
+      if (!agreed()) return;
       if (!email || !pw) { authMsg("Enter your email and password."); return; }
       authMsg("");
       (authCreate ? Backend.signUpEmail(email, pw) : Backend.signInEmail(email, pw)).catch(authFail);
@@ -6386,7 +6405,7 @@ function normalizeProfile(p) {
        <div class="set-section"><h3>DEVICE</h3>
          ${row("Reset to defaults", "Restore all console settings on this device", `<button class="btn-ghost set-reset" id="set-reset">RESET</button>`)}
        </div>
-       <div class="set-foot">CyberSOC v${APP_VERSION} \u00B7 data: Firebase (Firestore) \u00B7 feeds: RSS + Cloudflare Worker proxy</div>`;
+       <div class="set-foot">CyberSOC v${APP_VERSION} \u00B7 data: Firebase (Firestore) \u00B7 feeds: RSS + Cloudflare Worker proxy \u00B7 <a href="privacy.html" target="_blank" rel="noopener">Privacy &amp; acceptable use</a></div>`;
 
     wireBackendSections(wrap);
     wrap.querySelectorAll("[data-toggle]").forEach(el => el.addEventListener("click", () => {

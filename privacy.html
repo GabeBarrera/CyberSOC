@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CyberSOC — Privacy Notice &amp; Acceptable Use</title>
+<link rel="icon" type="image/png" href="assets/favicon/favicon.png" />
+<style>
+  :root {
+    --bg: #0c090b; --panel: #151014; --line: #2c2229; --txt: #ece6ea; --mut: #a99ea5; --dim: #7d727a;
+    --accent: #ff2d6f; --ok: #3ddc84; --code-bg: #0a0709;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #f6f5f7; --panel: #ffffff; --line: #dcd7dc; --txt: #1b1519; --mut: #564d54; --dim: #7a7078; --accent: #c8104f; --ok: #12824a; --code-bg: #f0edf0; }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--txt); font-family: var(--sans); font-size: 16px; line-height: 1.6; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 40px 20px 80px; }
+  .kicker { font-family: var(--mono); font-size: 12px; letter-spacing: 3px; text-transform: uppercase; color: var(--accent); }
+  h1 { font-size: clamp(28px, 5vw, 38px); line-height: 1.15; margin: 8px 0 14px; text-wrap: balance; }
+  h2 { font-size: 23px; margin: 0 0 12px; padding-top: 10px; scroll-margin-top: 12px; }
+  h3 { font-size: 17px; margin: 28px 0 8px; scroll-margin-top: 12px; }
+  p, li { color: var(--mut); }
+  p { margin: 0 0 14px; max-width: 70ch; }
+  .lede { font-size: 17px; }
+  b { color: var(--txt); font-weight: 600; }
+  a { color: var(--accent); }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  section { margin-top: 46px; padding-top: 22px; border-top: 1px solid var(--line); }
+  ul, ol { padding-left: 22px; margin: 0 0 14px; }
+  li { margin-bottom: 7px; max-width: 70ch; }
+  ol.steps > li { margin-bottom: 12px; }
+  code { font-family: var(--mono); font-size: .88em; background: var(--code-bg); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; color: var(--txt); overflow-wrap: anywhere; }
+  .toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+  .toc a { font-size: 13px; text-decoration: none; color: var(--mut); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; background: var(--panel); }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .code { margin: 12px 0 18px; border: 1px solid var(--line); border-radius: 8px; background: var(--code-bg); overflow: hidden; }
+  .code-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 8px 7px 14px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .code-label { font-family: var(--mono); font-size: 12px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .copy { flex: 0 0 auto; font-family: var(--mono); font-size: 12px; color: var(--txt); background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 6px 14px; min-width: 76px; cursor: pointer; }
+  .copy:hover { border-color: var(--accent); color: var(--accent); }
+  .copy.done { border-color: var(--ok); color: var(--ok); }
+  pre { margin: 0; padding: 14px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  pre code { display: block; background: none; border: none; padding: 0; font-size: 13px; line-height: 1.55; white-space: pre; overflow-wrap: normal; tab-size: 2; }
+  .tw { overflow-x: auto; margin: 12px 0 18px; border: 1px solid var(--line); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+  th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+  th { font-family: var(--mono); font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--dim); background: var(--panel); white-space: nowrap; }
+  td { color: var(--mut); min-width: 110px; }
+  tr:last-child td { border-bottom: none; }
+  footer { margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 13px; color: var(--dim); }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  .meta { font-family: var(--mono); font-size: 12px; color: var(--dim); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div class="kicker">CyberSOC</div>
+  <h1>Privacy Notice &amp; Acceptable Use</h1>
+  <p class="lede">CyberSOC is a private security operations console. This page explains what it stores when you sign in, who can see it, and the rules for using it. Signing in means you accept both parts.</p>
+  <p class="meta">Last updated November 17, 2026</p>
+</header>
+
+<nav class="toc" aria-label="Contents">
+  <a href="#privacy">Privacy notice</a><a href="#acceptable-use">Acceptable use</a><a href="#contact">Contact</a>
+</nav>
+
+<section id="privacy">
+  <h2>Privacy notice</h2>
+
+  <h3>What we collect about you</h3>
+  <ul>
+    <li><b>Account details</b> from your sign-in: email address, display name and a user ID created by Firebase Authentication. If you use Google sign-in, Google shares only your basic profile (name, email and profile picture) and nothing else from your Google account.</li>
+    <li><b>Your access role</b> (admin, viewer or pending) and when your account was first registered.</li>
+    <li><b>An edit history:</b> every change you save records your user ID, your email and the time.</li>
+    <li><b>Your RSS feed list</b>, if you add feeds while signed in.</li>
+  </ul>
+  <p>Firebase Authentication also keeps its own sign-in records (for example, when you last signed in), under Google's terms.</p>
+
+  <h3>What stays on your device</h3>
+  <p>Console preferences (theme, toggles, which folders are collapsed, the feed-proxy address) and a cache of map place lookups are kept in your browser's local storage. They are not sent to us. Clearing your browser data removes them.</p>
+
+  <h3>What we do not do</h3>
+  <ul>
+    <li>No advertising, no selling or sharing of your data, and no analytics or tracking scripts.</li>
+    <li>No access to your Gmail, Drive, contacts or anything else in your Google account.</li>
+  </ul>
+
+  <h3>Why it is collected</h3>
+  <p>To identify you, decide what you are allowed to see and change, keep an accountable record of who changed what, and remember your feed list across devices.</p>
+
+  <h3>Where it is stored and who can see it</h3>
+  <ul>
+    <li>Data is stored in Google Firebase (Cloud Firestore and Firebase Authentication).</li>
+    <li><b>Admins</b> can see every account's email, role and registration date, and the edit history on records.</li>
+    <li><b>Viewers</b> cannot see other accounts. Your feed list is visible only to you.</li>
+  </ul>
+
+  <h3>Information about other people</h3>
+  <p>The console holds security research records, including dossier files about people and organizations who are not users of this site. Those records are restricted to approved accounts; files marked confidential are visible to admins only. Questions or correction requests about such a record can go to the administrator (see <a href="#contact">Contact</a>).</p>
+
+  <h3>Services your browser contacts</h3>
+  <p>Using the console makes your browser request content from these providers. Each one can see your IP address and that you loaded their content:</p>
+  <ul>
+    <li>Google (Firebase sign-in and database, Google Fonts)</li>
+    <li>Cloudflare (the feed proxy, which fetches public feeds on your behalf)</li>
+    <li>unpkg and jsDelivr (code libraries and map borders)</li>
+    <li>CARTO (map tiles)</li>
+    <li>OpenStreetMap Nominatim (place lookups)</li>
+    <li>rdap.org (domain registration lookups from the <code>whois</code> command)</li>
+    <li>RSS feed publishers, when a feed is loaded without the proxy</li>
+  </ul>
+
+  <h3>How long it is kept</h3>
+  <p>Your account details and role are kept until an admin removes your access or you ask for deletion. Edit stamps stay on the records you changed for as long as those records exist.</p>
+
+  <h3>Your choices</h3>
+  <ul>
+    <li>You can sign out at any time, and remove your saved feeds yourself in the LOGS tab.</li>
+    <li>You can ask the administrator to show you, correct or delete your account information.</li>
+    <li>Signing out does not delete your account. Deleting it removes your access.</li>
+  </ul>
+</section>
+
+<section id="acceptable-use">
+  <h2>Acceptable use</h2>
+  <p>CyberSOC is for authorized users only. By signing in you agree to the following.</p>
+  <ol class="steps">
+    <li><b>Authorized purposes only.</b> Use the console only for the security work you were given access for, and only in ways that are lawful where you are.</li>
+    <li><b>Keep your access to yourself.</b> Do not share your account or let anyone else use your session. Sign out on shared devices.</li>
+    <li><b>Treat records as confidential.</b> Do not copy, export, screenshot or share dossier, file or intel content outside approved work, and never publish it.</li>
+    <li><b>Record facts responsibly.</b> Admins should store only information that is needed, accurate and lawfully obtained, and keep files about people marked confidential unless viewers genuinely need them.</li>
+    <li><b>No misuse.</b> Do not use the console to harass, stalk, discriminate against or target anyone, and do not try to get around access controls, read data your role does not allow, or interfere with the service.</li>
+    <li><b>Changes are attributed.</b> Every change you save is recorded with your account.</li>
+    <li><b>Access can end.</b> An admin can change or remove your access at any time, including for breaking these rules.</li>
+    <li><b>No guarantees.</b> Status feeds and threat intelligence come from third parties and can be late, wrong or unavailable. The console is provided as is; verify anything important at its source before acting on it.</li>
+  </ol>
+  <p>These terms may be updated. The date at the top shows the latest version; continuing to sign in after a change means you accept it.</p>
+</section>
+
+<section id="contact">
+  <h2>Contact</h2>
+  <p>For questions, access changes, or to view, correct or delete your information, contact the administrator who approved your account.</p>
+</section>
+
+<footer><a href="index.html">&larr; Back to CyberSOC</a></footer>
+
+</div>
+</body>
+</html>
