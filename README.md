@@ -23,7 +23,8 @@ troubleshooting are in [`instructions.html`](instructions.html).**
    `py -m http.server 8080` on Windows) and open `http://localhost:8080`.
 3. Sign in, then set your `soc_roles/<uid>` document's `role` to `admin` in
    the Firebase console.
-4. `cd worker && npx wrangler deploy`, then paste the Worker URL into
+4. Deploy `worker/` as the Worker `proxy-cybersoc` with Cloudflare Workers Builds (import this GitHub repo,
+   root directory `worker`), then set `WORKER_URL` in `index.html` or paste it into
    SETTINGS → Feed proxy.
 5. Optional: SETTINGS → Import legacy data to load the files in `legacy-data/`.
 

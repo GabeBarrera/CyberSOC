@@ -1556,7 +1556,7 @@ const FIREBASE_CONFIG = {
 };
 
 /* URL of the deployed Cloudflare Worker (worker/worker.js), no trailing slash,
-   e.g. "https://cybersoc-feeds.yourname.workers.dev". Leave "" to run without
+   e.g. "https://proxy-cybersoc.yourname.workers.dev". Leave "" to run without
    it: RSS feeds are then fetched directly (only feeds that send CORS headers
    load) and threat intel / IP geolocation / DownDetector stay offline.
    Can also be set per device in SETTINGS → Feed proxy. */
@@ -6382,7 +6382,7 @@ function normalizeProfile(p) {
        <div class="set-section"><h3>FEED PROXY</h3>
          <div class="set-desc" style="margin:-4px 0 14px">URL of your Cloudflare Worker (see instructions.html). It fetches RSS, threat intel, IP geolocation and DownDetector for the browser. Saved on this device${WORKER_URL ? "; leave blank to use the built-in default" : ""}.</div>
          <div class="set-inline">
-           <input type="url" id="set-worker" placeholder="https://cybersoc-feeds.yourname.workers.dev" spellcheck="false" autocapitalize="off" value="${escHtml(workerOverride())}" />
+           <input type="url" id="set-worker" placeholder="https://proxy-cybersoc.yourname.workers.dev" spellcheck="false" autocapitalize="off" value="${escHtml(workerOverride())}" />
            <button class="btn-ghost" id="set-worker-save">SAVE</button>
            <button class="btn-ghost" id="set-worker-test">TEST</button>
          </div>
