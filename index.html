@@ -18,16 +18,27 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="CyberSOC" />
 
-<!-- iOS detection — set as early as possible so the .ios hardening CSS applies
-     on the very first paint, before any blur layer is composited over the map. -->
+<!-- Device check — runs before anything renders. Phones and tablets (iOS,
+     iPadOS, Android, other mobile browsers) start every visit in Performance
+     mode, and the .mobile hardening CSS strips the GPU-heavy effects on the very
+     first paint, before any map tile, blur or animated layer is created. -->
 <script>
   (function () {
     var ua = navigator.userAgent || "";
     var isIOS = /iP(hone|ad|od)/.test(ua) ||
       // iPadOS 13+ reports as desktop Safari; fall back to touch-capable Mac.
       (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-    if (isIOS) document.documentElement.classList.add("ios");
+    var coarse = false;
+    try { coarse = window.matchMedia("(pointer: coarse)").matches; } catch (e) {}
+    var isMobile = isIOS ||
+      /Android|Mobi|IEMobile|Opera Mini|Silk|BlackBerry|webOS/i.test(ua) ||
+      // touch-first device with a small screen that hides its identity
+      (coarse && Math.min(screen.width, screen.height) < 820);
+    var root = document.documentElement;
+    if (isIOS) root.classList.add("ios");
+    if (isMobile) root.classList.add("mobile", "perf-mode", "reduce-motion");
     window.__IS_IOS__ = !!isIOS;
+    window.__IS_MOBILE__ = !!isMobile;
   })();
 </script>
 
@@ -109,20 +120,21 @@
 :root.perf-mode .ns-live,
 :root.perf-mode .tl-pulse { animation: none !important; }
 
-/* ===================== iOS HARDENING =====================
+/* ===================== MOBILE / iOS HARDENING =====================
    iOS WebKit caps per-tab GPU/IOSurface memory hard. backdrop-filter regions
    composited OVER the continuously-repainting Leaflet map each allocate a
    surface that re-renders every frame the map pans — a handful of them plus
    tiles exhausts the cap and WebKit kills the page. Strip every live blur on
    iOS unconditionally (independent of perf-mode / user toggles) and swap in an
-   opaque background so the panels stay legible. */
-:root.ios .hud-readout,
-:root.ios .map-legend,
-:root.ios .modal-scrim,
-:root.ios #cintel-ov,
-:root.ios .leaflet-popup-content-wrapper { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
-:root.ios .hud-readout { background: rgba(10,6,8,0.92) !important; }
-:root.ios .map-legend  { background: rgba(10,6,8,0.92) !important; }
+   opaque background so the panels stay legible. Applied to every phone and
+   tablet (.mobile, set by the device check in <head>), iOS included. */
+:root.mobile .hud-readout,
+:root.mobile .map-legend,
+:root.mobile .modal-scrim,
+:root.mobile #cintel-ov,
+:root.mobile .leaflet-popup-content-wrapper { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+:root.mobile .hud-readout { background: rgba(10,6,8,0.92) !important; }
+:root.mobile .map-legend  { background: rgba(10,6,8,0.92) !important; }
 
 * { box-sizing: border-box; }
 html, body {
@@ -3624,17 +3636,39 @@ function normalizeProfile(p) {
     });
   }
 
-  /* ---------- command line ---------- */
-  const CLI_MAX_LINES = 300;   // hard cap so a long session can't balloon the DOM
+  /* ---------- command line ----------
+     The console lives in memory only: nothing it prints or remembers is ever
+     written to storage, so it starts empty on every visit. Within a visit it
+     keeps the output of the last CLI_KEEP_COMMANDS commands (plus a hard line
+     cap for runaway output) and is wiped when the signed-in account changes. */
+  const CLI_KEEP_COMMANDS = 20;   // commands whose output stays on screen
+  const CLI_HISTORY = 20;         // commands recallable with the arrow keys
+  const CLI_MAX_LINES = 400;      // absolute cap, whatever the commands printed
+  function cliTrim(out) {
+    const cmds = out.querySelectorAll(":scope > .cli-line.cmd");
+    if (cmds.length > CLI_KEEP_COMMANDS) {
+      const keepFrom = cmds[cmds.length - CLI_KEEP_COMMANDS];
+      while (out.firstElementChild && out.firstElementChild !== keepFrom) out.removeChild(out.firstElementChild);
+    }
+    while (out.childElementCount > CLI_MAX_LINES) out.removeChild(out.firstElementChild);
+  }
   function cliPrint(text, cls) {
     const out = $("#cli-out");
     const line = document.createElement("div");
     line.className = "cli-line " + (cls || "sys");
     line.innerHTML = text;
     out.appendChild(line);
-    // trim oldest lines once over the cap (keeps memory + DOM bounded)
-    while (out.childElementCount > CLI_MAX_LINES) out.removeChild(out.firstElementChild);
+    cliTrim(out);
     out.scrollTop = out.scrollHeight;
+  }
+  let cliResetHistory = () => {};
+  /* new session: empty output, forget recalled commands, print the banner */
+  function cliNewSession() {
+    const out = $("#cli-out");
+    if (out) out.innerHTML = "";
+    cliResetHistory();
+    cliPrint("CyberSOC operator console v" + APP_VERSION, "head");
+    cliPrint("type 'help' to begin.", "sys");
   }
   function cliEcho(cmd) {
     cliPrint(`<span class="ci-prompt">soc@cybersoc:~$</span> ${escHtml(cmd)}`, "cmd");
@@ -4981,7 +5015,8 @@ function normalizeProfile(p) {
 
   function wireCLI() {
     const input = $("#cli-input");
-    const history = [];   // most-recent first, capped at 5
+    const history = [];   // most-recent first, capped at CLI_HISTORY — memory only
+    cliResetHistory = () => { history.length = 0; histIdx = -1; };
     let histIdx = -1;     // -1 = live (blank) line
     const caretEnd = () => requestAnimationFrame(() => { const n = input.value.length; try { input.setSelectionRange(n, n); } catch (e) {} });
 
@@ -4990,7 +5025,7 @@ function normalizeProfile(p) {
       const v = input.value;
       if (v.trim()) {
         runCommand(v);
-        if (history[0] !== v) { history.unshift(v); if (history.length > 5) history.pop(); }
+        if (history[0] !== v) { history.unshift(v); if (history.length > CLI_HISTORY) history.pop(); }
       }
       histIdx = -1;
       input.value = "";
@@ -5011,9 +5046,16 @@ function normalizeProfile(p) {
         caretEnd();
       }
     });
-    // boot banner
-    cliPrint("CyberSOC operator console v" + APP_VERSION, "head");
-    cliPrint("type 'help' to begin.", "sys");
+    // boot banner (fresh, empty console every visit)
+    cliNewSession();
+    // a different account must not see the previous one's console
+    let lastUid = Backend.state.user ? Backend.state.user.uid : null;
+    Backend.on("auth", (st) => {
+      const uid = st.user ? st.user.uid : null;
+      if (uid !== lastUid) { lastUid = uid; cliNewSession(); }
+    });
+    // a page restored from the back/forward cache is a new visit too
+    window.addEventListener("pageshow", (e) => { if (e.persisted) cliNewSession(); });
   }
 
   /* ---------- public init ---------- */
@@ -6208,15 +6250,23 @@ function normalizeProfile(p) {
       if (!s.radarMode) s.radarMode = DEFAULTS.radarMode;
       s.feeds = Object.assign({}, DEFAULTS.feeds, s.feeds || {}); // deep-merge feed flags
       s.tickerSources = Object.assign({}, DEFAULTS.tickerSources, s.tickerSources || {}); // deep-merge ticker source flags
-      // On iOS, default Performance Mode ON the first time (no stored value yet):
-      // it forces the GPU-heavy rotating radar + ambient animation off, which
-      // together with the iOS blur-stripping keeps WebKit from killing the tab.
-      // A returning user who explicitly set perfMode keeps their choice.
-      if (window.__IS_IOS__ && !("perfMode" in stored)) s.perfMode = true;
+      // Phones and tablets start EVERY visit in Performance Mode, whatever was
+      // saved: it turns off the radar, blur, high-resolution tiles and ambient
+      // animation that exhaust mobile browsers' graphics memory (iOS Safari
+      // kills the tab). It can be switched off for the current visit only.
+      if (window.__IS_MOBILE__) s.perfMode = true;
       return s;
-    } catch (e) { return Object.assign({}, DEFAULTS, { feeds: Object.assign({}, DEFAULTS.feeds), tickerSources: Object.assign({}, DEFAULTS.tickerSources) }); }
+    } catch (e) { return freshDefaults(); }
   }
-  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+  /* defaults for this device: Performance Mode on for phones and tablets */
+  function freshDefaults() {
+    return Object.assign({}, DEFAULTS, { feeds: Object.assign({}, DEFAULTS.feeds), tickerSources: Object.assign({}, DEFAULTS.tickerSources), perfMode: !!window.__IS_MOBILE__ });
+  }
+  function save() {
+    const out = Object.assign({}, state);
+    if (window.__IS_MOBILE__) delete out.perfMode;   // per-visit on mobile: never written, so the next visit starts protected again
+    try { localStorage.setItem(KEY, JSON.stringify(out)); } catch (e) {}
+  }
   function get(k) { return state[k]; }
   function tickerDuration() { return (74 - state.tickerSpeed * 11) + "s"; }
 
@@ -6361,7 +6411,9 @@ function normalizeProfile(p) {
          ${row("Auto-refresh", "How often the console re-syncs. Status RSS feeds are re-fetched at most every 5 minutes regardless", slider("refreshSec", 5, 300, 5, fmtDuration))}
          ${row("Clock", "Display time as Zulu (UTC) or this device's local timezone", segmented("clock", [{v:"zulu",l:"ZULU"},{v:"local",l:"LOCAL"}]))}
          ${row("Reduce motion", "Pause sweep, ticker and ambient animation", toggle("reduceMotion"))}
-         ${row("Performance mode", "Cut GPU load on slower machines \u2014 disables radar, blur effects and all ambient animation", toggle("perfMode"))}
+         ${row("Performance mode", window.__IS_MOBILE__
+           ? "Always on when a phone or tablet opens the console. Switching it off lasts until you reload \u2014 the radar, blur and animations can exhaust a mobile browser's memory"
+           : "Cut GPU load on slower machines \u2014 disables radar, blur effects and all ambient animation", toggle("perfMode"))}
        </div>
        <div class="set-section"><h3>DATA FEEDS</h3>
          <div class="set-desc" style="margin:-4px 0 14px">Sources this console loads. A source that is off is not fetched by this page, is left out of the alert feed and has no legend layer.</div>
@@ -6445,7 +6497,7 @@ function normalizeProfile(p) {
     const rb = wrap.querySelector("#set-reset");
     if (rb) rb.addEventListener("click", () => {
       if (!confirm("Reset all console settings to defaults?")) return;
-      state = Object.assign({}, DEFAULTS, { feeds: Object.assign({}, DEFAULTS.feeds), tickerSources: Object.assign({}, DEFAULTS.tickerSources) }); save(); applyAll(); render();
+      state = freshDefaults(); save(); applyAll(); render();
     });
   }
 
